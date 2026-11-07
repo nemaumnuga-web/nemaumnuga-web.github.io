@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>하늘함대 · Sky Fleet</title>
+<meta name="theme-color" content="#071012">
+<meta name="description" content="3D 공중전 · 채굴 · 교역 비행선 게임">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23071012'/><path d='M8 36h40l8-6-8-6H20l-6 6h-6z' fill='%2322d3d3'/></svg>">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-mode="loading">
+<canvas id="view"></canvas>
+
+<!-- ================= 로딩 ================= -->
+<section id="loading" class="screen">
+  <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+  <div class="ld-brand">AIRSHIP COMBAT · RED CANYON</div>
+  <h1 class="ld-title">하늘함대</h1>
+  <div class="ld-under"><b></b><i></i></div>
+  <ul class="ld-steps" id="ldSteps"></ul>
+  <div class="ld-game"><canvas id="skyrun"></canvas><div class="ld-gamehelp">SPACE / CLICK — LIFT · FLY THROUGH THE GATES, GRAB CREDITS <span id="srCr"></span></div></div>
+  <div class="ld-tip"><h4>PILOT TIP</h4><p id="ldTip"></p></div>
+  <div class="ld-bottom">
+    <div class="ld-phase" id="ldPhase">ASSEMBLING SHIP</div>
+    <div class="ld-sub">HULL · ENGINES · WEAPONS</div>
+    <div class="ld-bar" id="ldBar"></div>
+    <div class="ld-note">DO NOT CLOSE THE GAME · FIRST LAUNCH TAKES LONGER</div>
+    <div class="ld-pct" id="ldPct">0%</div>
+    <button class="btn big" id="ldGo" hidden>격납고 입장</button>
+  </div>
+  <aside class="ld-roster"><h5>이 하늘의 캡틴</h5><ol id="ldRoster"></ol></aside>
+</section>
+
+<!-- ================= 비행 HUD ================= -->
+<section id="hud">
+  <div class="panel" id="bp"><canvas id="bpc" width="360" height="130"></canvas><div class="hull" id="hullSeg"></div></div>
+  <div class="panel" id="cr"><span class="hex">C</span><b id="crv">0</b><small>CR</small></div>
+  <div id="radarBox"><canvas id="radar" width="440" height="440"></canvas><div class="rlabel" id="rlabel">레이더 · 600 M</div></div>
+  <div id="clock"><span id="clk">--:--</span><span class="pvp" id="pvpBadge" hidden>PvP</span></div>
+  <div class="panel" id="cargo">
+    <div class="ch"><span>화물칸</span><b id="cgKg">0 / 650 <small>킬로그램</small></b></div>
+    <div class="cbar"><i id="cgFill"></i><span class="cap"></span><em>한계</em></div>
+    <div class="cs"><span id="cgState">비어 있음 · 광석 근처에서 채굴하세요</span><b id="cgVal"></b></div>
+    <div id="cgList"></div>
+  </div>
+  <div id="banner"><h2 id="bnT"></h2><p id="bnS"></p><div class="bprog"><i id="bnP"></i></div></div>
+  <div id="markers"></div>
+  <div id="xhair"></div>
+  <div id="tbar"><div class="tn" id="tName"></div><div class="tb"><i id="tHp"></i></div><div class="td" id="tDist"></div></div>
+  <div id="feed"></div>
+  <div id="hint"></div>
+  <div id="hitmark">✕</div>
+  <div id="vign"></div>
+  <div id="keys">W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 클릭 사격 · E 채굴 · R 잠금 · F 미사일 · G 화물 투하 · M 지도 · Esc 마우스 해제</div>
+  <div id="touch">
+    <div class="tlabel" style="left:120px;bottom:330px">추진 · 회전</div>
+    <div id="joy"><i id="joyk"></i></div>
+    <button class="tbtn sq" id="tMap" style="left:24px;bottom:200px">맵<small>월드</small></button>
+    <button class="tbtn sq" id="tMis" style="left:24px;bottom:70px">미사일<small>장비</small></button>
+    <button class="tbtn rd" id="tDrop" style="right:300px;bottom:210px">드롭</button>
+    <button class="tbtn rd big" id="tAct" style="right:150px;bottom:60px">사격<small>탭</small></button>
+    <button class="tbtn rd" id="tLock" style="right:300px;bottom:70px">잠금<small>다음</small></button>
+    <button class="tbtn sq" id="tUp" style="right:24px;bottom:190px">▲<small>위로</small></button>
+    <button class="tbtn sq" id="tDn" style="right:24px;bottom:60px">▼<small>아래로</small></button>
+  </div>
+</section>
+
+<!-- ================= 항구 / 격납고 ================= -->
+<section id="port">
+  <div class="panel" id="pcr"><span class="hex">C</span><b id="pcrv">0</b><small>CR</small></div>
+  <div class="panel" id="pvpBox">
+    <small>PVP MODE</small>
+    <button id="pvpBtn">끄기</button>
+    <span>다른 캡틴과의 교전 허용</span>
+  </div>
+  <div class="panel" id="pShip"><small id="psTier">T1</small><b id="psName">드리프터</b><span id="psStat"></span></div>
+  <div class="pbar">
+    <div class="pinfo">
+      <div><small>포트</small><b id="pName">포트 앤톤</b></div>
+      <div class="rep"><small>평판</small><b id="rName">드리프터</b><span id="rXp">0 / 150</span><div class="rbar"><i id="rFill"></i></div></div>
+    </div>
+    <nav class="ptabs" id="ptabs">
+      <button data-tab="paint">페인트</button><button data-tab="inv">인벤토리</button><button data-tab="quest">퀘스트<i class="dot" id="qDot" hidden></i></button>
+      <button data-tab="upgrade">업그레이드</button><button data-tab="market">시장</button><button data-tab="yard">조선소</button>
+      <button data-tab="settings">설정</button>
+      <button class="leave" id="leave">항구를 떠나기</button>
+    </nav>
+  </div>
+  <div class="panel" id="ppanel" hidden><button class="x" id="ppx">✕</button><h3 id="ppT"></h3><div id="ppB"></div></div>
+</section>
+
+<div class="ov" id="dead"><div class="card"><h2 class="stencil red">SHIP DOWN</h2><p>격추당했습니다. <span id="deadInfo"></span></p><button class="btn big" id="deadGo">포트 앤톤으로 귀환</button></div></div>
+<div class="ov" id="mapOv"><div class="card wide"><button class="x" id="mapX">✕</button><h3>월드 지도</h3><canvas id="mapc" width="900" height="900"></canvas><p class="legend"><i class="lg port"></i>포트 <i class="lg ore"></i>광맥 <i class="lg pir"></i>해적 <i class="lg cap"></i>캡틴 <i class="lg me"></i>나</p></div></div>
+<div id="toast"></div>
+
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
