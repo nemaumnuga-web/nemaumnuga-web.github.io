@@ -107,10 +107,10 @@ const TURRET_SLOTS = [
   [[0, 2.15, -8.6], [0, 2.55, 11.2], [5.8, 2.0, 2], [-5.8, 2.0, 2]],
 ];
 export const MUZZLE = [[-0.45, 0, -5.4], [0.45, 0, -5.4]];
-export function makeShipModel(tier, paint, faction) {
+export function makeShipModel(tier, paint, faction, scaleMul = 1) {
   const mats = shipMats(paint, faction);
   const root = new THREE.Group(), model = new THREE.Group(); root.add(model);
-  const sc = TIERS[tier].scale; model.scale.setScalar(sc);
+  const sc = TIERS[tier].scale * scaleMul; model.scale.setScalar(sc);
   addProto(model, PROTOS[tier], mats);
   const turrets = TURRET_SLOTS[tier].map(p => {
     const t = new THREE.Group(); t.position.set(...p); addProto(t, TUR.base, mats);
@@ -124,8 +124,9 @@ export function makeShipModel(tier, paint, faction) {
 /* ---------- 함선 ---------- */
 const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _l = new THREE.Vector3(), _w = new THREE.Vector3();
 export class Ship {
-  constructor({ name, faction, tier = 0, paint = 'sand', lv = {}, pvp = false, isPlayer = false }) {
-    Object.assign(this, { name, faction, tier, paint, lv, pvp, isPlayer });
+  constructor({ name, faction, tier = 0, paint = 'sand', lv = {}, pvp = false, isPlayer = false, weapon = 'cannon', scaleMul = 1, hpMul = 1 }) {
+    Object.assign(this, { name, faction, tier, paint, lv, pvp, isPlayer, weapon, scaleMul, hpMul });
+    this.energy = 100; this.boosting = false; this.flareCd = 0;
     this.vel = new THREE.Vector3(); this.yaw = 0; this.yawVel = 0; this.bank = 0; this.pitchV = 0;
     this.cargo = {}; this.cargoKg = 0; this.alive = false; this.respawn = 0; this.kills = 0;
     this.inThrust = 0; this.inTurn = 0; this.inLift = 0; this.aim = null; this.lock = null; this.cdM = 0;
@@ -135,7 +136,7 @@ export class Ship {
   build(scene) {
     const parent = this.mesh && this.mesh.parent;
     if (this.mesh && parent) parent.remove(this.mesh);
-    const m = makeShipModel(this.tier, this.paint, this.faction);
+    const m = makeShipModel(this.tier, this.paint, this.faction, this.scaleMul);
     this.mesh = m.root; this.model = m.model; this.turrets = m.turrets; this.radar = m.radar;
     if (this.isPlayer) {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(16 * TIERS[this.tier].scale, 0.18, 6, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 3.5, 3.6), toneMapped: false, transparent: true, opacity: 0.85 }));
@@ -150,28 +151,31 @@ export class Ship {
   stats() {
     const T = TIERS[this.tier], l = this.lv;
     const g = k => l[k] || 0;
-    this.maxHp = Math.round(T.hp * (1 + 0.22 * g('armor')));
+    this.maxHp = Math.round(T.hp * (1 + 0.22 * g('armor')) * (this.hpMul || 1));
     this.maxSpeed = T.speed * (1 + 0.07 * g('engine')); this.accel = T.accel * (1 + 0.07 * g('engine')); this.turnRate = T.turn * (1 + 0.06 * g('engine'));
     this.cargoCap = Math.round(T.cargo * (1 + 0.2 * g('cargo')));
     this.drill = 1.3 * (1 + 0.5 * g('drill'));
     this.gunDmg = 2.2 + 0.9 * g('guns'); this.gunRate = 2.4 + 0.6 * g('guns');
     this.misDmg = 40 + 15 * g('missile'); this.misCd = Math.max(2.5, 6 - 0.6 * g('missile'));
-    this.radius = 16 * T.scale; this.hover = 7 * T.scale;
+    this.radius = 16 * this.scale; this.hover = 7 * this.scale;
     if (this.hp === undefined || this.hp > this.maxHp) this.hp = this.maxHp;
   }
-  get scale() { return TIERS[this.tier].scale; }
+  get scale() { return TIERS[this.tier].scale * (this.scaleMul || 1); }
   spawnAt(x, y, z, yaw) {
     this.pos.set(x, y, z); this.vel.set(0, 0, 0); this.yaw = yaw; this.yawVel = 0; this.hp = this.maxHp; this.alive = true; this.mesh.visible = true;
-    this.cargo = {}; this.cargoKg = 0; this.lock = null; this.cdM = 1;
+    this.cargo = {}; this.cargoKg = 0; this.lock = null; this.cdM = 1; this.energy = 100; this.flareCd = 0;
     this.mesh.rotation.set(0, yaw, 0); this.mesh.updateMatrixWorld(true);
   }
   fwd(out) { return out.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)); }
   world(x, y, z, out) { return this.model.localToWorld(out.set(x, y, z)); }
   get speed() { return Math.hypot(this.vel.x, this.vel.z); }
   physics(dt, onImpact) {
-    const load = this.cargoKg / Math.max(1, this.cargoCap), vmax = this.maxSpeed * (1 - 0.3 * clamp(load, 0, 1.2));
+    const load = this.cargoKg / Math.max(1, this.cargoCap); let vmax = this.maxSpeed * (1 - 0.3 * clamp(load, 0, 1.2)), acc = this.accel;
+    const boost = this.boosting && this.energy > 1 && this.inThrust > 0.2;
+    if (boost) { vmax *= 1.65; acc *= 2.4; this.energy = Math.max(0, this.energy - 28 * dt); } else this.energy = Math.min(100, this.energy + 13 * dt);
+    this.boostOn = boost; this.flareCd -= dt;
     this.fwd(_f); _r.set(-_f.z, 0, _f.x);
-    this.vel.addScaledVector(_f, this.inThrust * this.accel * dt);
+    this.vel.addScaledVector(_f, this.inThrust * acc * dt);
     this.vel.y += this.inLift * this.accel * 0.9 * dt;
     // 감쇠: 옆미끄럼 강하게, 전진 약하게
     const fw = this.vel.dot(_f), sd = this.vel.dot(_r);

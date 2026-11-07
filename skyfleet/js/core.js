@@ -152,8 +152,26 @@ export function addProto(parent, proto, mats, shadowKeys = { hull: 1, armor: 1, 
 }
 
 /* ---------- 소리 ---------- */
-let ac = null;
+let ac = null, muted = false, eng = null;
+export function setMute(m) { muted = m; if (eng) eng.g.gain.value = 0; }
+// 엔진 소리: 톱니파 2개 + 저역 필터, 속도에 따라 음높이·볼륨 변화
+export function engineSound(level, boost, on) {
+  try {
+    if (muted || !on) { if (eng) eng.g.gain.setTargetAtTime(0, ac.currentTime, 0.1); return; }
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
+    if (!eng) {
+      const g = ac.createGain(); g.gain.value = 0; const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380; f.connect(g); g.connect(ac.destination);
+      const o1 = ac.createOscillator(), o2 = ac.createOscillator(); o1.type = 'sawtooth'; o2.type = 'sawtooth'; o1.connect(f); o2.connect(f); o1.start(); o2.start();
+      eng = { g, f, o1, o2 };
+    }
+    const t = ac.currentTime, base = 42 + level * 38 + (boost ? 26 : 0);
+    eng.o1.frequency.setTargetAtTime(base, t, 0.15); eng.o2.frequency.setTargetAtTime(base * 1.505, t, 0.15);
+    eng.f.frequency.setTargetAtTime(300 + level * 500 + (boost ? 600 : 0), t, 0.2);
+    eng.g.gain.setTargetAtTime(0.018 + level * 0.025 + (boost ? 0.02 : 0), t, 0.2);
+  } catch (e) {}
+}
 export function sfx(kind, vol = 1) {
+  if (muted) return;
   try {
     ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
     const t = ac.currentTime, g = ac.createGain(); g.connect(ac.destination);

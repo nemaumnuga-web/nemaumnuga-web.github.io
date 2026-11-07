@@ -38,6 +38,8 @@ const stars = (() => {
   scene.add(m); return m;
 })();
 
+export const WEATHER = { storm: 0, target: 0, timer: 200, wind: new THREE.Vector3(1, 0, 0.3).normalize(), onChange: null };
+const STORM_COL = new THREE.Color(0xb98556);
 export const DAY = { tod: 0.4, len: 480, light: 1, night: 0, label: '' };
 const FOG_DAY = new THREE.Color(0xcbb79e), FOG_SET = new THREE.Color(0xd98d5f), FOG_NIGHT = new THREE.Color(0x0c1220);
 export const envMats = [];   // 밤에 환경광 세기를 줄일 재질들
@@ -288,6 +290,22 @@ const FOG_LIN = new THREE.Color();
 export function updateWorld(dt, focus) {
   DAY.tod = (DAY.tod + dt / DAY.len * (DAY.night > 0.5 ? 1.8 : 1)) % 1;
   applyDay(false);
+  // 모래폭풍
+  WEATHER.timer -= dt;
+  if (WEATHER.timer <= 0) {
+    if (WEATHER.target > 0) { WEATHER.target = 0; WEATHER.timer = rand(240, 420); }
+    else { WEATHER.target = 1; WEATHER.timer = rand(70, 110); WEATHER.wind.set(rand(-1, 1), 0, rand(-1, 1)).normalize(); }
+    if (WEATHER.onChange) WEATHER.onChange(WEATHER.target > 0);
+  }
+  WEATHER.storm += (WEATHER.target - WEATHER.storm) * Math.min(1, dt * 0.25);
+  const st = WEATHER.storm;
+  FOG.near = lerp(1500, 90, st); FOG.far = lerp(7800, 1100, st);
+  if (st > 0.01) {
+    FOG.color.lerp(STORM_COL.clone().multiplyScalar(lerp(0.12, 1, DAY.light)), st * 0.85);
+    const n = Math.round(30 * st * Q.fx), w = WEATHER.wind;
+    for (let i = 0; i < n; i++) { const x = camera.position.x + rand(-260, 260), y = camera.position.y + rand(-80, 80), z = camera.position.z + rand(-260, 260);
+      SMOKE.emit(x, y, z, w.x * 70 + rand(-10, 10), rand(-4, 4), w.z * 70 + rand(-10, 10), rand(2, 3.5), rand(18, 30), rand(40, 70), [0.75, 0.55, 0.36], [0.68, 0.5, 0.33], 0.22 * st); }
+  }
   sky.position.copy(camera.position); stars.position.copy(camera.position);
   if (focus) { sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 1800); moon.target.position.copy(focus); moon.position.copy(focus).addScaledVector(SUN_DIR, -1800); }
   flash.intensity *= Math.exp(-dt * 7);

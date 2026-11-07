@@ -37,7 +37,7 @@
 
 <!-- ================= 비행 HUD ================= -->
 <section id="hud">
-  <div class="panel" id="bp"><canvas id="bpc" width="360" height="130"></canvas><div class="hull" id="hullSeg"></div></div>
+  <div class="panel" id="bp"><canvas id="bpc" width="360" height="130"></canvas><div class="hull" id="hullSeg"></div><div class="en"><i id="enFill"></i></div><div class="bpi"><span>부스트 에너지</span><span id="flareT">플레어 준비</span></div></div>
   <div class="panel" id="cr"><span class="hex">C</span><b id="crv">0</b><small>CR</small></div>
   <div id="radarBox"><canvas id="radar" width="440" height="440"></canvas><div class="rlabel" id="rlabel">레이더 · 600 M</div></div>
   <div id="clock"><span id="clk">--:--</span><span class="pvp" id="pvpBadge" hidden>PvP</span></div>
@@ -52,10 +52,13 @@
   <div id="xhair"></div>
   <div id="tbar"><div class="tn" id="tName"></div><div class="tb"><i id="tHp"></i></div><div class="td" id="tDist"></div></div>
   <div id="feed"></div>
+  <div id="evbar"><div class="evt"><span class="evtag">⚑ 이벤트 · 지금 진행 중</span> 해적 기함 「고르곤」</div><div class="evb"><i id="evHp"></i></div><div class="evi" id="evInfo"></div></div>
+  <div id="mwarn"></div>
+  <div id="dmgn"></div>
   <div id="hint"></div>
   <div id="hitmark">✕</div>
   <div id="vign"></div>
-  <div id="keys">W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 클릭 사격 · E 채굴 · R 잠금 · F 미사일 · G 화물 투하 · M 지도 · Esc 마우스 해제</div>
+  <div id="keys">W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 클릭 사격 · X 부스트 · C 플레어 · E 채굴 · R 잠금 · F 미사일 · G 투하 · M 지도 · Tab 순위 · Esc 마우스 해제</div>
   <div id="touch">
     <div class="tlabel" style="left:120px;bottom:330px">추진 · 회전</div>
     <div id="joy"><i id="joyk"></i></div>
@@ -64,6 +67,9 @@
     <button class="tbtn rd" id="tDrop" style="right:300px;bottom:210px">드롭</button>
     <button class="tbtn rd big" id="tAct" style="right:150px;bottom:60px">사격<small>탭</small></button>
     <button class="tbtn rd" id="tLock" style="right:300px;bottom:70px">잠금<small>다음</small></button>
+    <button class="tbtn rd" id="tBoost" style="right:170px;bottom:250px">부스트<small>누르기</small></button>
+    <button class="tbtn rd" id="tFlare" style="right:420px;bottom:140px">플레어<small>회피</small></button>
+    <button class="tbtn sq" id="tBoard" style="left:24px;bottom:330px">순위<small>점수</small></button>
     <button class="tbtn sq" id="tUp" style="right:24px;bottom:190px">▲<small>위로</small></button>
     <button class="tbtn sq" id="tDn" style="right:24px;bottom:60px">▼<small>아래로</small></button>
   </div>
@@ -95,6 +101,7 @@
 
 <div class="ov" id="dead"><div class="card"><h2 class="stencil red">SHIP DOWN</h2><p>격추당했습니다. <span id="deadInfo"></span></p><button class="btn big" id="deadGo">포트 앤톤으로 귀환</button></div></div>
 <div class="ov" id="mapOv"><div class="card wide"><button class="x" id="mapX">✕</button><h3>월드 지도</h3><canvas id="mapc" width="900" height="900"></canvas><p class="legend"><i class="lg port"></i>포트 <i class="lg ore"></i>광맥 <i class="lg pir"></i>해적 <i class="lg cap"></i>캡틴 <i class="lg me"></i>나</p></div></div>
+<div class="ov" id="board"><div class="card wide"><h3>순위표</h3><div id="boardB"></div><p class="legend">PC: Tab 키를 누르고 있는 동안 표시</p></div></div>
 <div id="toast"></div>
 
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>

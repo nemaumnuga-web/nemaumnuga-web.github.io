@@ -185,3 +185,23 @@ input[type=range]{accent-color:var(--teal);width:100%}
 .lg{display:inline-block;width:10px;height:10px;margin-right:-8px}.lg.port{background:var(--teal)}.lg.ore{background:#d9783a;transform:rotate(45deg)}.lg.pir{background:var(--red);border-radius:50%}.lg.cap{background:#9fb0b4;border-radius:50%}.lg.me{background:#fff}
 #toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
 #toast div{background:rgba(4,8,9,.9);border-left:3px solid var(--teal);padding:8px 18px;font-size:15px;animation:fd 3.2s forwards}
+
+/* ---------- 업그레이드 추가 요소 ---------- */
+.en{height:6px;background:rgba(255,255,255,.08);margin-top:8px}.en i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#2b7cff,#5fd0ff);transition:width .1s}.en i.on{background:linear-gradient(90deg,#5fd0ff,#fff);box-shadow:0 0 8px #5fd0ff}
+.bpi{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:4px}
+#evbar{position:fixed;left:50%;top:48px;transform:translateX(-50%);width:min(520px,60vw);background:rgba(20,6,4,.82);border:1px solid rgba(255,74,58,.6);padding:8px 14px;display:none;text-align:center}
+.evt{font-size:14px;font-weight:800}.evtag{background:var(--red);color:#fff;padding:1px 8px;margin-right:6px;font-size:12px}
+.evb{height:8px;background:rgba(255,255,255,.15);margin:6px 0 4px}.evb i{display:block;height:100%;background:linear-gradient(90deg,#ff4a3a,#ffb347)}
+.evi{font-family:var(--num);font-size:11px;color:#ffd0c8}
+#evbar ~ #tbar{top:120px}
+#mwarn{position:fixed;left:50%;top:30%;transform:translateX(-50%);color:#fff;background:rgba(200,30,20,.75);padding:6px 18px;font-weight:800;display:none;animation:blink .5s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+#dmgn{position:fixed;inset:0;pointer-events:none}
+.dn{position:absolute;transform:translate(-50%,-50%);font-family:var(--num);font-weight:900;font-size:15px;color:#fff;text-shadow:0 0 4px #000,0 1px 2px #000}
+.dn.big{font-size:22px;color:#7ff3ff}
+#board .card{max-height:80vh;overflow:auto}
+#board table{width:100%;border-collapse:collapse;font-size:14px;text-align:left}
+#board th{color:var(--dim);font-weight:500;padding:6px;border-bottom:1px solid var(--line)}
+#board td{padding:6px;border-bottom:1px solid rgba(255,255,255,.06)}
+#board tr.me{background:rgba(34,211,211,.15)}
+@media (max-width:900px){#tBoost{right:130px!important;bottom:200px!important}#tFlare{right:300px!important;bottom:120px!important}#tBoard{bottom:280px!important}}

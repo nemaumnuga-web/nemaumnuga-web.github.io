@@ -18,6 +18,11 @@ export const MODS = {
   cargo:   { ic: '📦', nm: '화물칸 확장', max: 5, base: 180, ds: l => `적재량 +${l * 20}%` },
   drill:   { ic: '⛏️', nm: '채굴 레이저', max: 5, base: 160, ds: l => `채굴 속도 ×${(1 + l * 0.5).toFixed(1)}` },
 };
+export const WEAPONS = {
+  cannon: { nm: '기관포', ic: '🔫', cost: 0, dmg: 1, rate: 1, speed: 680, spread: 1, life: 1.15, pellets: 1, barrels: 2, err: 0.25, ds: '균형 잡힌 연사형 주포 · 사거리 780m' },
+  flak:   { nm: '플랙포', ic: '💥', cost: 1800, dmg: 0.45, rate: 0.55, speed: 560, spread: 5, life: 0.7, pellets: 4, barrels: 2, err: 0.35, ds: '근거리 산탄 · 가까울수록 강력 · 사거리 390m' },
+  rail:   { nm: '레일건', ic: '⚡', cost: 4500, dmg: 9, rate: 0.2, speed: 1500, spread: 0.15, life: 0.75, pellets: 1, barrels: 1, err: 0.12, ds: '초고속 정밀탄 · 한 방이 강력 · 사거리 1,100m' },
+};
 export const modCost = (k, lv, tier) => Math.round(MODS[k].base * (lv + 1) * (1 + tier * 0.6));
 
 export const ORES = {
@@ -65,7 +70,7 @@ export const TIPS = [
 const KEY = 'skyfleet_save_v2';
 function freshShip(tier) { return { tier, lv: { guns: 0, missile: tier >= 1 ? 1 : 0, armor: 0, engine: 0, cargo: 0, drill: 0 } }; }
 export function defaultSave() {
-  return { credits: 300, xp: 0, ships: [freshShip(0)], active: 0, paint: 'sand', pvp: false, storage: {}, prices: {}, quests: [], stats: { kills: 0, mined: 0, deaths: 0 }, skyrunBest: 0 };
+  return { credits: 300, xp: 0, ships: [freshShip(0)], active: 0, paint: 'sand', pvp: false, storage: {}, prices: {}, quests: [], stats: { kills: 0, mined: 0, deaths: 0, bosses: 0 }, skyrunBest: 0, weapons: ['cannon'], mute: false };
 }
 export let save = defaultSave();
 export function loadSave() {
