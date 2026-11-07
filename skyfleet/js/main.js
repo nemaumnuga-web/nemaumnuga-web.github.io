@@ -3,7 +3,7 @@ import { THREE, $, rand, pick, clamp, lerp, wrap, fmt, isTouch, QUALITY, camera,
 import { TIERS, MODS, modCost, ORES, RAR_COL, RANKS, rankOf, PAINTS, TIPS, CAPTAIN_NAMES, PIRATE_NAMES, WORLD, save, loadSave, persist, activeShip, ownsTier, buyTier, refillQuests, makeQuest, questProgress, priceOf, driftPrices, WEAPONS, MODULES, CHAPTERS, INTRO, ENDING, REGIONS, ownsLevel } from './data.js';
 import { scene, buildWorld, updateWorld, terrainH, groundAt, ports, ores, depleteOre, nearestPort, homePort, DAY, FIRE, SMOKE, WEATHER, islands, islandAt, WRECKS, surfaceBelow } from './world.js';
 import { Ship, blinkNav, makeShipModel } from './ships.js';
-import { initSolare, say as solSay, event as solEvent, tickSolare, chatOpen, toggleChat } from './solare.js';
+import { initSolare, say as solSay, event as solEvent, tickSolare, chatOpen, toggleChat, agentUpdate, agentPause, agentReset, agentOn, agentState, setPermUI, refreshSolUI, cfg as solCfg, setLLM, llmText, permName, permDesc, PERM_NAMES } from './solare.js';
 import { S, explode, fireTurrets, fireMissile, updateBullets, updateMissiles, spawnDebris, updateDebris, dropCrate, updateCrates, mineBeam, shipFx, clearFx, dropFlares, incoming, updateFlares, shieldFx } from './fx.js';
 import { runAI } from './ai.js';
 import { hscene, hcam, buildHangar, setHangarShip, updateHangar } from './hangar.js';
@@ -45,7 +45,7 @@ function tickLoading() {
 }
 async function boot() {
   progress('INITIALIZING RENDERER', 0.06); await frameYield(); await sleep(250);
-  progress('LOADING PILOT PROFILE', 0.14); loadSave(); setMute(!!save.mute); $('ldRoster').innerHTML = CAPTAIN_NAMES.slice(0, 12).map(n => `<li>${n}</li>`).join(''); await sleep(250);
+  progress('LOADING PILOT PROFILE', 0.14); loadSave(); setMute(!!save.mute); refreshSolUI(); $('ldRoster').innerHTML = CAPTAIN_NAMES.slice(0, 12).map(n => `<li>${n}</li>`).join(''); await sleep(250);
   await buildWorld(progress);
   progress('ASSEMBLING SHIP', 0.78); await frameYield();
   buildHangar(); setHangarShip(activeShip().tier, save.paint); buildMapImage(); await frameYield();
@@ -253,7 +253,7 @@ function updatePlayer(dt) {
   p.inThrust = clamp(ky - inp.jy * 1.1, -1, 1);
   p.inLift = ((key[' '] || inp.up) ? 1 : 0) - ((key.shift || key.q || inp.dn) ? 1 : 0);
   const manual = kx || ky || p.inLift || Math.abs(inp.jx) > 0.15 || Math.abs(inp.jy) > 0.15;
-  if (AP.on && manual) { AP.on = false; solSay('수동 조종으로 전환했어요.'); }
+  if (AP.on && manual) { if (AP.src === 'user') { AP.on = false; solSay('수동 조종으로 전환했어요.'); } else { AP.on = false; agentPause(6); } }
   // 카메라 방향 조종: 함선이 카메라가 보는 쪽으로 선회하고, 시선 높이로 고도를 맞춤
   if (camSteerOn() && !kx && Math.abs(inp.jx) < 0.25 && (Math.abs(p.inThrust) > 0.05 || p.speed > 12)) {
     p.inTurn = clamp(wrap(cam.yaw - p.yaw) * 2.6, -1, 1);
@@ -271,7 +271,7 @@ function updatePlayer(dt) {
   if (WRECKS.some(w => Math.hypot(w.x - p.pos.x, w.z - p.pos.z) < 380)) { story('wreck', 1); solEvent('wreck', 1, 300); }
   if (islands.some(I => Math.hypot(I.x - p.pos.x, I.z - p.pos.z) < I.r + 200)) solEvent('island', 1, 400);
   const inc = incoming(p); if (inc && inc < 800) solEvent('missile', 2, 15);
-  const act = inp.act, wantMine = (key.e || (act && nearNode)) && nearNode;
+  const act = inp.act, wantMine = (key.e || (act && nearNode)) && nearNode;   // AP 채굴은 autopilot()에서 처리
   hintMsg = '';
   if (nearNode) {
     const o = ORES[nearNode.type];
@@ -456,7 +456,7 @@ $('mapOv').onclick = e => { if (e.target.id === 'mapOv') $('mapOv').classList.re
 
 /* ================= 항구 / 격납고 ================= */
 function enterHangar(port) {
-  dockPort = port; setMode('hangar'); $('ppanel').hidden = true;
+  dockPort = port; setMode('hangar'); $('ppanel').hidden = true; AP.on = false;
   if (aiDirty) spawnAll();
   setHangarShip(activeShip().tier, save.paint); refreshPort();
   for (const b of document.querySelectorAll('#ptabs button[data-tab]')) b.classList.remove('on');
@@ -552,8 +552,11 @@ function openTab(tab) {
     B.querySelectorAll('[data-un]').forEach(el => el.onclick = () => { a.mods = a.mods.filter(x => x !== el.dataset.un); re(); });
   } else if (tab === 'settings') {
     T('설정');
-    B.innerHTML = `<div class="kv" style="align-items:center"><span>그래픽 품질</span><select class="sel" id="qSel"><option value="high">높음</option><option value="mid">보통</option><option value="low">낮음</option></select><span>AI 함선 수 <b id="aiv">${aiCount()}</b>척</span><input type="range" id="aiR" min="20" max="40" step="2" value="${aiCount()}"><span>소리</span><button class="btn ghost" id="muteB">${save.mute ? '꺼짐 — 켜기' : '켜짐 — 끄기'}</button><span>카메라 방향 조종</span><button class="btn ghost" id="csB">${save.camSteer !== false ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><span>스토리</span><button class="btn ghost" id="introB">인트로 다시 보기</button><span>저장 초기화</span><button class="btn red" id="rst">모두 지우기</button></div><p style="color:var(--dim);font-size:12px;margin-top:16px">조작: W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 마우스 시점(클릭하면 고정) · 클릭 사격 · E 채굴 · R 잠금 · F 미사일 · X 부스트 · C 플레어 · G 화물 투하 · M 지도 · Tab 순위</p>`;
+    B.innerHTML = `<div class="kv" style="align-items:center"><span>그래픽 품질</span><select class="sel" id="qSel"><option value="high">높음</option><option value="mid">보통</option><option value="low">낮음</option></select><span>AI 함선 수 <b id="aiv">${aiCount()}</b>척</span><input type="range" id="aiR" min="20" max="40" step="2" value="${aiCount()}"><span>소리</span><button class="btn ghost" id="muteB">${save.mute ? '꺼짐 — 켜기' : '켜짐 — 끄기'}</button><span>솔라레 목소리</span><button class="btn ghost" id="voB">${solCfg().voice ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><span>AI 대화 (Qwen3 0.6B)</span><div><button class="btn ghost" id="llmB">${solCfg().llm ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><div style="font-size:12px;color:var(--dim);margin-top:6px" id="solLLMStat">${llmText()}</div></div><span>자율 권한</span><div><select class="sel" id="permS">${PERM_NAMES.map((n, i) => `<option value="${i}" ${solCfg().perm === i ? 'selected' : ''}>${i} · ${n}</option>`).join('')}</select><div style="font-size:12px;color:var(--dim);margin-top:6px">${permDesc(solCfg().perm)}</div></div><span>카메라 방향 조종</span><button class="btn ghost" id="csB">${save.camSteer !== false ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><span>스토리</span><button class="btn ghost" id="introB">인트로 다시 보기</button><span>저장 초기화</span><button class="btn red" id="rst">모두 지우기</button></div><p style="color:var(--dim);font-size:12px;margin-top:16px">조작: W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 마우스 시점(클릭하면 고정) · 클릭 사격 · E 채굴 · R 잠금 · F 미사일 · X 부스트 · C 플레어 · G 화물 투하 · M 지도 · Tab 순위</p>`;
     $('qSel').value = QUALITY; $('qSel').onchange = e => { try { localStorage.setItem('skyfleet_q', e.target.value); } catch (er) {} location.reload(); };
+    $('voB').onclick = () => { solCfg().voice = !solCfg().voice; persist(); openTab('settings'); };
+    $('llmB').onclick = () => { setLLM(!solCfg().llm); openTab('settings'); };
+    $('permS').onchange = e => { setPermUI(+e.target.value); $('solPerm').textContent = `권한 ${permName()}`; openTab('settings'); };
     $('csB').onclick = () => { save.camSteer = save.camSteer === false; persist(); openTab('settings'); };
     $('introB').onclick = () => { $('ppanel').hidden = true; const port = dockPort; playIntro(() => enterHangar(port)); };
     $('muteB').onclick = () => { save.mute = !save.mute; setMute(save.mute); persist(); openTab('settings'); };
@@ -570,7 +573,7 @@ function launch() {
   player.spawnAt(p.x, p.deck + player.hover + 2, p.z, yaw);
   cam.yaw = yaw; cam.pitch = 0.3; cam.last = 0;
   camera.position.set(p.x + Math.sin(yaw) * 90, p.deck + 50, p.z + Math.cos(yaw) * 90);
-  launchT = 2.6; docking = 0; $('ppanel').hidden = true;
+  launchT = 2.6; docking = 0; $('ppanel').hidden = true; AP.on = false; agentReset();
   setMode('fly');
   banner('LAUNCH', DAY.night > 0.5 ? '야간 비행입니다, 캡틴 · 착륙장 조명을 따라 귀환하세요' : '맑은 하늘입니다, 캡틴', 3.2);
   sfx('ui'); story('launch', 1); setTimeout(() => solEvent(DAY.night > 0.5 ? 'night' : 'launch', 1, 5), 1200);
@@ -621,41 +624,118 @@ function updateIntroCam(dt) {
   camera.position.set(Math.cos(introCam) * r, h + Math.sin(introCam * 2) * 80, Math.sin(introCam) * r);
   camera.lookAt(300, 380, -500); camera.fov = 55; camera.updateProjectionMatrix();
 }
-// 자동 비행 (솔라레)
-const AP = { on: false, x: 0, y: 0, z: 0, label: '', kind: '' };
-function setAP(x, y, z, label, kind) { Object.assign(AP, { on: true, x, y, z, label, kind }); }
+// 자동 비행 (솔라레). 사용자 명령(src=user)과 자율 에이전트(src=agent)가 같이 쓴다
+const AP = { on: false, x: 0, y: 0, z: 0, label: '', kind: '', src: 'user', target: null, node: null };
+function setAP(x, y, z, label, kind, src = 'user') { Object.assign(AP, { on: true, x, y, z, label, kind, src, target: null, node: null }); }
+let shipSeq = 0; const sid = s => s._id || (s._id = ++shipSeq);
 function autopilot(p, dt) {
+  // 전투: 목표 주위를 300m 거리로 돌며 잠금·사격
+  if (AP.kind === 'fight') {
+    const t = AP.target;
+    if (!t || !t.alive || !S.hooks.hostile(p, t)) { AP.on = false; if (AP.src === 'agent') agentReset(); return; }
+    const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, dist = Math.hypot(dx, dz), d = wrap(Math.atan2(-dx, -dz) - p.yaw);
+    const want = (t.faction === 'pirate' ? 300 : 340) * (t.scale || 1);
+    p.inTurn = clamp(d * 2.4, -1, 1);
+    p.inThrust = clamp((dist - want) / 140, -0.7, 1) * Math.max(0.25, Math.cos(d));
+    p.inLift = clamp((t.pos.y + 50 - p.pos.y) / 30, -1, 1);
+    p.boosting = dist > 1100 && Math.abs(d) < 0.3;
+    if (dist < p.lockRange) p.lock = t;
+    if (p.lock === t && dist > 220 && dist < 1100 && p.cdM <= 0 && p.lv.missile > 0 && Math.random() < dt * 0.5) fireMissile(p, t);
+    return;
+  }
+  // 광맥: 도착하면 자동 채굴
+  if (AP.kind === 'ore' && AP.node && !AP.node.alive) { AP.on = false; if (AP.src === 'agent') agentReset(); return; }
   const dx = AP.x - p.pos.x, dz = AP.z - p.pos.z, dist = Math.hypot(dx, dz);
   const want = Math.atan2(-dx, -dz), d = wrap(want - p.yaw);
-  p.inTurn = clamp(d * 2, -1, 1);
+  p.inTurn = clamp(d * 2.2, -1, 1);
   const slow = AP.kind === 'port' ? 70 : 50;
   p.inThrust = dist > slow ? clamp(dist / 200, 0.25, 1) * Math.max(0.2, Math.cos(d)) : -clamp(p.speed / 15, 0, 0.8);
   p.boosting = dist > 900 && Math.abs(d) < 0.3;
   const ax = p.pos.x + p.vel.x * 2.5, az = p.pos.z + p.vel.z * 2.5;
-  const cruise = Math.max(groundAt(ax, az), groundAt(p.pos.x, p.pos.z)) + 70 * p.scale;
+  const cruise = Math.max(surfaceBelow(ax, p.pos.y, az), surfaceBelow(p.pos.x, p.pos.y, p.pos.z)) + 70 * p.scale;
   const wantY = dist > 250 ? Math.max(AP.y + 60, cruise) : Math.max(AP.y, groundAt(p.pos.x, p.pos.z) + p.hover + 4);
   p.inLift = clamp((wantY - p.pos.y) / 25, -1, 1);
-  if (dist < 40 && AP.kind === 'ore') { AP.on = false; solSay('도착했어요! E를 길게 눌러 채굴하세요.', 'happy'); }
-  if (dist < 25 && AP.kind === 'port' && p.pos.y - AP.y < 20) { /* 도킹은 자동으로 진행됨 */ }
+  if (AP.kind === 'ore' && dist < 45 && AP.node && AP.node.alive) { S.hooks.mine(p, AP.node, dt); mineBeam(p, AP.node); p.mining = true; }
+  if (dist < 40 && AP.kind === 'ore' && AP.src === 'user') { AP.on = false; solSay('도착했어요! E를 길게 누르면 채굴돼요.', 'happy'); }
+  if (dist < 60 && (AP.kind === 'island' || AP.kind === 'wreck') && AP.src === 'user') { AP.on = false; solSay(AP.kind === 'island' ? '부유섬 위에 도착했어요.' : '난파선에 도착했어요. 잔해를 살펴보세요.', 'calm'); }
+}
+function goalFromAgent(g) {
+  const p = player; if (!p || !p.alive) return;
+  if (g.kind === 'fight') { AP.target = g.target; setAP(g.target.pos.x, g.target.pos.y, g.target.pos.z, g.target.name, 'fight', 'agent'); AP.target = g.target; return; }
+  if (g.kind === 'ore') {
+    let best = null, bd = 1e9; for (const o of ores) { if (!o.alive) continue; const d = Math.hypot(o.x - p.pos.x, o.z - p.pos.z); if (d < bd) { bd = d; best = o; } }
+    if (!best) return; setAP(best.x, best.y + 30 * p.scale, best.z, ORES[best.type].nm, 'ore', 'agent'); AP.node = best; return;
+  }
+  if (g.kind === 'port') { const [pt] = nearestPort(p.pos); setAP(pt.x, pt.deck + p.hover + 6, pt.z, pt.def.nm, 'port', 'agent'); return; }
+  if (g.kind === 'island') { let b = null, bd = 1e9; for (const I of islands) { const d = Math.hypot(I.x - p.pos.x, I.z - p.pos.z); if (d < bd) { bd = d; b = I; } } if (b) setAP(b.x, b.y + 80, b.z, '부유섬', 'island', 'agent'); return; }
+  if (g.kind === 'wreck') { let b = null, bd = 1e9; for (const w of WRECKS) { const d = Math.hypot(w.x - p.pos.x, w.z - p.pos.z); if (d < bd) { bd = d; b = w; } } if (b) setAP(b.x, b.y + 60, b.z, '난파선', 'wreck', 'agent'); return; }
+}
+const oreTotalKg = () => Object.entries(save.storage).reduce((a, [k, n]) => a + n * ORES[k].kg, 0);
+function solSnap() {
+  const p = player, list = S.ships.filter(s => s.alive && S.hooks.hostile(p, s)).map(s => ({ ship: s, dist: s.pos.distanceTo(p.pos) })).sort((a, b) => a.dist - b.dist);
+  const h = list[0] ? { ship: list[0].ship, dist: list[0].dist, name: list[0].ship.name } : null;
+  const ch = CHAPTERS[save.story.ch], mission = ch && !save.story.done ? { id: ch.id, need: ch.need, have: save.story.have, nm: ch.nm } : null;
+  const a = activeShip(), T = TIERS[a.tier];
+  const ownedUnequipped = save.modules.some(id => !a.mods.includes(id)) && a.mods.length < T.slots;
+  return { alive: p.alive, mode, hpPct: p.hp / p.maxHp, shieldPct: p.shBroken > 0 ? 0 : p.shield / Math.max(1, p.maxShield), shBroken: p.shBroken > 0,
+    cargoPct: p.cargoKg / Math.max(1, p.cargoCap), cargoKg: p.cargoKg, storageKg: oreTotalKg(), incomingMissile: incoming(p), flareReady: p.flareCd <= 0,
+    hostile: h, boss: EV.boss && EV.boss.alive ? EV.boss : null, mission, missionKill: !!mission && mission.id === 'kill', ownedUnequipped, credits: save.credits };
+}
+function brief() {
+  const s = solSnap(), m = s.mission ? `임무: ${s.mission.nm}(${Math.floor(s.mission.have)}/${s.mission.need})` : '임무 없음';
+  return `선체 ${Math.round(s.hpPct * 100)}%, 방어막 ${Math.round(s.shieldPct * 100)}%, 화물 ${Math.round(s.cargoPct * 100)}%, ${m}, 권한 ${solCfg().perm}단계, 소지 ${fmt(save.credits)}C` + (s.hostile ? `, 가장 가까운 적 ${s.hostile.name} ${Math.round(s.hostile.dist)}m` : '');
+}
+function sellAll() {
+  if (mode !== 'hangar' || !dockPort) return '시장은 포트에서만 열려요.';
+  let total = 0, n = 0;
+  for (const k in ORES) { const c = save.storage[k] || 0; if (c) { total += c * priceOf(k, dockPort.def); n += c; save.storage[k] = 0; } }
+  if (!n) return '팔 광석이 없어요.';
+  save.credits += total; story('sell', 1); persist(); refreshPort(); sfx('coin');
+  return `광석 ${n}개를 ${fmt(total)} C에 팔았어요.`;
+}
+function equipBest(silent) {
+  const a = activeShip(), T = TIERS[a.tier]; let n = 0;
+  for (const id of save.modules) { if (a.mods.length >= T.slots) break; if (!a.mods.includes(id)) { a.mods.push(id); n++; } }
+  if (n) { story('module', 1); persist(); refreshPort(); }
+  if (silent) return n;
+  return n ? `모듈 ${n}개를 장착했어요.` : '장착할 모듈이 없어요. 모듈 탭에서 먼저 사 주세요.';
+}
+const BUY_ORDER = ['shield1', 'turbo', 'reactive', 'recharge', 'thruster', 'aimcomp', 'loader', 'shield2', 'rack', 'compress', 'drone', 'nanobot', 'stabil', 'scanner', 'flares', 'magnet', 'accel', 'shield3'];
+function buyBest() {
+  const reserve = 0.5;
+  for (const id of BUY_ORDER) { const m = MODULES[id]; if (!save.modules.includes(id) && save.credits >= m.cost / reserve) { save.credits -= m.cost; save.modules.push(id); persist(); equipBest(true); refreshPort(); sfx('coin'); solEvent('autoBuy', 1, 2); return true; } }
+  const r = rankOf(save.xp);
+  for (const t of TIERS) { if (ownsTier(t.id) || t.rank > r) continue; if (t.tier > 0 && !ownsLevel(t.tier - 1)) continue; if (save.credits >= t.cost * 1.3) { save.credits -= t.cost; buyTier(t.id); persist(); setHangarShip(t.id, save.paint); refreshPort(); sfx('coin'); if (t.tier >= 1) story('ship', 1); return true; } }
+  return false;
 }
 const solCtx = {
+  mode: () => mode, brief,
   cancelAuto() { AP.on = false; },
+  goal(g) { goalFromAgent(g); },
   autoPort() { if (mode !== 'fly' || !player.alive) return null; const [pt] = nearestPort(player.pos); setAP(pt.x, pt.deck + player.hover + 6, pt.z, pt.def.nm, 'port'); return pt.def.nm; },
   autoOre(type) {
     if (mode !== 'fly' || !player.alive) return '비행 중일 때 안내할 수 있어요.';
     let best = null, bd = 1e9; for (const o of ores) { if (!o.alive || (type && o.type !== type)) continue; const d = Math.hypot(o.x - player.pos.x, o.z - player.pos.z); if (d < bd) { bd = d; best = o; } }
-    if (!best) return null; setAP(best.x, best.y + 30 * player.scale, best.z, ORES[best.type].nm, 'ore');
+    if (!best) return null; setAP(best.x, best.y + 30 * player.scale, best.z, ORES[best.type].nm, 'ore'); AP.node = best;
     return `${ORES[best.type].nm} 광맥(${ORES[best.type].rar}, 남은 ${best.amount})까지 ${Math.round(bd)}m. 자동 비행 시작!${best.island ? ' 부유섬 위에 있어요.' : ''}`;
   },
+  gotoIsland() { if (mode !== 'fly') return null; goalFromAgent({ kind: 'island' }); return AP.on ? '가장 가까운 부유섬으로 안내할게요.' : null; },
+  gotoWreck() { if (mode !== 'fly') return null; goalFromAgent({ kind: 'wreck' }); return AP.on ? '난파선 묘지로 안내할게요.' : null; },
+  fightBoss() { const b = EV.boss; if (!b || !b.alive) return null; goalFromAgent({ kind: 'fight', target: b }); return '고르곤에게 향합니다. 방어막을 잘 살피세요!'; },
+  flare() { return mode === 'fly' && player.alive && dropFlares(player); },
+  sellAll, equipBest, buyBest,
+  launch() { if (mode === 'hangar') launch(); },
   bossInfo() { const b = EV.boss; if (b && b.alive) return `고르곤은 ${Math.round(b.pos.distanceTo(player.pos))}m 떨어져 있어요. 체력 ${Math.round(b.hp / b.maxHp * 100)}%, 남은 시간 ${Math.floor(EV.life / 60)}분.`; return `지금은 고르곤 신호가 없어요. 약 ${Math.max(1, Math.round(EV.timer / 60))}분 뒤 나타날 것 같아요.`; },
   priceInfo() { return Object.keys(ORES).map(k => { let bp = null, bv = 0; for (const p of ports) { const v = priceOf(k, p.def); if (v > bv) { bv = v; bp = p; } } return `${ORES[k].nm} ${bv}C(${bp.def.nm})`; }).join(' · ') + ' — 가장 비싸게 사는 곳이에요.'; },
-  status() { const p = player; const sh = p.shBroken > 0 ? `방어막 붕괴, ${Math.ceil(p.shBroken)}초 후 복구` : `방어막 ${Math.round(p.shield / p.maxShield * 100)}%`; return `선체 ${Math.round(p.hp / p.maxHp * 100)}%, ${sh}, 화물 ${fmt(p.cargoKg)}/${fmt(p.cargoCap)}kg, 부스트 에너지 ${Math.round(p.energy)}%. ${p.hp / p.maxHp < 0.4 ? '수리가 필요해요!' : '양호해요.'}`; },
-  threatInfo() { const h = S.ships.filter(s => s.alive && S.hooks.hostile(player, s)).map(s => [s, s.pos.distanceTo(player.pos)]).sort((a, b) => a[1] - b[1]); if (!h.length) return '주변에 적대 함선이 없어요.'; const [s, d] = h[0]; return `가장 가까운 적은 ${s.name}(${TIERS[s.tier].t} ${TIERS[s.tier].nm}), ${Math.round(d)}m. 1km 안에 적 ${h.filter(x => x[1] < 1000).length}척.`; },
+  status() { const p = player, s = solSnap(); const sh = p.shBroken > 0 ? `방어막 붕괴, ${Math.ceil(p.shBroken)}초 후 복구` : `방어막 ${Math.round(s.shieldPct * 100)}%`; return `선체 ${Math.round(s.hpPct * 100)}%, ${sh}, 화물 ${fmt(p.cargoKg)}/${fmt(p.cargoCap)}kg, 부스트 에너지 ${Math.round(p.energy)}%. ${s.hpPct < 0.4 ? '수리가 필요해요!' : '양호해요.'}`; },
+  threatInfo() { const s = solSnap(); if (!s.hostile) return '주변에 적대 함선이 없어요.'; const near = S.ships.filter(x => x.alive && S.hooks.hostile(player, x) && x.pos.distanceTo(player.pos) < 1000).length; return `가장 가까운 적은 ${s.hostile.name}, ${Math.round(s.hostile.dist)}m. 1km 안에 적 ${near}척.`; },
   missionInfo() { const st = save.story, ch = CHAPTERS[st.ch]; return ch && !st.done ? `${ch.nm}: ${ch.goal}. ${ch.solare}` : '모든 이야기를 끝냈어요! 이제 하늘은 캡틴 거예요.'; },
   adviceInfo() { const a = activeShip(), T = TIERS[a.tier]; if (a.mods.length < T.slots) return `모듈 슬롯이 ${T.slots - a.mods.length}칸 비어 있어요. 방어막 발생기나 터보 차저를 추천해요.`; if ((a.lv.guns || 0) < 3) return '포탑 업그레이드를 먼저 올리면 전투가 훨씬 편해져요.'; return '다음 등급 함선을 노려 볼까요? 조선소를 확인해 보세요.'; },
   onChat(on) { if (on && document.pointerLockElement) document.exitPointerLock(); },
 };
 initSolare(solCtx);
+// 설정 값 표시
+$('solPerm').textContent = `권한 ${permName()}`;
 // 속도선 (카메라에 붙은 선분)
 const SPD = (() => {
   const N = 90, pos = new Float32Array(N * 6), g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -775,7 +855,7 @@ function frame(now) {
   tickSolare(dt);
   if (mode === 'intro') { updateWorld(dt, camera.position); updateIntroCam(dt); render(scene, camera, dt); return; }
   blinkNav(now / 1000);
-  if (mode === 'hangar') { engineSound(0, false, false); updateHangar(dt); render(hscene, hcam, dt); return; }
+  if (mode === 'hangar') { engineSound(0, false, false); if (player) agentUpdate(dt, solSnap()); updateHangar(dt); render(hscene, hcam, dt); return; }
   // fly / dead
   mineSoundT -= dt; priceT -= dt; if (priceT <= 0) { driftPrices(); priceT = 60; }
   if (!$('mapOv').classList.contains('on')) for (let step = 0; step < SUBSTEPS; step++) {
@@ -801,10 +881,11 @@ function frame(now) {
   updateWorld(dt, player.pos);
   if (player.alive) updateCamera(dt); else { camera.lookAt(player.pos); }
   updateSpeedLines(dt);
+  if (player) agentUpdate(dt, solSnap());
   hudFrame(dt);
   render(scene, camera, dt);
 }
 requestAnimationFrame(frame);
 boot().catch(e => { console.error(e); $('ldPhase').textContent = '오류: ' + e.message; });
 
-window.__sf = { S, save, EV, WEATHER, AP, story, solCtx, get mode() { return mode; }, get player() { return player; }, ports, ores, launch: () => launch(), enterHangar: p => enterHangar(p || homePort()), key, inp, DAY, cam };
+window.__sf = { S, get save() { return save; }, EV, WEATHER, AP, story, solCtx, get mode() { return mode; }, get player() { return player; }, ports, ores, launch: () => launch(), enterHangar: p => enterHangar(p || homePort()), key, inp, DAY, cam };

@@ -111,10 +111,10 @@
 <!-- 솔라레 -->
 <div id="solare" data-mood="calm"><div class="av" id="solAv"><i></i><b></b></div><div class="sbub"><small>SOLARE · 함선 AI</small><p id="solText"></p></div></div>
 <button id="solBtn"><span class="av mini"><i></i><b></b></span>솔라레</button>
-<div id="solChat"><div class="sch"><div class="av mini"><i></i><b></b></div><b>솔라레</b><small>함선 AI 비서 (가상)</small><button class="x" id="solClose">✕</button></div>
+<div id="solChat"><div class="sch"><div class="av mini"><i></i><b></b></div><b>솔라레</b><small id="solPerm">함선 AI 비서 (가상)</small><button class="x" id="solClose">✕</button></div>
   <div id="solLog"></div>
-  <div id="solQuick"><button>상태 보고</button><button data-q="가까운 포트로">가까운 포트로 자동비행</button><button data-q="가까운 광맥">가까운 광맥 안내</button><button data-q="금 광맥">금 광맥 찾기</button><button data-q="보스">고르곤 위치</button><button data-q="시세">시세 알려줘</button><button data-q="임무">지금 임무</button><button data-q="추천">개조 추천</button><button data-q="취소">자동비행 취소</button></div>
-  <form id="solForm"><input id="solIn" placeholder="솔라레에게 말하기 (예: 에테르 결정 어디 있어?)" autocomplete="off"><button class="btn">전송</button></form></div>
+  <div id="solQuick"><button data-q="상태 보고">상태 보고</button><button data-q="가까운 포트로 가">포트로 가</button><button data-q="가까운 광맥">광맥 안내</button><button data-q="금 광맥">금 광맥 찾기</button><button data-q="보스">고르곤 위치</button><button data-q="시세">시세 알려줘</button><button data-q="임무">지금 임무</button><button data-q="추천">개조 추천</button><button data-q="임무 해줘">임무 해줘</button><button data-q="권한 올려">권한 올려</button><button data-q="취소">멈춰</button></div>
+  <form id="solForm"><input id="solIn" placeholder="말하거나 입력하세요 (예: 임무 해줘 / 금 광맥 어디야?)" autocomplete="off"><button type="button" id="solMic" class="mic" title="음성 입력">🎙</button><button class="btn">전송</button></form></div>
 
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
 <script type="module" src="js/main.js"></script>

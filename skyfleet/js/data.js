@@ -148,7 +148,7 @@ export const ENDING = '아크라이트의 에테르 기관이 깨어나자, 붉�
 const KEY = 'skyfleet_save_v2';
 function freshShip(cls) { return { tier: cls, lv: { guns: 0, missile: TIERS[cls].tier >= 1 ? 1 : 0, armor: 0, engine: 0, cargo: 0, drill: 0 }, weapon: 'cannon', mods: [] }; }
 export function defaultSave() {
-  return { ver: 3, credits: 300, xp: 0, ships: [freshShip(0)], active: 0, paint: 'sand', pvp: false, storage: {}, prices: {}, quests: [], stats: { kills: 0, mined: 0, deaths: 0, bosses: 0 }, skyrunBest: 0, weapons: ['cannon'], modules: [], mute: false, story: { ch: 0, have: 0, intro: false, done: false }, camSteer: true };
+  return { ver: 3, credits: 300, xp: 0, ships: [freshShip(0)], active: 0, paint: 'sand', pvp: false, storage: {}, prices: {}, quests: [], stats: { kills: 0, mined: 0, deaths: 0, bosses: 0 }, skyrunBest: 0, weapons: ['cannon'], modules: [], mute: false, solare: { voice: true, llm: false, perm: 0, mic: true }, story: { ch: 0, have: 0, intro: false, done: false }, camSteer: true };
 }
 export let save = defaultSave();
 export function loadSave() {

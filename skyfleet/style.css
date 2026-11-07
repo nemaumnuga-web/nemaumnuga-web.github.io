@@ -267,3 +267,8 @@ body[data-mode=hangar] #solBtn{left:auto;right:330px;top:30px}
 .slot small{font-size:9px;line-height:1.2}.slot em{font-style:normal;font-size:9px;color:var(--red)}
 .row.story{border-color:var(--teal);background:rgba(34,211,211,.07)}
 @media (max-width:900px){#obj{top:215px;width:200px}#solBtn{left:auto;right:180px;top:12px}#solare{bottom:280px}}
+
+.mic{width:44px;height:auto;background:rgba(34,211,211,.12);border:1px solid var(--line);color:#fff;font-size:18px;padding:0 10px;flex:none}
+.mic.rec{background:var(--red);border-color:var(--red);animation:blink .6s steps(2) infinite}
+.mic:disabled{opacity:.35}
+#solPerm{font-family:var(--num);color:var(--teal)!important}
