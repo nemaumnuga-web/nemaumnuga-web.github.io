@@ -3,16 +3,21 @@
 import { pipeline, env, TextStreamer } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js';
 
 env.allowLocalModels = false;
-const MODEL = 'onnx-community/Qwen3-0.6B-ONNX';
-let gen = null, loading = null;
+// 모델 목록: 작은 쪽(gemma, 약 275MB) / 똑똑한 쪽(qwen3, 약 570MB)
+const MODELS = {
+  qwen3: { id: 'onnx-community/Qwen3-0.6B-ONNX', gpu: 'q4f16', cpu: 'q8', thinking: false },
+  gemma: { id: 'onnx-community/gemma-3-270m-it-ONNX', gpu: 'q4f16', cpu: 'q4', thinking: false },
+};
+let gen = null, loading = null, curModel = null;
 
-async function load() {
-  if (gen) return gen;
-  if (loading) return loading;
+async function load(key = 'qwen3') {
+  if (gen && curModel === key) return gen;
+  if (loading && curModel === key) return loading;
+  const M = MODELS[key] || MODELS.qwen3; curModel = key; gen = null;
   const webgpu = !!(self.navigator && navigator.gpu);
-  loading = pipeline('text-generation', MODEL, {
+  loading = pipeline('text-generation', M.id, {
     device: webgpu ? 'webgpu' : 'wasm',
-    dtype: webgpu ? 'q4f16' : 'q8',
+    dtype: webgpu ? M.gpu : M.cpu,
     progress_callback: p => { if (p.status === 'progress') self.postMessage({ type: 'progress', file: p.file, pct: Math.round(p.progress || 0) }); },
   }).then(g => { gen = g; self.postMessage({ type: 'ready', device: webgpu ? 'webgpu' : 'wasm' }); return g; })
     .catch(e => { loading = null; self.postMessage({ type: 'error', message: String(e && e.message || e) }); throw e; });
@@ -21,12 +26,12 @@ async function load() {
 
 self.onmessage = async e => {
   const m = e.data;
-  if (m.type === 'load') { try { await load(); } catch (_) {} return; }
+  if (m.type === 'load') { try { await load(m.model); } catch (_) {} return; }
   if (m.type === 'chat') {
     try {
-      const g = await load();
+      const g = await load(m.model);
       const tok = g.tokenizer;
-      // Qwen3: 생각(thinking) 모드를 끄고 바로 답하게 함
+      // Qwen3: 생각(thinking) 모드를 끄고 바로 답하게 함 (다른 모델은 이 옵션을 무시)
       const prompt = tok.apply_chat_template(m.messages, { tokenize: false, add_generation_prompt: true, enable_thinking: false });
       let out = '';
       const streamer = new TextStreamer(tok, {

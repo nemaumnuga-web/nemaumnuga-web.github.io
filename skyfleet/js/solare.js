@@ -45,30 +45,14 @@ const PERM_DESC = [
 ];
 
 /* ---------- 설정 ---------- */
-export function cfg() { save.solare = Object.assign({ voice: true, llm: false, perm: 0, mic: true }, save.solare || {}); return save.solare; }
+export function cfg() { save.solare = Object.assign({ llm: false, model: 'qwen3', perm: 0, mic: true }, save.solare || {}); return save.solare; }
 export const permName = () => `${cfg().perm} · ${PERM_NAMES[cfg().perm]}`;
 export const permDesc = p => PERM_DESC[p];
 export { PERM_NAMES };
 
 /* ---------- 음성 출력 ---------- */
-let voiceCache = null;
-function koVoice() {
-  if (!('speechSynthesis' in window)) return null;
-  voiceCache = voiceCache || speechSynthesis.getVoices();
-  if (!voiceCache.length) voiceCache = speechSynthesis.getVoices();
-  return voiceCache.find(v => /ko[-_]KR/i.test(v.lang)) || voiceCache.find(v => /^ko/i.test(v.lang)) || null;
-}
-if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { voiceCache = null; };
-export function speak(t) {
-  if (!cfg().voice || !('speechSynthesis' in window) || !t) return;
-  try {
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(t.replace(/[「」]/g, ''));
-    u.lang = 'ko-KR'; const v = koVoice(); if (v) u.voice = v;
-    u.rate = 1.04; u.pitch = 1.18; u.volume = 0.9;
-    speechSynthesis.speak(u);
-  } catch (e) {}
-}
+// 목소리 출력은 사용하지 않음 (글자로만 답함)
+export function speak() {}
 
 /* ---------- 음성 입력 ---------- */
 const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -108,18 +92,20 @@ function ensureWorker() {
 function emitStatus() { const el = $('solLLMStat'); if (el) el.textContent = llmText(); }
 export function llmText() {
   if (!cfg().llm) return 'AI 대화 꺼짐 (규칙 기반 답변)';
-  if (llm.state === 'ready') return `Qwen3-0.6B 준비됨 · ${llm.device === 'webgpu' ? 'GPU' : 'CPU'}`;
+  if (llm.state === 'ready') return `${MODEL_NAMES[cfg().model] || cfg().model} 준비됨 · ${llm.device === 'webgpu' ? 'GPU' : 'CPU'}`;
   if (llm.state === 'loading') return `모델 내려받는 중… ${llm.pct}%`;
   if (llm.state === 'error') return `모델 실패: ${llm.err || ''} — 규칙 기반으로 답해요`;
   return '켜짐 — 첫 대화 때 모델(약 570MB)을 내려받아요';
 }
-export function setLLM(on) { cfg().llm = !!on; persist(); if (on) { ensureWorker(); worker && worker.postMessage({ type: 'load' }); } emitStatus(); }
+export const MODEL_NAMES = { qwen3: 'Qwen3 0.6B (똑똑함, 약 570MB)', gemma: 'Gemma 3 270M (가벼움, 약 275MB)' };
+export function setLLM(on) { cfg().llm = !!on; persist(); if (on) { ensureWorker(); worker && worker.postMessage({ type: 'load', model: cfg().model }); } emitStatus(); }
+export function setModel(key) { cfg().model = MODEL_NAMES[key] ? key : 'qwen3'; llm.state = 'off'; persist(); if (cfg().llm) { ensureWorker(); worker && worker.postMessage({ type: 'load', model: cfg().model }); } emitStatus(); }
 function askLLM(messages, onDelta) {
   return new Promise((resolve, reject) => {
     if (!worker) ensureWorker();
     if (!worker) return reject(new Error('no worker'));
     const id = ++reqId; pending.set(id, { resolve, reject, onDelta });
-    worker.postMessage({ type: 'chat', id, messages });
+    worker.postMessage({ type: 'chat', id, messages, model: cfg().model });
     setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error('timeout')); } }, 60000);
   });
 }
@@ -161,7 +147,7 @@ export function classify(raw) {
     if (has(s, '내려', '낮춰', '줄여')) return { k: 'perm', to: 'down' };
     return { k: 'query', id: 'perm' };
   }
-  if (has(s, '목소리', '음성', '말하지마', '소리')) { if (has(s, '꺼', '끄', '말하지')) return { k: 'cmd', id: 'voiceOff' }; if (has(s, '켜', '말해')) return { k: 'cmd', id: 'voiceOn' }; }
+  if (has(s, '목소리', '말하지마')) return { k: 'cmd', id: 'noVoice' };
   if (has(s, '멈춰', '정지', '그만', '취소', '수동', '직접할게', '내가할게')) return { k: 'cmd', id: 'cancel' };
   if (has(s, '자율', '알아서', '임무수행', '임무해', '임무진행', '대신해', '자동으로')) { if (has(s, '꺼', '끄', '멈')) return { k: 'cmd', id: 'agentOff' }; return { k: 'cmd', id: 'agentOn' }; }
   if (has(s, '판매', '팔아', '팔줘', '매각')) return { k: 'cmd', id: 'sell' };
@@ -215,8 +201,7 @@ function runCmd(id, c) {
   const x = ctx;
   switch (id) {
     case 'cancel': x.cancelAuto(); agentOff(false); return reply('조종권을 돌려 드릴게요.');
-    case 'voiceOff': cfg().voice = false; persist(); return reply('목소리를 껐어요. 글로만 답할게요.');
-    case 'voiceOn': cfg().voice = true; persist(); return reply('다시 말할 수 있어요, 캡틴!', 'happy');
+    case 'noVoice': return reply('저는 목소리 없이 글자로만 답해 드려요. 말씀은 🎙 버튼으로 하실 수 있어요.');
     case 'agentOn': if (cfg().perm < 2) return askPerm(2, '임무를 대신하려면 권한이 필요해요. 임무 자율(2단계)로 올릴까요?'); agentOn(); return reply('임무를 대신 진행할게요.', 'happy');
     case 'agentOff': agentOff(true); return reply('자율 임무를 멈췄어요.');
     case 'port': { const r = x.autoPort(); return reply(r ? `${r}으로 자동 비행할게요. 조작하면 잠시 비켜 드려요.` : '출격한 뒤에 말씀해 주세요.'); }
@@ -276,7 +261,7 @@ async function chatAnswer(q) {
     return cfgOn ? 'AI가 아직 준비 중이에요. 잠시 후 다시 말씀해 주세요. 명령이나 상태 질문은 지금도 바로 답해 드려요.' : '잡담은 설정에서 AI 대화를 켜면 더 잘 답해 드려요. 명령이나 상태 질문은 지금도 돼요!';
   };
   if (!cfgOn) return reply(fallback());
-  ensureWorker(); if (llm.state !== 'ready') worker && worker.postMessage({ type: 'load' });
+  ensureWorker(); if (llm.state !== 'ready') worker && worker.postMessage({ type: 'load', model: cfg().model });
   if (llm.state !== 'ready') return reply(llm.state === 'loading' ? `모델을 내려받는 중이에요 (${llm.pct}%). 조금만 기다려 주세요.` : fallback());
   const bubble = botLine('…');
   const sys = `너는 우주 비행선 게임 「하늘함대」의 함선 AI 「솔라레」다. 캡틴에게 한국어 존댓말로 짧게(두 문장 이내) 답한다. 모르는 것은 지어내지 않는다. 현재 상태: ${ctx.brief()}`;
