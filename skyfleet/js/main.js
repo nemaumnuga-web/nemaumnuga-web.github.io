@@ -1,9 +1,10 @@
 // 하늘함대 — 메인: 로딩, 비행, 전투, 채굴, 도킹, 항구 UI
 import { THREE, $, rand, pick, clamp, lerp, wrap, fmt, isTouch, QUALITY, camera, render, frameYield, sleep, sfx, COL, engineSound, setMute } from './core.js';
-import { TIERS, MODS, modCost, ORES, RAR_COL, RANKS, rankOf, PAINTS, TIPS, CAPTAIN_NAMES, PIRATE_NAMES, WORLD, save, loadSave, persist, activeShip, ownsTier, buyTier, refillQuests, makeQuest, questProgress, priceOf, driftPrices, WEAPONS } from './data.js';
-import { scene, buildWorld, updateWorld, terrainH, groundAt, ports, ores, depleteOre, nearestPort, homePort, DAY, FIRE, SMOKE, WEATHER } from './world.js';
-import { Ship, blinkNav } from './ships.js';
-import { S, explode, fireTurrets, fireMissile, updateBullets, updateMissiles, spawnDebris, updateDebris, dropCrate, updateCrates, mineBeam, shipFx, clearFx, dropFlares, incoming, updateFlares } from './fx.js';
+import { TIERS, MODS, modCost, ORES, RAR_COL, RANKS, rankOf, PAINTS, TIPS, CAPTAIN_NAMES, PIRATE_NAMES, WORLD, save, loadSave, persist, activeShip, ownsTier, buyTier, refillQuests, makeQuest, questProgress, priceOf, driftPrices, WEAPONS, MODULES, CHAPTERS, INTRO, ENDING, REGIONS, ownsLevel } from './data.js';
+import { scene, buildWorld, updateWorld, terrainH, groundAt, ports, ores, depleteOre, nearestPort, homePort, DAY, FIRE, SMOKE, WEATHER, islands, islandAt, WRECKS, surfaceBelow } from './world.js';
+import { Ship, blinkNav, makeShipModel } from './ships.js';
+import { initSolare, say as solSay, event as solEvent, tickSolare, chatOpen, toggleChat } from './solare.js';
+import { S, explode, fireTurrets, fireMissile, updateBullets, updateMissiles, spawnDebris, updateDebris, dropCrate, updateCrates, mineBeam, shipFx, clearFx, dropFlares, incoming, updateFlares, shieldFx } from './fx.js';
 import { runAI } from './ai.js';
 import { hscene, hcam, buildHangar, setHangarShip, updateHangar } from './hangar.js';
 import { startSkyRun } from './skyrun.js';
@@ -48,7 +49,7 @@ async function boot() {
   await buildWorld(progress);
   progress('ASSEMBLING SHIP', 0.78); await frameYield();
   buildHangar(); setHangarShip(activeShip().tier, save.paint); buildMapImage(); await frameYield();
-  makePlayer(); spawnAll(); await sleep(200);
+  buildWrecks(); makePlayer(); spawnAll(); renderObjective(); await sleep(200);
   progress('ENTERING RED CANYON', 1); await sleep(500);
   [...$('ldSteps').children].forEach(li => li.className = 'done');
   $('ldPhase').textContent = 'READY'; $('ldGo').hidden = false;
@@ -57,19 +58,20 @@ $('ldGo').onclick = () => {
   const best = skyrun.stop(); clearInterval(tipTimer);
   if (srCredits) { save.credits += srCredits; toast(`SKY RUN 보너스 <b>+${srCredits} CR</b>`); }
   save.skyrunBest = Math.max(save.skyrunBest || 0, best); persist();
-  enterHangar(homePort());
+  const go = () => { enterHangar(homePort()); setTimeout(() => solSay(save.story.ch === 0 ? '안녕하세요, 캡틴. 첫 임무는 출항이에요. 아래 「항구를 떠나기」를 눌러 주세요!' : `다시 오셨네요, 캡틴! ${CHAPTERS[save.story.ch] ? '현재 임무: ' + CHAPTERS[save.story.ch].nm : ''}`, 'happy', 2), 600); };
+  if (!save.story.intro) playIntro(go); else go();
 };
 
 /* ================= 함선 생성 ================= */
 function makePlayer() {
   const a = activeShip();
   if (player) scene.remove(player.mesh);
-  player = new Ship({ name: '나', faction: 'player', tier: a.tier, paint: save.paint, lv: a.lv, isPlayer: true, weapon: a.weapon || 'cannon' });
+  player = new Ship({ name: '나', faction: 'player', tier: a.tier, paint: save.paint, lv: a.lv, isPlayer: true, weapon: a.weapon || 'cannon', mods: a.mods || [] });
   scene.add(player.mesh); S.player = player;
   S.ships = S.ships.filter(s => !s.isPlayer); S.ships.unshift(player);
 }
 function aiCount() { return clamp(save.aiCount || 20, 20, 40); }
-function rollLv(tier) { const m = 1 + tier; const r = () => Math.floor(rand(0, m + 0.99)); return { guns: r(), missile: Math.max(tier >= 1 ? 1 : 0, r() - 1), armor: r(), engine: r(), cargo: r(), drill: r() }; }
+function rollLv(cls) { const tier = TIERS[cls].tier; const m = 1 + tier; const r = () => Math.floor(rand(0, m + 0.99)); return { guns: r(), missile: Math.max(tier >= 1 ? 1 : 0, r() - 1), armor: r(), engine: r(), cargo: r(), drill: r() }; }
 function spawnAI(s) {
   if (s.faction === 'pirate') {
     for (let k = 0; k < 50; k++) {
@@ -89,8 +91,9 @@ function spawnAll() {
   const capNames = [...CAPTAIN_NAMES].sort(() => Math.random() - 0.5);
   for (let i = 0; i < n; i++) {
     const pirate = i < nPir;
-    const tier = pirate ? clamp(Math.floor(pt + rand(-1.3, 0.9)), 0, 3) : clamp(Math.floor(rand(0, 3.2)), 0, 3);
-    const s = new Ship({ name: pirate ? PIRATE_NAMES[i % PIRATE_NAMES.length] : capNames[i % capNames.length], faction: pirate ? 'pirate' : 'captain', tier, paint: pirate ? pick(['night', 'crimson', 'steel']) : pick(PAINTS).id, lv: rollLv(tier), pvp: !pirate && Math.random() < 0.5, weapon: pirate && tier >= 1 ? pick(['cannon', 'cannon', 'flak', 'rail']) : pick(['cannon', 'cannon', 'cannon', 'flak']) });
+    const lvl = pirate ? clamp(Math.floor(TIERS[pt].tier + rand(-1.3, 0.9)), 0, 3) : clamp(Math.floor(rand(0, 3.2)), 0, 3);
+    const tier = pick(TIERS.filter(t => t.tier === lvl)).id;
+    const s = new Ship({ name: pirate ? PIRATE_NAMES[i % PIRATE_NAMES.length] : capNames[i % capNames.length], faction: pirate ? 'pirate' : 'captain', tier, paint: pirate ? pick(['night', 'crimson', 'steel']) : pick(PAINTS).id, lv: rollLv(tier), pvp: !pirate && Math.random() < 0.5, weapon: pirate && lvl >= 1 ? pick(['cannon', 'cannon', 'flak', 'rail']) : pick(['cannon', 'cannon', 'cannon', 'flak']) });
     s.ai.skill = rand(0.6, 1); scene.add(s.mesh); S.ships.push(s); spawnAI(s);
   }
   aiDirty = false;
@@ -112,22 +115,26 @@ S.hooks.damage = (t, amt, by, at) => {
   if (!t.alive) return;
   if (by && by.faction === 'pirate' && inSafe(t)) return;   // 포트 보호 구역
   if (t.isPlayer && by && !by.isPlayer) amt *= 0.55;          // 난이도 보정
-  t.hp -= amt;
   if (by && S.hooks.hostile(t, by)) { t.ai.attacker = by; t.ai.attackT = 12; }
-  if (by && by.isPlayer) { hitT = 0.12; dmgNum(t, amt, at); if (t.isBoss) EV.playerDmg += amt; }
-  if (t.isPlayer) { $('vign').style.opacity = 1; setTimeout(() => $('vign').style.opacity = 0, 160); S.shake = Math.max(S.shake, 0.2); }
+  if (by && by.isPlayer) { hitT = 0.12; dmgNum(t, amt, at, t.shield > 0 && t.shBroken <= 0); if (t.isBoss) EV.playerDmg += amt; }
+  const hull = by ? t.absorb(amt, at || (by && by.pos)) : amt;   // 방어막이 먼저 흡수 (추락 피해는 직접)
+  if (t.isPlayer) { if (hull > 0) { $('vign').style.opacity = 1; setTimeout(() => $('vign').style.opacity = 0, 160); } S.shake = Math.max(S.shake, hull > 0 ? 0.2 : 0.06); }
+  if (hull <= 0) return;
+  t.hp -= hull;
+  if (t.isPlayer && t.hp < t.maxHp * 0.3) solEvent('lowHull', 3, 20);
   if (t.hp > 0) return;
   t.alive = false; t.mesh.visible = false; t.respawn = 12;
   if (t.isBoss) { bossDown(t, by); }
   explode(t.pos, 55 * t.scale); spawnDebris(t.pos, t.scale);
-  const loot = t.faction === 'pirate' ? Math.round(rand(50, 140) * (t.tier + 1)) : 0;
+  const loot = t.faction === 'pirate' ? Math.round(rand(50, 140) * (TIERS[t.tier].tier + 1)) : 0;
   dropCrate(tmp.copy(t.pos), loot, t.cargo);
   t.cargo = {}; t.cargoKg = 0;
   if (by && by !== t) {
     by.kills++;
     feed(`<span style="color:${FC[by.faction]}">${by.name}</span> ▸ <span style="color:${FC[t.faction]}">${t.name}</span>`);
     if (by.isPlayer) {
-      const bounty = t.faction === 'pirate' ? 90 * (t.tier + 1) : 60 * (t.tier + 1), xp = t.faction === 'pirate' ? 15 * (t.tier + 1) : 10;
+      const lv = TIERS[t.tier].tier, bounty = Math.round((t.faction === 'pirate' ? 90 * (lv + 1) : 60 * (lv + 1)) * (by.bountyMul || 1)), xp = t.faction === 'pirate' ? 15 * (lv + 1) : 10;
+      if (t.faction === 'pirate') story('kill', 1); solEvent('kill', 1, 8);
       save.credits += bounty; gainXp(xp); save.stats.kills++; if (t.faction === 'pirate') questProgress('kill', 1);
       toast(`격추! 현상금 <b>+${bounty} CR</b> · 평판 +${xp}`); persist();
     }
@@ -139,9 +146,9 @@ S.hooks.mine = (s, node, dt) => {
   s.mineAcc = (s.mineAcc || 0) + s.drill * dt;
   while (s.mineAcc >= 1) {
     s.mineAcc -= 1; const o = ORES[node.type];
-    if (s.cargoKg + o.kg > s.cargoCap) { if (s.isPlayer) hintMsg = '화물칸 가득 참 — 포트로 귀환해 보관하세요'; s.mineAcc = 0; return; }
+    if (s.cargoKg + o.kg > s.cargoCap) { if (s.isPlayer) { hintMsg = '화물칸 가득 참 — 포트로 귀환해 보관하세요'; solEvent('cargoFull', 1, 40); } s.mineAcc = 0; return; }
     s.cargo[node.type] = (s.cargo[node.type] || 0) + 1; s.cargoKg += o.kg; node.amount--;
-    if (s.isPlayer) { questProgress('mine', o.kg); save.stats.mined += o.kg; if (Math.random() < 0.25) gainXp(1); if (mineSoundT <= 0) { sfx('coin', 0.5); mineSoundT = 0.25; } }
+    if (s.isPlayer) { questProgress('mine', o.kg); story('mine', o.kg); if (node.island) story('island', 1); save.stats.mined += o.kg; if (Math.random() < 0.25) gainXp(1); if (mineSoundT <= 0) { sfx('coin', 0.5); mineSoundT = 0.25; } }
     if (node.amount <= 0) { explode(tmp.set(node.x, node.y + 6, node.z), 10, 'hit'); depleteOre(node); if (s.isPlayer) toast('광맥이 고갈되었습니다'); return; }
   }
 };
@@ -151,12 +158,12 @@ S.hooks.pickup = (s, c) => {
   if (s.isPlayer) { if (c.credits) save.credits += c.credits; sfx('coin'); toast(`전리품 회수 ${c.credits ? `<b>+${c.credits} CR</b> ` : ''}${got.join(', ')}`); persist(); }
 };
 function onImpact(s, vy) { S.hooks.damage(s, (vy - 14) * 2.2, null); SMOKE.emit(s.pos.x, s.pos.y - 6, s.pos.z, 0, 8, 0, 1.5, 8, 26, COL.dust, COL.dustE, 0.6); }
-function gainXp(n) { const r0 = rankOf(save.xp); save.xp += n; const r1 = rankOf(save.xp); if (r1 > r0) toast(`평판 상승! <b>${RANKS[r1].nm}</b> — 조선소에 새 함선이 열렸을 수 있습니다`); }
+function gainXp(n) { const r0 = rankOf(save.xp); save.xp += n; const r1 = rankOf(save.xp); if (r1 > r0) { toast(`평판 상승! <b>${RANKS[r1].nm}</b> — 조선소에 새 함선이 열렸을 수 있습니다`); solEvent('rank', 2, 1); } }
 function onPlayerDeath() {
   save.stats.deaths++; persist();
   setTimeout(() => {
     if (player.alive) return;
-    setMode('dead'); $('dead').classList.add('on');
+    setMode('dead'); $('dead').classList.add('on'); solEvent('death', 3, 1);
     $('deadInfo').textContent = '화물은 추락 지점에 떨어졌습니다. 다시 회수할 수 있어요.';
   }, 1800);
 }
@@ -168,6 +175,8 @@ const cam = { yaw: 0, pitch: 0.22, dist: 1, last: 0 };
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const k = e.key.toLowerCase(); key[k] = true;
+  if ((k === 'enter' || k === 'v') && (mode === 'fly' || mode === 'hangar')) { e.preventDefault(); if (document.pointerLockElement) document.exitPointerLock(); toggleChat(true); return; }
+  if (introOn && (k === ' ' || k === 'enter')) { introNext(); return; }
   if (k === ' ' || k === 'tab') e.preventDefault();
   if (mode !== 'fly') return;
   if (k === 'r') cycleLock(); if (k === 'f') fireMissile(player, player.lock); if (k === 'g') dropCargo(); if (k === 'm') openMap();
@@ -243,13 +252,25 @@ function updatePlayer(dt) {
   p.inTurn = clamp(-kx - inp.jx * 1.1, -1, 1);
   p.inThrust = clamp(ky - inp.jy * 1.1, -1, 1);
   p.inLift = ((key[' '] || inp.up) ? 1 : 0) - ((key.shift || key.q || inp.dn) ? 1 : 0);
+  const manual = kx || ky || p.inLift || Math.abs(inp.jx) > 0.15 || Math.abs(inp.jy) > 0.15;
+  if (AP.on && manual) { AP.on = false; solSay('수동 조종으로 전환했어요.'); }
+  // 카메라 방향 조종: 함선이 카메라가 보는 쪽으로 선회하고, 시선 높이로 고도를 맞춤
+  if (camSteerOn() && !kx && Math.abs(inp.jx) < 0.25 && (Math.abs(p.inThrust) > 0.05 || p.speed > 12)) {
+    p.inTurn = clamp(wrap(cam.yaw - p.yaw) * 2.6, -1, 1);
+    if (!p.inLift && p.inThrust > 0.05) p.inLift = clamp((0.24 - cam.pitch) * 2.4, -1, 1);
+  }
+  if (AP.on) autopilot(p, dt);
   if (launchT > 0) { launchT -= dt; p.inLift = Math.max(p.inLift, launchT > 1.2 ? 1 : 0.4); }
   p.boosting = !!(key.x || inp.boost);
   applyWind(p, dt);
   p.physics(dt, onImpact);
   // 근처 광맥
   nearNode = null; let nd = 1e9;
-  for (const o of ores) { if (!o.alive) continue; const d = Math.hypot(o.x - p.pos.x, o.z - p.pos.z); if (d < 70 * p.scale && p.pos.y - o.y < 110 && d < nd) { nd = d; nearNode = o; } }
+  for (const o of ores) { if (!o.alive) continue; const d = Math.hypot(o.x - p.pos.x, o.z - p.pos.z); if (d < 70 * p.scale * p.mineRange && p.pos.y - o.y < 110 * p.mineRange && p.pos.y > o.y - 10 && d < nd) { nd = d; nearNode = o; } }
+  if (nearNode && ORES[nearNode.type].glow >= 0.5) solEvent('rare', 1, 60);
+  if (WRECKS.some(w => Math.hypot(w.x - p.pos.x, w.z - p.pos.z) < 380)) { story('wreck', 1); solEvent('wreck', 1, 300); }
+  if (islands.some(I => Math.hypot(I.x - p.pos.x, I.z - p.pos.z) < I.r + 200)) solEvent('island', 1, 400);
+  const inc = incoming(p); if (inc && inc < 800) solEvent('missile', 2, 15);
   const act = inp.act, wantMine = (key.e || (act && nearNode)) && nearNode;
   hintMsg = '';
   if (nearNode) {
@@ -261,7 +282,7 @@ function updatePlayer(dt) {
   // 조준·사격
   const rayHit = computeAim();
   let tgtPt = aimPt;
-  if (p.lock && (!p.lock.alive || p.lock.pos.distanceTo(p.pos) > 1300 || !S.hooks.hostile(p, p.lock))) p.lock = null;
+  if (p.lock && (!p.lock.alive || p.lock.pos.distanceTo(p.pos) > p.lockRange * 1.3 || !S.hooks.hostile(p, p.lock))) p.lock = null;
   const firing = inp.fire || (act && !nearNode);
   if (p.lock && !firing) { const d = p.lock.pos.distanceTo(p.pos); tgtPt = tmp.copy(p.lock.pos).addScaledVector(p.lock.vel, d / 680).clone(); }
   p.aimTurrets(dt, tgtPt);
@@ -271,7 +292,7 @@ function updatePlayer(dt) {
   // 도킹
   const [port, pd] = nearestPort(p.pos);
   const onPad = pd < 32 * Math.max(1, p.scale * 0.8) && p.pos.y - port.deck < 40 * p.scale && p.speed < 18 && launchT <= 0;
-  if (onPad) { docking = Math.min(1, docking + dt / 2.2); banner('DOCKING', `${port.def.nm} · 안정적으로 유지`, 0.3, docking); if (docking >= 1) { docking = 0; dock(port); } }
+  if (onPad) { AP.on = false; docking = Math.min(1, docking + dt / 2.2); banner('DOCKING', `${port.def.nm} · 안정적으로 유지`, 0.3, docking); if (docking >= 1) { docking = 0; dock(port); } }
   else { docking = Math.max(0, docking - dt); if (!hintMsg && pd < 260 && launchT <= 0) hintMsg = `착륙장 중앙(원) 위로 천천히 내려오면 <b>${port.def.nm}</b>에 도킹합니다`; }
   if (Math.abs(p.pos.x) > WORLD || Math.abs(p.pos.z) > WORLD) hintMsg = '⚠ 전장 경계 — 안쪽으로 돌아가세요';
   $('clock').classList.toggle('safe', inSafe(p));
@@ -280,21 +301,22 @@ function dock(port) {
   const p = player; let val = 0;
   for (const [k, n] of Object.entries(p.cargo)) { save.storage[k] = (save.storage[k] || 0) + n; val += n * priceOf(k, port.def); }
   p.cargo = {}; p.cargoKg = 0; p.hp = p.maxHp;
-  persist(); sfx('ui'); enterHangar(port);
+  persist(); sfx('ui'); story('dock', 1); enterHangar(port); solEvent('dock', 1, 5);
   if (val) toast(`화물 보관 완료 — 시장 가치 <b>${fmt(val)} CR</b>`);
 }
 
 /* ================= 카메라 ================= */
 function updateCamera(dt) {
   const p = player, sc = p.scale;
-  if (performance.now() - cam.last > 1600) cam.yaw = cam.yaw + wrap(p.yaw - cam.yaw) * (1 - Math.exp(-dt * 1.6));
-  const dist = 62 * sc * cam.dist, cp = Math.cos(cam.pitch);
+  if (!camSteerOn() && performance.now() - cam.last > 1600) cam.yaw = cam.yaw + wrap(p.yaw - cam.yaw) * (1 - Math.exp(-dt * 1.6));
+  if (camSteerOn() && Math.abs(inp.jx) > 0.25) cam.yaw = cam.yaw + wrap(p.yaw - cam.yaw) * (1 - Math.exp(-dt * 3));
+  const spd = p.speed / p.maxSpeed, dist = (58 + spd * 14 + (p.boostOn ? 10 : 0)) * sc * cam.dist, cp = Math.cos(cam.pitch);
   const want = tmp.set(p.pos.x + Math.sin(cam.yaw) * cp * dist, p.pos.y + 10 * sc + Math.sin(cam.pitch) * dist, p.pos.z + Math.cos(cam.yaw) * cp * dist);
   const g = groundAt(want.x, want.z) + 5; if (want.y < g) want.y = g;
-  camera.position.lerp(want, 1 - Math.exp(-dt * 10));
+  camera.position.lerp(want, 1 - Math.exp(-dt * 9));
   camera.lookAt(p.pos.x, p.pos.y + 16 * sc, p.pos.z);
   if (S.shake > 0.001) { camera.rotation.x += rand(-1, 1) * S.shake * 0.03; camera.rotation.y += rand(-1, 1) * S.shake * 0.03; S.shake *= Math.exp(-dt * 6); }
-  const fov = 62 + p.speed / p.maxSpeed * 6; camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-dt * 3)); camera.updateProjectionMatrix();
+  const fov = 60 + spd * 10 + (p.boostOn ? 9 : 0); camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-dt * 3)); camera.updateProjectionMatrix();
 }
 
 /* ================= HUD ================= */
@@ -317,7 +339,7 @@ function drawBlueprint(tier) {
   x.restore();
   x.fillStyle = '#7ff3f3'; x.font = '10px Orbitron'; x.fillText(`${TIERS[tier].t} · ${TIERS[tier].en}`, 22, 24);
 }
-$('hullSeg').innerHTML = '<i></i>'.repeat(22);
+$('hullSeg').innerHTML = '<i></i>'.repeat(22); $('shSeg').innerHTML = '<i></i>'.repeat(22);
 const rc = $('radar').getContext('2d'), RANGE = 600;
 let sweep = 0;
 function drawRadar(dt) {
@@ -366,6 +388,10 @@ function hudFrame(dt) {
   if (bpTier !== p.tier) drawBlueprint(p.tier);
   const segs = $('hullSeg').children, on = Math.ceil(p.hp / p.maxHp * segs.length);
   for (let i = 0; i < segs.length; i++) segs[i].classList.toggle('on', i < on); $('hullSeg').classList.toggle('low', p.hp / p.maxHp < 0.3);
+  const shr = p.shBroken > 0 ? 0 : p.shield / Math.max(1, p.maxShield), ss = $('shSeg').children, son = Math.ceil(shr * ss.length);
+  for (let i = 0; i < ss.length; i++) ss[i].classList.toggle('on', i < son);
+  $('shSeg').dataset.c = p.shBroken > 0 ? 'x' : shr > 0.66 ? 'g' : shr > 0.33 ? 'y' : 'r';
+  $('shT').textContent = p.shBroken > 0 ? `방어막 붕괴 · 재충전 ${Math.ceil(p.shBroken)}s` : `방어막 ${Math.round(shr * 100)}%`;
   $('crv').textContent = fmt(save.credits);
   $('clk').textContent = `${DAY.night > 0.5 ? '☾' : '☀'} ${DAY.label}${inSafe(p) ? ' · 포트 보호 구역' : ''}`; $('pvpBadge').hidden = !save.pvp;
   drawRadar(dt);
@@ -386,8 +412,9 @@ function hudFrame(dt) {
   for (const s of S.ships) {
     if (!s.alive || s === p) continue; const d = s.pos.distanceTo(p.pos); if (d > 520 && s !== p.lock && !(s.isBoss && d < 2600)) continue;
     const h = S.hooks.hostile(p, s);
-    marker(h ? 'tgt' : '', `<b style="font-size:12px;font-weight:600">${s.name}</b><div class="hp"><i style="width:${s.hp / s.maxHp * 100}%;background:${h ? '#ff4a3a' : '#9fc3ff'}"></i></div><small>${Math.round(d)} M</small><div class="tri"></div>`, s.pos.x, s.pos.y + 22 * s.scale, s.pos.z);
+    marker(h ? 'tgt' : '', `<b style="font-size:12px;font-weight:600">${s.name}</b><div class="hp sh"><i style="width:${s.shBroken > 0 ? 0 : s.shield / s.maxShield * 100}%"></i></div><div class="hp"><i style="width:${s.hp / s.maxHp * 100}%;background:${h ? '#ff4a3a' : '#9fc3ff'}"></i></div><small>${Math.round(d)} M</small><div class="tri"></div>`, s.pos.x, s.pos.y + 22 * s.scale, s.pos.z);
   }
+  if (AP.on) marker('ap', `<b>솔라레 안내 · ${AP.label}</b><small>${Math.round(Math.hypot(AP.x - p.pos.x, AP.z - p.pos.z))}M</small><div class="tri"></div>`, AP.x, AP.y + 40, AP.z);
   for (let i = mkUsed; i < mkPool.length; i++) mkPool[i].style.display = 'none';
   // 잠금 표적 바
   if (p.lock) { $('tbar').style.display = 'block'; $('tName').textContent = `🔒 ${p.lock.name} · ${TIERS[p.lock.tier].t}`; $('tHp').style.width = (p.lock.hp / p.lock.maxHp * 100) + '%'; $('tDist').textContent = Math.round(p.lock.pos.distanceTo(p.pos)) + ' M'; }
@@ -415,6 +442,10 @@ function openMap() {
   const c = $('mapc'), x = c.getContext('2d'), W = c.width, span = WORLD * 1.15, P = (wx, wz) => [(wx / span + 1) / 2 * W, (wz / span + 1) / 2 * W];
   x.imageSmoothingEnabled = true; x.drawImage(mapImg, 0, 0, W, W);
   x.strokeStyle = 'rgba(255,74,58,.6)'; x.setLineDash([10, 8]); const [b0] = P(-WORLD, 0), [b1] = P(WORLD, 0); x.strokeRect(b0, b0, b1 - b0, b1 - b0); x.setLineDash([]);
+  x.textAlign = 'center'; x.font = 'italic 600 26px Pretendard, sans-serif'; x.fillStyle = 'rgba(255,255,255,.45)'; for (const r of REGIONS) { const [a, b] = P(r.x, r.z); x.fillText(r.nm, a, b); }
+  for (const I of islands) { const [a, b] = P(I.x, I.z); x.fillStyle = 'rgba(143,160,74,.85)'; x.beginPath(); x.arc(a, b, Math.max(5, I.r / (WORLD * 1.15) * W / 2), 0, 7); x.fill(); }
+  for (const w of WRECKS) { const [a, b] = P(w.x, w.z); x.strokeStyle = '#bbb'; x.lineWidth = 3; x.beginPath(); x.moveTo(a - 7, b - 7); x.lineTo(a + 7, b + 7); x.moveTo(a + 7, b - 7); x.lineTo(a - 7, b + 7); x.stroke(); }
+  if (AP.on) { const [a, b] = P(AP.x, AP.z); x.strokeStyle = '#22d3d3'; x.lineWidth = 3; x.beginPath(); x.arc(a, b, 14, 0, 7); x.stroke(); }
   for (const o of ores) if (o.alive) { const [a, b] = P(o.x, o.z); x.fillStyle = '#' + ORES[o.type].col.toString(16).padStart(6, '0'); x.save(); x.translate(a, b); x.rotate(Math.PI / 4); x.fillRect(-5, -5, 10, 10); x.restore(); }
   for (const s of S.ships) if (s.alive && s !== player) { const [a, b] = P(s.pos.x, s.pos.z); x.fillStyle = s.faction === 'pirate' ? '#ff4a3a' : '#9fb0b4'; x.beginPath(); x.arc(a, b, 5, 0, 7); x.fill(); }
   for (const p of ports) { const [a, b] = P(p.x, p.z); x.fillStyle = '#22d3d3'; x.fillRect(a - 10, b - 10, 20, 20); x.fillStyle = '#fff'; x.font = 'bold 22px Pretendard, sans-serif'; x.textAlign = 'center'; x.fillText(p.def.nm, a, b - 18); }
@@ -437,13 +468,13 @@ function refreshPort() {
   $('rFill').style.width = nx ? ((save.xp - RANKS[r].xp) / (nx.xp - RANKS[r].xp) * 100) + '%' : '100%';
   $('pvpBtn').textContent = save.pvp ? '켜기' : '끄기'; $('pvpBtn').classList.toggle('on', save.pvp);
   const a = activeShip(), T = TIERS[a.tier];
-  const tmpS = { lv: a.lv, tier: a.tier }; const st = statsFor(a.tier, a.lv);
+  const st = statsFor(a.tier, a.lv);
   $('psTier').textContent = `${T.t} · ${T.en}`; $('psName').textContent = T.nm;
-  $('psStat').innerHTML = `선체 ${st.hp} · 속도 ${st.speed.toFixed(0)} m/s · 화물 ${fmt(st.cargo)}kg<br>포탑 ${T.turrets}문 · ${WEAPONS[a.weapon || 'cannon'].nm} · 미사일 Lv.${a.lv.missile} · 채굴 Lv.${a.lv.drill}`;
-  void tmpS;
+  $('psStat').innerHTML = `${T.role} · 선체 ${st.hp} · 방어막 ${T.shield} · 속도 ${st.speed.toFixed(0)} m/s<br>화물 ${fmt(st.cargo)}kg · 포탑 ${T.turrets}문 · ${WEAPONS[a.weapon || 'cannon'].nm}<br>모듈 ${a.mods.length}/${T.slots} 장착`;
+  renderObjective();
   $('qDot').hidden = !save.quests.some(q => q.have >= q.need || (q.type === 'deliver' && (save.storage[q.ore] || 0) > 0));
 }
-function statsFor(tier, lv) { const T = TIERS[tier]; return { hp: Math.round(T.hp * (1 + 0.22 * (lv.armor || 0))), speed: T.speed * (1 + 0.07 * (lv.engine || 0)), cargo: Math.round(T.cargo * (1 + 0.2 * (lv.cargo || 0))) }; }
+function statsFor(tier, lv) { const T = TIERS[tier]; return { hp: Math.round(T.hp * (1 + 0.22 * (lv.armor || 0))), speed: T.speed * (1 + 0.06 * (lv.engine || 0)), cargo: Math.round(T.cargo * (1 + 0.2 * (lv.cargo || 0))) }; }
 $('pvpBtn').onclick = () => { save.pvp = !save.pvp; persist(); refreshPort(); sfx('ui'); toast(save.pvp ? 'PvP 켜짐 — PvP를 켠 캡틴과 서로 공격할 수 있습니다' : 'PvP 꺼짐 — 해적만 적대적입니다'); };
 document.querySelectorAll('#ptabs button[data-tab]').forEach(b => b.onclick = () => {
   const on = b.classList.contains('on'); document.querySelectorAll('#ptabs button[data-tab]').forEach(x => x.classList.remove('on'));
@@ -476,13 +507,14 @@ function openTab(tab) {
       return `<div class="row"><div class="ic" style="color:#${ORES[k].col.toString(16).padStart(6, '0')}">◆</div><div><div class="nm" style="color:${RAR_COL[ORES[k].rar]}">${ORES[k].nm} <small style="color:var(--dim)">${ORES[k].rar}</small></div><div class="ds">보관 ${n}개 · 개당 <b>${pr} C</b> <span style="color:${tr === '▲' ? '#7fe07f' : tr === '▼' ? '#ff7a6a' : 'var(--dim)'}">${tr}</span></div></div><div style="display:flex;gap:6px"><button class="btn ghost" data-s1="${k}" ${n ? '' : 'disabled'}>1개</button><button class="btn" data-sa="${k}" ${n ? '' : 'disabled'}>전부 ${n ? fmt(n * pr) : 0} C</button></div></div>`; }).join('');
     const total = Object.keys(ORES).reduce((s, k) => s + (save.storage[k] || 0) * priceOf(k, dockPort.def), 0);
     B.innerHTML = `<p style="color:var(--dim);font-size:13px">포트마다 시세가 다르고 시간이 지나면 변합니다.</p>${rows}<div class="row" style="grid-template-columns:1fr auto"><b>보관 광석 전부 판매</b><button class="btn" id="sellAll" ${total ? '' : 'disabled'}>${fmt(total)} C 받기</button></div>`;
-    const sell = (k, n) => { const pr = priceOf(k, dockPort.def); save.storage[k] -= n; save.credits += pr * n; persist(); sfx('coin'); refreshPort(); openTab('market'); };
+    const sell = (k, n) => { const pr = priceOf(k, dockPort.def); save.storage[k] -= n; save.credits += pr * n; story('sell', 1); persist(); sfx('coin'); refreshPort(); openTab('market'); };
     B.querySelectorAll('[data-s1]').forEach(el => el.onclick = () => sell(el.dataset.s1, 1));
     B.querySelectorAll('[data-sa]').forEach(el => el.onclick = () => sell(el.dataset.sa, save.storage[el.dataset.sa]));
-    $('sellAll').onclick = () => { for (const k in ORES) { const n = save.storage[k] || 0; if (n) { save.credits += priceOf(k, dockPort.def) * n; save.storage[k] = 0; } } persist(); sfx('coin'); refreshPort(); openTab('market'); };
+    $('sellAll').onclick = () => { story('sell', 1); for (const k in ORES) { const n = save.storage[k] || 0; if (n) { save.credits += priceOf(k, dockPort.def) * n; save.storage[k] = 0; } } persist(); sfx('coin'); refreshPort(); openTab('market'); };
   } else if (tab === 'quest') {
     T('퀘스트'); refillQuests();
-    B.innerHTML = save.quests.map((q, i) => {
+    const sc = CHAPTERS[save.story.ch];
+    B.innerHTML = (sc && !save.story.done ? `<h4 class="ylv">주 임무 (스토리)</h4><div class="row story"><div class="ic">📜</div><div><div class="nm">${sc.nm}</div><div class="ds">${sc.goal} · 보상 ${fmt(sc.cr)} C · 평판 +${sc.xp}</div>${sc.need > 1 ? `<div class="qbar"><i style="width:${save.story.have / sc.need * 100}%"></i></div>` : ''}</div><span style="color:var(--dim);font-size:12px">${save.story.ch + 1}/${CHAPTERS.length}</span></div><h4 class="ylv">의뢰</h4>` : '') + save.quests.map((q, i) => {
       const have = q.type === 'deliver' ? Math.min(q.need, q.have) : q.have, done = have >= q.need, stock = q.type === 'deliver' ? (save.storage[q.ore] || 0) : 0;
       const btn = done ? `<button class="btn" data-claim="${i}">보상 받기</button>` : q.type === 'deliver' ? `<button class="btn ghost" data-dlv="${i}" ${stock ? '' : 'disabled'}>납품 (${stock})</button>` : `<span style="color:var(--dim);font-size:12px">진행 중</span>`;
       return `<div class="row"><div class="ic">${q.type === 'kill' ? '⚔️' : q.type === 'mine' ? '⛏️' : '📦'}</div><div><div class="nm">${q.nm}</div><div class="ds">보상 ${fmt(q.cr)} C · 평판 +${q.xp} · ${fmt(have)} / ${fmt(q.need)}</div><div class="qbar"><i style="width:${have / q.need * 100}%"></i></div></div>${btn}</div>`;
@@ -492,12 +524,12 @@ function openTab(tab) {
     $('qReroll').onclick = () => { save.credits -= 50; save.quests = save.quests.filter(q => q.have > 0); refillQuests(); persist(); refreshPort(); openTab('quest'); };
   } else if (tab === 'yard') {
     T('조선소'); const r = rankOf(save.xp);
-    B.innerHTML = `<p style="color:var(--dim);font-size:13px">평판 등급이 오르면 다음 등급 함선을 연구·구매할 수 있습니다. 모든 분기는 다음 단계의 함선으로 이어집니다.</p>` + TIERS.map(t => {
-      const own = ownsTier(t.id), act = a.tier === t.id, locked = r < t.rank;
-      const btn = act ? `<button class="btn" disabled>탑승 중</button>` : own ? `<button class="btn ghost" data-use="${t.id}">탑승</button>` : `<button class="btn" data-buy="${t.id}" ${locked || save.credits < t.cost ? 'disabled' : ''}>${locked ? `🔒 ${RANKS[t.rank].nm}` : `구매 ${fmt(t.cost)} C`}</button>`;
-      return `<div class="tcard ${act ? 'on' : ''}"><h4><small>${t.t}</small>${t.nm}</h4>${btn}<p>${t.ds}<br>선체 ${t.hp} · 화물 ${fmt(t.cargo)}kg · 속도 ${t.speed} m/s · 포탑 ${t.turrets}문</p></div>`;
-    }).join('');
-    B.querySelectorAll('[data-buy]').forEach(el => el.onclick = () => { const t = TIERS[+el.dataset.buy]; if (save.credits < t.cost) return; save.credits -= t.cost; buyTier(t.id); persist(); sfx('coin'); toast(`<b>${t.nm}</b> 구매 완료!`); aiDirty = true; setHangarShip(t.id, save.paint); refreshPort(); openTab('yard'); });
+    B.innerHTML = `<p style="color:var(--dim);font-size:13px">평판 등급과 이전 등급 함선 보유가 필요합니다. 등급마다 전투·화물·정찰 등 여러 갈래가 있고, 모든 분기는 다음 단계로 이어집니다.</p>` + [0, 1, 2, 3, 4].map(lvl => `<h4 class="ylv">T${lvl + 1}</h4>` + TIERS.filter(t => t.tier === lvl).map(t => {
+      const own = ownsTier(t.id), act = a.tier === t.id, lockR = r < t.rank, lockP = lvl > 0 && !ownsLevel(lvl - 1);
+      const btn = act ? `<button class="btn" disabled>탑승 중</button>` : own ? `<button class="btn ghost" data-use="${t.id}">탑승</button>` : `<button class="btn" data-buy="${t.id}" ${lockR || lockP || save.credits < t.cost ? 'disabled' : ''}>${lockR ? `🔒 ${RANKS[t.rank].nm}` : lockP ? `🔒 T${lvl} 필요` : `구매 ${fmt(t.cost)} C`}</button>`;
+      return `<div class="tcard ${act ? 'on' : ''}"><h4><small>${t.t}</small>${t.nm} <em class="role">${t.role}</em></h4>${btn}<p>${t.ds}<br>선체 ${t.hp} · 방어막 ${t.shield} · 속도 ${t.speed} m/s · 화물 ${fmt(t.cargo)}kg · 포탑 ${t.turrets}문 · 모듈 슬롯 ${t.slots}</p></div>`;
+    }).join('')).join('');
+    B.querySelectorAll('[data-buy]').forEach(el => el.onclick = () => { const t = TIERS[+el.dataset.buy]; if (save.credits < t.cost) return; save.credits -= t.cost; buyTier(t.id); persist(); sfx('coin'); toast(`<b>${t.nm}</b> 구매 완료!`); solEvent('newShip', 2, 1); if (t.tier >= 1) story('ship', 1); if (t.id === 8) story('arc', 1); aiDirty = true; setHangarShip(t.id, save.paint); refreshPort(); openTab('yard'); });
     B.querySelectorAll('[data-use]').forEach(el => el.onclick = () => { save.active = save.ships.findIndex(s => s.tier === +el.dataset.use); persist(); setHangarShip(activeShip().tier, save.paint); refreshPort(); openTab('yard'); });
   } else if (tab === 'inv') {
     T('인벤토리');
@@ -505,10 +537,25 @@ function openTab(tab) {
     B.innerHTML = `<h4 style="margin:6px 0">보관 창고</h4>` + (st.length ? st.map(([k, n]) => `<div class="row"><div class="ic" style="color:#${ORES[k].col.toString(16).padStart(6, '0')}">◆</div><div><div class="nm">${ORES[k].nm}</div><div class="ds">${n}개 · ${n * ORES[k].kg}kg</div></div><span style="font-family:var(--num);font-size:13px">${fmt(n * priceOf(k, dockPort.def))} C</span></div>`).join('') : '<p style="color:var(--dim)">비어 있습니다. 광석을 채굴해 도킹하면 여기 보관됩니다.</p>')
       + `<h4 style="margin:18px 0 6px">보유 함선</h4>` + save.ships.map(s => `<div class="row"><div class="ic">🚀</div><div><div class="nm">${TIERS[s.tier].t} ${TIERS[s.tier].nm}</div><div class="ds">${Object.entries(s.lv).map(([k, v]) => `${MODS[k].nm.split(' ')[0]} ${v}`).join(' · ')}</div></div>${s === a ? '<span style="color:var(--teal)">탑승 중</span>' : ''}</div>`).join('')
       + `<h4 style="margin:18px 0 6px">기록</h4><div class="kv"><span>격추</span><b>${save.stats.kills}</b><span>채굴</span><b>${fmt(save.stats.mined)} kg</b><span>격추당함</span><b>${save.stats.deaths}</b><span>SKY RUN 최고</span><b>${save.skyrunBest || 0}</b></div>`;
+  } else if (tab === 'modules') {
+    T('모듈'); const Tt = TIERS[a.tier]; save.modules = save.modules || [];
+    const cats = ['방어', '기동', '공격', '유틸'];
+    B.innerHTML = `<div class="slots">${Array.from({ length: Tt.slots }, (_, i) => { const id = a.mods[i], m = MODULES[id]; return m ? `<button class="slot full" data-un="${id}" title="해제">${m.ic}<small>${m.nm}</small><em>해제</em></button>` : '<div class="slot">빈 슬롯</div>'; }).join('')}</div>
+      <p style="color:var(--dim);font-size:12px">${Tt.nm}: 슬롯 ${a.mods.length}/${Tt.slots}. 모듈은 한 번 사면 모든 함선에 장착할 수 있어요.</p>`
+      + cats.map(c => `<h4 class="ylv">${c}</h4>` + Object.entries(MODULES).filter(([, m]) => m.cat === c).map(([id, m]) => {
+        const own = save.modules.includes(id), eq = a.mods.includes(id), full = a.mods.length >= Tt.slots;
+        const btn = eq ? `<button class="btn ghost" data-un="${id}">해제</button>` : own ? `<button class="btn" data-eq="${id}" ${full ? 'disabled' : ''}>${full ? '슬롯 없음' : '장착'}</button>` : `<button class="btn" data-mbuy="${id}" ${save.credits < m.cost ? 'disabled' : ''}>구매 ${fmt(m.cost)} C</button>`;
+        return `<div class="row"><div class="ic">${m.ic}</div><div><div class="nm">${m.nm}${eq ? ' <small style="color:var(--teal)">장착 중</small>' : ''}</div><div class="ds">${m.ds}</div></div>${btn}</div>`; }).join('')).join('');
+    const re = () => { persist(); sfx('ui'); refreshPort(); openTab('modules'); };
+    B.querySelectorAll('[data-mbuy]').forEach(el => el.onclick = () => { const id = el.dataset.mbuy, m = MODULES[id]; if (save.credits < m.cost) return; save.credits -= m.cost; save.modules.push(id); if (a.mods.length < Tt.slots) { a.mods.push(id); story('module', 1); } toast(`<b>${m.nm}</b> 구매${a.mods.includes(id) ? '·장착' : ''} 완료`); re(); });
+    B.querySelectorAll('[data-eq]').forEach(el => el.onclick = () => { if (a.mods.length < Tt.slots && !a.mods.includes(el.dataset.eq)) { a.mods.push(el.dataset.eq); story('module', 1); } re(); });
+    B.querySelectorAll('[data-un]').forEach(el => el.onclick = () => { a.mods = a.mods.filter(x => x !== el.dataset.un); re(); });
   } else if (tab === 'settings') {
     T('설정');
-    B.innerHTML = `<div class="kv" style="align-items:center"><span>그래픽 품질</span><select class="sel" id="qSel"><option value="high">높음</option><option value="mid">보통</option><option value="low">낮음</option></select><span>AI 함선 수 <b id="aiv">${aiCount()}</b>척</span><input type="range" id="aiR" min="20" max="40" step="2" value="${aiCount()}"><span>소리</span><button class="btn ghost" id="muteB">${save.mute ? '꺼짐 — 켜기' : '켜짐 — 끄기'}</button><span>저장 초기화</span><button class="btn red" id="rst">모두 지우기</button></div><p style="color:var(--dim);font-size:12px;margin-top:16px">조작: W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 마우스 시점(클릭하면 고정) · 클릭 사격 · E 채굴 · R 잠금 · F 미사일 · X 부스트 · C 플레어 · G 화물 투하 · M 지도 · Tab 순위</p>`;
+    B.innerHTML = `<div class="kv" style="align-items:center"><span>그래픽 품질</span><select class="sel" id="qSel"><option value="high">높음</option><option value="mid">보통</option><option value="low">낮음</option></select><span>AI 함선 수 <b id="aiv">${aiCount()}</b>척</span><input type="range" id="aiR" min="20" max="40" step="2" value="${aiCount()}"><span>소리</span><button class="btn ghost" id="muteB">${save.mute ? '꺼짐 — 켜기' : '켜짐 — 끄기'}</button><span>카메라 방향 조종</span><button class="btn ghost" id="csB">${save.camSteer !== false ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><span>스토리</span><button class="btn ghost" id="introB">인트로 다시 보기</button><span>저장 초기화</span><button class="btn red" id="rst">모두 지우기</button></div><p style="color:var(--dim);font-size:12px;margin-top:16px">조작: W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 마우스 시점(클릭하면 고정) · 클릭 사격 · E 채굴 · R 잠금 · F 미사일 · X 부스트 · C 플레어 · G 화물 투하 · M 지도 · Tab 순위</p>`;
     $('qSel').value = QUALITY; $('qSel').onchange = e => { try { localStorage.setItem('skyfleet_q', e.target.value); } catch (er) {} location.reload(); };
+    $('csB').onclick = () => { save.camSteer = save.camSteer === false; persist(); openTab('settings'); };
+    $('introB').onclick = () => { $('ppanel').hidden = true; const port = dockPort; playIntro(() => enterHangar(port)); };
     $('muteB').onclick = () => { save.mute = !save.mute; setMute(save.mute); persist(); openTab('settings'); };
     $('aiR').oninput = e => { save.aiCount = +e.target.value; $('aiv').textContent = save.aiCount; aiDirty = true; persist(); };
     $('rst').onclick = () => { if (confirm('정말 모든 진행 상황을 지울까요?')) { localStorage.removeItem('skyfleet_save_v2'); location.reload(); } };
@@ -518,7 +565,7 @@ $('leave').onclick = () => launch();
 function launch() {
   const a = activeShip(), p = dockPort;
   if (player.tier !== a.tier || player.paint !== save.paint) { player.tier = a.tier; player.paint = save.paint; }
-  player.lv = a.lv; player.weapon = a.weapon || 'cannon'; player.hp = undefined; player.build(scene);
+  player.lv = a.lv; player.weapon = a.weapon || 'cannon'; player.mods = a.mods || []; player.hp = undefined; player.shield = 0; player.build(scene);
   const yaw = Math.atan2(p.x, p.z);   // 바깥쪽 대신 맵 중앙을 향함
   player.spawnAt(p.x, p.deck + player.hover + 2, p.z, yaw);
   cam.yaw = yaw; cam.pitch = 0.3; cam.last = 0;
@@ -526,7 +573,121 @@ function launch() {
   launchT = 2.6; docking = 0; $('ppanel').hidden = true;
   setMode('fly');
   banner('LAUNCH', DAY.night > 0.5 ? '야간 비행입니다, 캡틴 · 착륙장 조명을 따라 귀환하세요' : '맑은 하늘입니다, 캡틴', 3.2);
-  sfx('ui');
+  sfx('ui'); story('launch', 1); setTimeout(() => solEvent(DAY.night > 0.5 ? 'night' : 'launch', 1, 5), 1200);
+}
+
+/* ================= 스토리 · 솔라레 · 자동비행 · 연출 ================= */
+function camSteerOn() { return save.camSteer !== false && (isTouch || document.pointerLockElement === cv) && !AP.on; }
+// 스토리 진행
+function story(id, amt) {
+  const st = save.story; if (st.done) return; const ch = CHAPTERS[st.ch]; if (!ch || ch.id !== id) return;
+  st.have = Math.min(ch.need, st.have + amt); renderObjective();
+  if (st.have < ch.need) return;
+  save.credits += ch.cr; gainXp(ch.xp); st.ch++; st.have = 0; persist();
+  banner('CHAPTER CLEAR', `${ch.nm} 완료 · +${fmt(ch.cr)} CR · 평판 +${ch.xp}`, 4);
+  const nx = CHAPTERS[st.ch];
+  if (nx) setTimeout(() => { solSay(`다음 임무: ${nx.nm}. ${nx.solare}`, 'happy', 2); renderObjective(); }, 1500);
+  else { st.done = true; persist(); setTimeout(showEnding, 2500); }
+  if (nx && nx.id === 'ship' && ownsLevel(1)) story('ship', 1);
+  if (nx && nx.id === 'arc' && ownsTier(8)) story('arc', 1);
+  if (nx && nx.id === 'module' && save.ships.some(s => s.mods.length)) story('module', 1);
+}
+function renderObjective() {
+  const st = save.story, ch = CHAPTERS[st.ch], el = $('obj');
+  if (!ch || st.done) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `<small>주 임무 · ${st.ch + 1}/${CHAPTERS.length}</small><b>${ch.nm}</b><span>${ch.goal}</span>${ch.need > 1 ? `<div class="qbar"><i style="width:${st.have / ch.need * 100}%"></i></div><em>${fmt(st.have)} / ${fmt(ch.need)}</em>` : ''}`;
+}
+function showEnding() { $('introT').textContent = '에필로그'; $('introS').textContent = ''; introOn = true; introLines = [{ t: '에필로그', s: ENDING, solare: true }]; introI = -1; $('intro').classList.add('on'); introNext(); }
+// 인트로 (첫 실행)
+let introOn = false, introI = -1, introLines = INTRO, introDone = null, introTyper = null, introCam = 0;
+function playIntro(after) {
+  introOn = true; introI = -1; introLines = INTRO; introDone = after; $('intro').classList.add('on'); setMode('intro'); introNext();
+}
+function introNext() {
+  if (introTyper && introTyper.busy) { introTyper.finish(); return; }
+  introI++;
+  if (introI >= introLines.length) { introOn = false; $('intro').classList.remove('on'); if (introDone) { const f = introDone; introDone = null; save.story.intro = true; persist(); f(); } return; }
+  const L = introLines[introI]; $('introT').textContent = L.t; $('introAv').classList.toggle('on', !!L.solare);
+  let i = 0; const el = $('introS'), full = L.s;
+  const iv = setInterval(() => { i += 1; el.textContent = full.slice(0, i); if (i >= full.length) { clearInterval(iv); introTyper.busy = false; } }, 32);
+  introTyper = { busy: true, finish() { clearInterval(iv); el.textContent = full; this.busy = false; } };
+  $('introDots').innerHTML = introLines.map((_, k) => `<i class="${k === introI ? 'on' : ''}"></i>`).join('');
+}
+$('introNext').onclick = () => introNext();
+$('introSkip').onclick = () => { introI = introLines.length; introTyper && introTyper.finish(); introNext(); };
+function updateIntroCam(dt) {
+  introCam += dt * 0.05; const r = 1700, h = 620;
+  camera.position.set(Math.cos(introCam) * r, h + Math.sin(introCam * 2) * 80, Math.sin(introCam) * r);
+  camera.lookAt(300, 380, -500); camera.fov = 55; camera.updateProjectionMatrix();
+}
+// 자동 비행 (솔라레)
+const AP = { on: false, x: 0, y: 0, z: 0, label: '', kind: '' };
+function setAP(x, y, z, label, kind) { Object.assign(AP, { on: true, x, y, z, label, kind }); }
+function autopilot(p, dt) {
+  const dx = AP.x - p.pos.x, dz = AP.z - p.pos.z, dist = Math.hypot(dx, dz);
+  const want = Math.atan2(-dx, -dz), d = wrap(want - p.yaw);
+  p.inTurn = clamp(d * 2, -1, 1);
+  const slow = AP.kind === 'port' ? 70 : 50;
+  p.inThrust = dist > slow ? clamp(dist / 200, 0.25, 1) * Math.max(0.2, Math.cos(d)) : -clamp(p.speed / 15, 0, 0.8);
+  p.boosting = dist > 900 && Math.abs(d) < 0.3;
+  const ax = p.pos.x + p.vel.x * 2.5, az = p.pos.z + p.vel.z * 2.5;
+  const cruise = Math.max(groundAt(ax, az), groundAt(p.pos.x, p.pos.z)) + 70 * p.scale;
+  const wantY = dist > 250 ? Math.max(AP.y + 60, cruise) : Math.max(AP.y, groundAt(p.pos.x, p.pos.z) + p.hover + 4);
+  p.inLift = clamp((wantY - p.pos.y) / 25, -1, 1);
+  if (dist < 40 && AP.kind === 'ore') { AP.on = false; solSay('도착했어요! E를 길게 눌러 채굴하세요.', 'happy'); }
+  if (dist < 25 && AP.kind === 'port' && p.pos.y - AP.y < 20) { /* 도킹은 자동으로 진행됨 */ }
+}
+const solCtx = {
+  cancelAuto() { AP.on = false; },
+  autoPort() { if (mode !== 'fly' || !player.alive) return null; const [pt] = nearestPort(player.pos); setAP(pt.x, pt.deck + player.hover + 6, pt.z, pt.def.nm, 'port'); return pt.def.nm; },
+  autoOre(type) {
+    if (mode !== 'fly' || !player.alive) return '비행 중일 때 안내할 수 있어요.';
+    let best = null, bd = 1e9; for (const o of ores) { if (!o.alive || (type && o.type !== type)) continue; const d = Math.hypot(o.x - player.pos.x, o.z - player.pos.z); if (d < bd) { bd = d; best = o; } }
+    if (!best) return null; setAP(best.x, best.y + 30 * player.scale, best.z, ORES[best.type].nm, 'ore');
+    return `${ORES[best.type].nm} 광맥(${ORES[best.type].rar}, 남은 ${best.amount})까지 ${Math.round(bd)}m. 자동 비행 시작!${best.island ? ' 부유섬 위에 있어요.' : ''}`;
+  },
+  bossInfo() { const b = EV.boss; if (b && b.alive) return `고르곤은 ${Math.round(b.pos.distanceTo(player.pos))}m 떨어져 있어요. 체력 ${Math.round(b.hp / b.maxHp * 100)}%, 남은 시간 ${Math.floor(EV.life / 60)}분.`; return `지금은 고르곤 신호가 없어요. 약 ${Math.max(1, Math.round(EV.timer / 60))}분 뒤 나타날 것 같아요.`; },
+  priceInfo() { return Object.keys(ORES).map(k => { let bp = null, bv = 0; for (const p of ports) { const v = priceOf(k, p.def); if (v > bv) { bv = v; bp = p; } } return `${ORES[k].nm} ${bv}C(${bp.def.nm})`; }).join(' · ') + ' — 가장 비싸게 사는 곳이에요.'; },
+  status() { const p = player; const sh = p.shBroken > 0 ? `방어막 붕괴, ${Math.ceil(p.shBroken)}초 후 복구` : `방어막 ${Math.round(p.shield / p.maxShield * 100)}%`; return `선체 ${Math.round(p.hp / p.maxHp * 100)}%, ${sh}, 화물 ${fmt(p.cargoKg)}/${fmt(p.cargoCap)}kg, 부스트 에너지 ${Math.round(p.energy)}%. ${p.hp / p.maxHp < 0.4 ? '수리가 필요해요!' : '양호해요.'}`; },
+  threatInfo() { const h = S.ships.filter(s => s.alive && S.hooks.hostile(player, s)).map(s => [s, s.pos.distanceTo(player.pos)]).sort((a, b) => a[1] - b[1]); if (!h.length) return '주변에 적대 함선이 없어요.'; const [s, d] = h[0]; return `가장 가까운 적은 ${s.name}(${TIERS[s.tier].t} ${TIERS[s.tier].nm}), ${Math.round(d)}m. 1km 안에 적 ${h.filter(x => x[1] < 1000).length}척.`; },
+  missionInfo() { const st = save.story, ch = CHAPTERS[st.ch]; return ch && !st.done ? `${ch.nm}: ${ch.goal}. ${ch.solare}` : '모든 이야기를 끝냈어요! 이제 하늘은 캡틴 거예요.'; },
+  adviceInfo() { const a = activeShip(), T = TIERS[a.tier]; if (a.mods.length < T.slots) return `모듈 슬롯이 ${T.slots - a.mods.length}칸 비어 있어요. 방어막 발생기나 터보 차저를 추천해요.`; if ((a.lv.guns || 0) < 3) return '포탑 업그레이드를 먼저 올리면 전투가 훨씬 편해져요.'; return '다음 등급 함선을 노려 볼까요? 조선소를 확인해 보세요.'; },
+  onChat(on) { if (on && document.pointerLockElement) document.exitPointerLock(); },
+};
+initSolare(solCtx);
+// 속도선 (카메라에 붙은 선분)
+const SPD = (() => {
+  const N = 90, pos = new Float32Array(N * 6), g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  m.frustumCulled = false; camera.add(m); scene.add(camera);
+  const P = Array.from({ length: N }, () => ({ x: 0, y: 0, z: 0 })), reset = (q, far) => { const a = rand(0, 6.28), r = rand(7, 26); q.x = Math.cos(a) * r; q.y = Math.sin(a) * r * 0.7; q.z = far ? -rand(20, 160) : -160; };
+  P.forEach(q => reset(q, true));
+  return { m, pos, P, reset, g };
+})();
+function updateSpeedLines(dt) {
+  const p = player, k = p.alive ? clamp((p.speed / p.maxSpeed - 0.55) * 2.2, 0, 1) + (p.boostOn ? 0.6 : 0) : 0;
+  SPD.m.material.opacity = Math.min(0.55, k * 0.4); SPD.m.visible = k > 0.02;
+  if (!SPD.m.visible) return;
+  const v = p.speed * (p.boostOn ? 2.4 : 1.6), len = 4 + k * 10;
+  SPD.P.forEach((q, i) => { q.z += v * dt; if (q.z > -4) SPD.reset(q); SPD.pos.set([q.x, q.y, q.z, q.x, q.y, q.z - len], i * 6); });
+  SPD.g.attributes.position.needsUpdate = true;
+}
+// 난파선 모델
+function buildWrecks() {
+  for (const w of WRECKS) {
+    const m = makeShipModel(pick([6, 8, 4, 7]), 'night', 'pirate', w.scale / TIERS[6].scale);
+    m.root.traverse(o => { if (o.isMesh && o.material && o.material.toneMapped === false) o.visible = false; if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    m.turrets.forEach(t => { t.rotation.y = rand(-2, 2); t.userData.gun.rotation.x = rand(-0.4, 0.2); });
+    m.root.position.set(w.x, w.y - 4 * w.scale, w.z); m.root.rotation.set(w.pitch, w.yaw, w.roll, 'YXZ'); scene.add(m.root);
+  }
+}
+// 방어막 이벤트 처리
+function shieldEvents(s) {
+  while (s.events.length) {
+    const e = s.events.shift(); shieldFx(s, e);
+    if (s.isPlayer) { if (e === 'break') { solEvent('shieldBreak', 3, 10); toast('⚠ 방어막 붕괴!'); } else solEvent('shieldRestore', 1, 10); }
+  }
 }
 
 /* ================= 날씨 · 이벤트 · 부가 HUD ================= */
@@ -540,16 +701,17 @@ function spawnBoss() {
     x = rand(-WORLD * 0.75, WORLD * 0.75); z = rand(-WORLD * 0.75, WORLD * 0.75);
     if (ports.every(p => Math.hypot(p.x - x, p.z - z) > 950) && Math.hypot(player.pos.x - x, player.pos.z - z) > 800) break;
   }
-  const boss = new Ship({ name: '해적 기함 「고르곤」', faction: 'pirate', tier: 3, paint: 'night', lv: { guns: 4, missile: 4, armor: 5, engine: 0, cargo: 0, drill: 0 }, weapon: 'cannon', scaleMul: 1.9, hpMul: 2.5 });
+  const boss = new Ship({ name: '해적 기함 「고르곤」', faction: 'pirate', tier: 6, paint: 'night', lv: { guns: 4, missile: 4, armor: 5, engine: 0, cargo: 0, drill: 0 }, weapon: 'cannon', scaleMul: 1.9, hpMul: 2.5 });
   boss.isBoss = true; boss.temp = true; boss.ai.skill = 0.9; scene.add(boss.mesh); S.ships.push(boss);
   boss.spawnAt(x, groundAt(x, z) + 280, z, rand(-3, 3));
   for (let i = 0; i < 3; i++) {
-    const t = clamp(Math.floor(rand(1, 2.99)), 0, 3);
+    const t = pick(TIERS.filter(c => c.tier === Math.floor(rand(1, 2.99)))).id;
     const e = new Ship({ name: `고르곤 호위함 ${i + 1}`, faction: 'pirate', tier: t, paint: 'night', lv: rollLv(t), weapon: pick(['cannon', 'flak', 'rail']) });
     e.temp = true; e.ai.skill = rand(0.7, 1); scene.add(e.mesh); S.ships.push(e);
     e.spawnAt(x + rand(-150, 150), groundAt(x, z) + rand(200, 320), z + rand(-150, 150), rand(-3, 3));
   }
   EV.boss = boss; EV.playerDmg = 0; EV.life = 480;
+  solEvent('boss', 2, 1);
   banner('EVENT', '해적 기함 「고르곤」 출현! 격추에 기여하면 큰 보상을 받습니다', 4.5);
   toast('⚑ 이벤트 · 지금 진행 중 — 레이더의 큰 빨간 점을 찾으세요'); sfx('ui');
 }
@@ -558,6 +720,7 @@ function bossDown(t, by) {
   explode(t.pos, 140); explode(tmp.copy(t.pos).add(tmp2.set(30, 10, 0)), 90); spawnDebris(t.pos, 2); spawnDebris(t.pos, 1.5);
   dropCrate(tmp.copy(t.pos), 900, { aether: 5, gold: 8, silver: 10 });
   if (EV.playerDmg > 0) {
+    story('boss', 1); solEvent('bossDown', 2, 1);
     const share = clamp(EV.playerDmg / t.maxHp, 0.1, 1), cr = Math.round(1200 + 2800 * share), xp = Math.round(60 + 140 * share);
     save.credits += cr; gainXp(xp); save.stats.bosses = (save.stats.bosses || 0) + 1; persist();
     banner('EVENT CLEAR', `기함 격추! 기여도 ${Math.round(share * 100)}% · +${fmt(cr)} CR · 평판 +${xp}`, 5);
@@ -571,11 +734,11 @@ function updateEvent(dt) {
   if (EV.life <= 0 && EV.boss.alive) { for (const s of [...S.ships]) if (s.temp) removeShip(s); EV.boss = null; EV.timer = rand(360, 480); toast('해적 기함이 전장을 떠났습니다'); }
 }
 const dnums = [];
-function dmgNum(t, amt, at) {
+function dmgNum(t, amt, at, shielded) {
   const last = dnums.find(d => d.t === t && d.age < 0.25);
   if (last) { last.amt += amt; last.age = Math.min(last.age, 0.05); return; }
   const el = document.createElement('div'); el.className = 'dn'; $('dmgn').appendChild(el);
-  dnums.push({ t, pos: (at || t.pos).clone().add(tmp2.set(rand(-4, 4), rand(4, 10), rand(-4, 4))), amt, age: 0, el, big: player.weapon === 'rail' });
+  dnums.push({ t, pos: (at || t.pos).clone().add(tmp2.set(rand(-4, 4), rand(4, 10), rand(-4, 4))), amt, age: 0, el, big: player.weapon === 'rail' }); if (shielded) el.classList.add('sh');
 }
 let boardT = 0;
 function hudExtras(dt) {
@@ -609,6 +772,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (mode === 'loading') { tickLoading(); return; }
+  tickSolare(dt);
+  if (mode === 'intro') { updateWorld(dt, camera.position); updateIntroCam(dt); render(scene, camera, dt); return; }
   blinkNav(now / 1000);
   if (mode === 'hangar') { engineSound(0, false, false); updateHangar(dt); render(hscene, hcam, dt); return; }
   // fly / dead
@@ -616,6 +781,7 @@ function frame(now) {
   if (!$('mapOv').classList.contains('on')) for (let step = 0; step < SUBSTEPS; step++) {
     updatePlayer(dt);
     for (const s of S.ships) {
+      if (s.events.length) shieldEvents(s);
       if (s.isPlayer) { if (s.alive) shipFx(s, dt); continue; }
       if (!s.alive) { if (s.temp) continue; s.respawn -= dt; if (s.respawn <= 0) { s.lv = rollLv(s.tier); s.stats(); spawnAI(s); } continue; }
       runAI(s, dt); s.boosting = s.ai.mode === 'return' || (s.ai.target && s.ai.target.pos.distanceTo(s.pos) > 700);
@@ -634,10 +800,11 @@ function frame(now) {
   engineSound(player.alive ? clamp(player.speed / player.maxSpeed, 0, 1.4) : 0, player.boostOn, mode === 'fly' && player.alive);
   updateWorld(dt, player.pos);
   if (player.alive) updateCamera(dt); else { camera.lookAt(player.pos); }
+  updateSpeedLines(dt);
   hudFrame(dt);
   render(scene, camera, dt);
 }
 requestAnimationFrame(frame);
 boot().catch(e => { console.error(e); $('ldPhase').textContent = '오류: ' + e.message; });
 
-window.__sf = { S, save, EV, WEATHER, get mode() { return mode; }, get player() { return player; }, ports, ores, launch: () => launch(), enterHangar: p => enterHangar(p || homePort()), key, inp, DAY, cam };
+window.__sf = { S, save, EV, WEATHER, AP, story, solCtx, get mode() { return mode; }, get player() { return player; }, ports, ores, launch: () => launch(), enterHangar: p => enterHangar(p || homePort()), key, inp, DAY, cam };

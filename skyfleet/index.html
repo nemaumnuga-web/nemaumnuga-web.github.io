@@ -37,7 +37,7 @@
 
 <!-- ================= 비행 HUD ================= -->
 <section id="hud">
-  <div class="panel" id="bp"><canvas id="bpc" width="360" height="130"></canvas><div class="hull" id="hullSeg"></div><div class="en"><i id="enFill"></i></div><div class="bpi"><span>부스트 에너지</span><span id="flareT">플레어 준비</span></div></div>
+  <div class="panel" id="bp"><canvas id="bpc" width="360" height="130"></canvas><div class="shs" id="shSeg"></div><div class="bpi"><span id="shT">방어막 100%</span><span>선체</span></div><div class="hull" id="hullSeg"></div><div class="en"><i id="enFill"></i></div><div class="bpi"><span>부스트 에너지</span><span id="flareT">플레어 준비</span></div></div>
   <div class="panel" id="cr"><span class="hex">C</span><b id="crv">0</b><small>CR</small></div>
   <div id="radarBox"><canvas id="radar" width="440" height="440"></canvas><div class="rlabel" id="rlabel">레이더 · 600 M</div></div>
   <div id="clock"><span id="clk">--:--</span><span class="pvp" id="pvpBadge" hidden>PvP</span></div>
@@ -51,6 +51,7 @@
   <div id="markers"></div>
   <div id="xhair"></div>
   <div id="tbar"><div class="tn" id="tName"></div><div class="tb"><i id="tHp"></i></div><div class="td" id="tDist"></div></div>
+  <div class="panel" id="obj"></div>
   <div id="feed"></div>
   <div id="evbar"><div class="evt"><span class="evtag">⚑ 이벤트 · 지금 진행 중</span> 해적 기함 「고르곤」</div><div class="evb"><i id="evHp"></i></div><div class="evi" id="evInfo"></div></div>
   <div id="mwarn"></div>
@@ -58,7 +59,7 @@
   <div id="hint"></div>
   <div id="hitmark">✕</div>
   <div id="vign"></div>
-  <div id="keys">W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 클릭 사격 · X 부스트 · C 플레어 · E 채굴 · R 잠금 · F 미사일 · G 투하 · M 지도 · Tab 순위 · Esc 마우스 해제</div>
+  <div id="keys">W/S 추진 · 마우스 방향 · A/D 회전 · Space/Shift 상승·하강 · 클릭 사격 · V 솔라레 · X 부스트 · C 플레어 · E 채굴 · R 잠금 · F 미사일 · G 투하 · M 지도 · Tab 순위 · Esc 마우스 해제</div>
   <div id="touch">
     <div class="tlabel" style="left:120px;bottom:330px">추진 · 회전</div>
     <div id="joy"><i id="joyk"></i></div>
@@ -91,7 +92,7 @@
     </div>
     <nav class="ptabs" id="ptabs">
       <button data-tab="paint">페인트</button><button data-tab="inv">인벤토리</button><button data-tab="quest">퀘스트<i class="dot" id="qDot" hidden></i></button>
-      <button data-tab="upgrade">업그레이드</button><button data-tab="market">시장</button><button data-tab="yard">조선소</button>
+      <button data-tab="upgrade">업그레이드</button><button data-tab="modules">모듈</button><button data-tab="market">시장</button><button data-tab="yard">조선소</button>
       <button data-tab="settings">설정</button>
       <button class="leave" id="leave">항구를 떠나기</button>
     </nav>
@@ -103,6 +104,17 @@
 <div class="ov" id="mapOv"><div class="card wide"><button class="x" id="mapX">✕</button><h3>월드 지도</h3><canvas id="mapc" width="900" height="900"></canvas><p class="legend"><i class="lg port"></i>포트 <i class="lg ore"></i>광맥 <i class="lg pir"></i>해적 <i class="lg cap"></i>캡틴 <i class="lg me"></i>나</p></div></div>
 <div class="ov" id="board"><div class="card wide"><h3>순위표</h3><div id="boardB"></div><p class="legend">PC: Tab 키를 누르고 있는 동안 표시</p></div></div>
 <div id="toast"></div>
+<!-- 인트로 / 스토리 -->
+<div id="intro"><div class="lb top"></div><div class="lb bot"></div>
+  <div class="ibox"><div class="av big" id="introAv"><i></i><b></b></div><h2 id="introT"></h2><p id="introS"></p>
+  <div class="idots" id="introDots"></div><div class="ibtn"><button class="btn ghost" id="introSkip">건너뛰기</button><button class="btn" id="introNext">다음 ▸</button></div></div></div>
+<!-- 솔라레 -->
+<div id="solare" data-mood="calm"><div class="av" id="solAv"><i></i><b></b></div><div class="sbub"><small>SOLARE · 함선 AI</small><p id="solText"></p></div></div>
+<button id="solBtn"><span class="av mini"><i></i><b></b></span>솔라레</button>
+<div id="solChat"><div class="sch"><div class="av mini"><i></i><b></b></div><b>솔라레</b><small>함선 AI 비서 (가상)</small><button class="x" id="solClose">✕</button></div>
+  <div id="solLog"></div>
+  <div id="solQuick"><button>상태 보고</button><button data-q="가까운 포트로">가까운 포트로 자동비행</button><button data-q="가까운 광맥">가까운 광맥 안내</button><button data-q="금 광맥">금 광맥 찾기</button><button data-q="보스">고르곤 위치</button><button data-q="시세">시세 알려줘</button><button data-q="임무">지금 임무</button><button data-q="추천">개조 추천</button><button data-q="취소">자동비행 취소</button></div>
+  <form id="solForm"><input id="solIn" placeholder="솔라레에게 말하기 (예: 에테르 결정 어디 있어?)" autocomplete="off"><button class="btn">전송</button></form></div>
 
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
 <script type="module" src="js/main.js"></script>

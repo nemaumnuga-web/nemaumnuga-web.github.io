@@ -205,3 +205,65 @@ input[type=range]{accent-color:var(--teal);width:100%}
 #board td{padding:6px;border-bottom:1px solid rgba(255,255,255,.06)}
 #board tr.me{background:rgba(34,211,211,.15)}
 @media (max-width:900px){#tBoost{right:130px!important;bottom:200px!important}#tFlare{right:300px!important;bottom:120px!important}#tBoard{bottom:280px!important}}
+
+/* ---------- 방어막 HUD ---------- */
+.shs{display:flex;gap:3px;margin-top:10px;height:8px}
+.shs i{flex:1;background:rgba(80,255,140,.12);transform:skewX(-30deg)}
+.shs[data-c=g] i.on{background:#4dffa0;box-shadow:0 0 6px #4dffa0}.shs[data-c=y] i.on{background:#ffd84a;box-shadow:0 0 6px #ffd84a}.shs[data-c=r] i.on{background:#ff5a3a;box-shadow:0 0 6px #ff5a3a}
+.shs[data-c=x] i{background:rgba(255,80,60,.25);animation:blink .6s steps(2) infinite}
+.mk .hp.sh{height:3px;margin-bottom:1px}.mk .hp.sh i{background:#5dffb0}
+.dn.sh{color:#7dffc0}
+/* ---------- 임무 추적 ---------- */
+#obj{left:16px;top:262px;width:300px;padding:10px 14px;display:none}
+#obj small{display:block;font-size:11px;color:var(--teal);letter-spacing:.1em}#obj b{display:block;font-size:15px;margin:2px 0}#obj span{font-size:12px;color:var(--dim)}
+#obj em{font-style:normal;font-size:11px;color:var(--dim);font-family:var(--num)}
+.mk.ap b{color:var(--teal);font-size:13px}.mk.ap .tri{border-top-color:#fff}
+/* ---------- 인트로 ---------- */
+#intro{position:fixed;inset:0;z-index:60;display:none;pointer-events:auto}
+#intro.on{display:block}
+.lb{position:absolute;left:0;right:0;height:11vh;background:#000}.lb.top{top:0}.lb.bot{bottom:0}
+.ibox{position:absolute;left:50%;bottom:14vh;transform:translateX(-50%);width:min(860px,90vw);background:linear-gradient(rgba(4,10,12,.2),rgba(4,10,12,.85));padding:26px 30px 20px;border-left:4px solid var(--teal);display:grid;grid-template-columns:auto 1fr;gap:6px 22px}
+.ibox h2{grid-column:2;margin:0;font-family:var(--stencil);letter-spacing:.35em;color:var(--teal);font-size:clamp(20px,2.6vw,32px)}
+.ibox p{grid-column:2;margin:4px 0 0;font-size:clamp(15px,1.6vw,20px);line-height:1.7;min-height:3.4em}
+.ibox .av{grid-row:1/4;visibility:hidden}.ibox .av.on{visibility:visible}
+.idots{grid-column:2;display:flex;gap:6px;margin-top:8px}.idots i{width:22px;height:4px;background:rgba(255,255,255,.2)}.idots i.on{background:var(--teal)}
+.ibtn{grid-column:1/3;display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+/* ---------- 솔라레 아바타 ---------- */
+.av{position:relative;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#bffcff 0,#22d3d3 35%,#0b4a50 70%,transparent 72%);box-shadow:0 0 18px rgba(34,211,211,.7),inset 0 0 12px rgba(255,255,255,.5);flex:none}
+.av:before,.av:after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(34,211,211,.5);animation:ring 2.4s linear infinite}
+.av:after{inset:-12px;border-color:rgba(34,211,211,.25);animation-duration:3.6s;animation-direction:reverse;border-style:dashed}
+@keyframes ring{to{transform:rotate(360deg)}}
+.av i,.av b{position:absolute;top:40%;width:14%;height:9%;background:#032224;border-radius:3px;animation:eye 4s infinite}.av i{left:28%}.av b{right:28%}
+@keyframes eye{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+.av.big{width:110px;height:110px}
+.av.mini{width:26px;height:26px;box-shadow:0 0 8px rgba(34,211,211,.7)}.av.mini:before,.av.mini:after{display:none}
+#solare[data-mood=alert] .av{background:radial-gradient(circle at 50% 40%,#ffd6cc 0,#ff5a3a 35%,#4a100b 70%,transparent 72%);box-shadow:0 0 18px rgba(255,90,58,.8)}
+#solare[data-mood=happy] .av{background:radial-gradient(circle at 50% 40%,#f4ffd0 0,#7dffb0 35%,#0b4a30 70%,transparent 72%)}
+#solare{position:fixed;left:16px;bottom:200px;z-index:12;display:flex;align-items:center;gap:16px;opacity:0;transform:translateX(-20px);transition:.3s;pointer-events:none;max-width:min(460px,80vw)}
+#solare.on{opacity:1;transform:none}
+.sbub{background:rgba(4,12,14,.88);border:1px solid var(--line);padding:8px 14px;clip-path:polygon(10px 0,100% 0,100% 100%,0 100%,0 10px)}
+.sbub small{font-family:var(--num);font-size:10px;color:var(--teal);letter-spacing:.15em}.sbub p{margin:3px 0 0;font-size:14px;line-height:1.5}
+body[data-mode=hangar] #solare{bottom:auto;top:200px;left:30px}
+body[data-mode=loading] #solare,body[data-mode=intro] #solare,body[data-mode=loading] #solBtn,body[data-mode=intro] #solBtn{display:none}
+#solBtn{position:fixed;z-index:13;left:330px;top:16px;display:flex;align-items:center;gap:8px;background:rgba(8,14,16,.82);color:#fff;border:1px solid var(--line);padding:7px 14px 7px 8px;font-size:14px;font-weight:700}
+body[data-mode=hangar] #solBtn{left:auto;right:330px;top:30px}
+#solChat{position:fixed;z-index:45;right:16px;bottom:16px;width:min(420px,calc(100vw - 32px));height:min(560px,70vh);background:rgba(5,12,14,.95);border:1px solid var(--line);display:none;flex-direction:column}
+#solChat.on{display:flex}
+.sch{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);position:relative}.sch small{color:var(--dim);font-size:11px}
+#solLog{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+#solLog div{max-width:85%;padding:8px 12px;font-size:14px;line-height:1.5}
+#solLog .bot{background:rgba(34,211,211,.12);border-left:3px solid var(--teal);align-self:flex-start}
+#solLog .me{background:rgba(255,255,255,.08);align-self:flex-end}
+#solQuick{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-top:1px solid rgba(255,255,255,.06)}
+#solQuick button{background:rgba(34,211,211,.1);border:1px solid var(--line);color:var(--teal);font-size:12px;padding:5px 9px}
+#solForm{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+#solIn{flex:1;background:#0b1517;border:1px solid var(--line);color:#fff;padding:9px 10px;font:inherit;font-size:14px;user-select:text;-webkit-user-select:text}
+/* ---------- 조선소 · 모듈 ---------- */
+.ylv{margin:16px 0 4px;font-family:var(--num);color:var(--teal);font-size:13px;letter-spacing:.2em}
+.role{font-style:normal;font-size:11px;background:rgba(34,211,211,.15);color:var(--teal);padding:1px 7px;margin-left:6px;vertical-align:middle}
+.slots{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.slot{width:82px;height:82px;border:1px dashed rgba(255,255,255,.25);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--dim);text-align:center;gap:2px;background:none;padding:4px}
+.slot.full{border:1px solid var(--teal);background:rgba(34,211,211,.1);color:#fff;font-size:22px}
+.slot small{font-size:9px;line-height:1.2}.slot em{font-style:normal;font-size:9px;color:var(--red)}
+.row.story{border-color:var(--teal);background:rgba(34,211,211,.07)}
+@media (max-width:900px){#obj{top:215px;width:200px}#solBtn{left:auto;right:180px;top:12px}#solare{bottom:280px}}

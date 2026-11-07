@@ -1,6 +1,6 @@
 // 탄환·미사일·폭발·파편·전리품 상자·채굴 빔
 import { THREE, Q, camera, rand, rv, clamp, sfx, box, cyl, put, finish, HPI, COL } from './core.js';
-import { scene, FIRE, SMOKE, flash, groundAt } from './world.js';
+import { scene, FIRE, SMOKE, flash, groundAt, surfaceBelow } from './world.js';
 import { MUZZLE } from './ships.js';
 import { WEAPONS } from './data.js';
 
@@ -34,14 +34,14 @@ export function fireTurrets(s, point, spread = 0.012) {
     const W = WEAPONS[s.weapon] || WEAPONS.cannon;
     if (t.userData.cd > 0 || t.userData.err > W.err) continue;
     t.userData.cd = 1 / (s.gunRate * W.rate);
-    const g = t.userData.gun, sp = spread * W.spread;
+    const g = t.userData.gun, sp = spread * W.spread * (s.spreadMul || 1);
     for (let b = 0; b < W.barrels; b++) {
       const mz = W.barrels === 1 ? [0, 0, -5.4] : MUZZLE[b];
       const p0 = g.localToWorld(tmp.set(mz[0], mz[1], mz[2])).clone();
       for (let k = 0; k < W.pellets; k++) {
         if (bullets.length >= MAXB) break;
         const dir = tmp2.copy(point).sub(p0).normalize(); dir.x += rand(-sp, sp); dir.y += rand(-sp, sp); dir.z += rand(-sp, sp); dir.normalize();
-        const v = dir.clone().multiplyScalar(W.speed).add(s.vel);
+        const v = dir.clone().multiplyScalar(W.speed * (s.bulletSpd || 1)).add(s.vel);
         bullets.push({ pos: p0.clone(), vel: v, q: new THREE.Quaternion().setFromUnitVectors(Z_NEG, dir.clone()), life: W.life, owner: s, dmg: s.gunDmg * W.dmg, w: s.weapon || 'cannon' });
       }
       if (camera.position.distanceToSquared(p0) < 1.2e6) FIRE.emit(p0.x, p0.y, p0.z, s.vel.x, s.vel.y, s.vel.z, 0.06, (W.barrels === 1 ? 9 : 4) * s.scale, 1.5, W.barrels === 1 ? [3, 5, 6] : s.faction === 'pirate' ? COL.red : COL.cyan, COL.fireMid, 1);
@@ -87,9 +87,12 @@ export const missiles = [];
 export function fireMissile(s, target) {
   if (s.cdM > 0 || !(s.lv.missile > 0) || !target) return false;
   s.cdM = s.misCd;
-  const m = new THREE.Mesh(misGeo, misMat); s.world((missiles.length % 2 ? 5.6 : -5.6), 2.0, -6, m.position); scene.add(m);
-  s.fwd(tmp); const v = tmp.clone().multiplyScalar(80).add(s.vel); v.y += 25;
-  missiles.push({ mesh: m, vel: v, life: 7, owner: s, dmg: s.misDmg, target, spd: 100 });
+  const G = s.G, pz = G ? G.f + 8 : -6;
+  for (let k = 0; k < (s.misCount || 1); k++) {
+    const m = new THREE.Mesh(misGeo, misMat); s.world(((missiles.length + k) % 2 ? 5.6 : -5.6), 2.0 + k * 1.2, pz, m.position); scene.add(m);
+    s.fwd(tmp); const v = tmp.clone().multiplyScalar(80).add(s.vel); v.y += 25 + k * 12; v.x += (k ? 1 : -1) * 15 * (s.misCount > 1);
+    missiles.push({ mesh: m, vel: v, life: 7, owner: s, dmg: s.misDmg, target, spd: 100 });
+  }
   if (s.isPlayer) sfx('shot', 1.6);
   return true;
 }
@@ -173,10 +176,10 @@ export function dropCrate(pos, credits, cargo) {
 export function updateCrates(dt) {
   for (let i = S.crates.length - 1; i >= 0; i--) {
     const c = S.crates[i]; c.life -= dt;
-    const gy = groundAt(c.g.position.x, c.g.position.z) + 2;
+    const gy = surfaceBelow(c.g.position.x, c.g.position.y, c.g.position.z) + 2;
     c.vel.y -= 25 * dt; c.g.position.addScaledVector(c.vel, dt); if (c.g.position.y < gy) { c.g.position.y = gy; c.vel.set(0, 0, 0); }
     c.g.children[0].rotation.y += dt;
-    for (const s of S.ships) if (s.alive && s.pos.distanceTo(c.g.position) < 26 * s.scale) { S.hooks.pickup(s, c); c.life = 0; break; }
+    for (const s of S.ships) if (s.alive && s.pos.distanceTo(c.g.position) < 26 * s.scale * (s.magnet || 1)) { S.hooks.pickup(s, c); c.life = 0; break; }
     if (c.life <= 0) { scene.remove(c.g); S.crates.splice(i, 1); }
   }
 }
@@ -197,14 +200,27 @@ export function shipFx(s, dt) {
   if (camera.position.distanceToSquared(s.pos) > 1.4e6 * Q.fx) return;
   s.fwd(tmp2);
   const thr = 0.6 + Math.abs(s.inThrust) + (s.speed / s.maxSpeed) * 0.4, back = -20 - s.speed * 0.3, sc = s.scale;
-  const nacs = s.tier >= 3 ? [[-8, -0.3], [8, -0.3], [-11.5, -2.4], [11.5, -2.4]] : [[-8, -0.3], [8, -0.3]];
-  for (const [x, y] of nacs) { s.world(x, y, 15.4, tmp); FIRE.emit(tmp.x, tmp.y, tmp.z, tmp2.x * back + rand(-2, 2), rand(-2, 2), tmp2.z * back + rand(-2, 2), 0.2, 2.5 * thr * sc, 0.6, COL.exhaust, COL.exhaustE, 0.7); if (s.boostOn) FIRE.emit(tmp.x, tmp.y, tmp.z, tmp2.x * back * 3, 0, tmp2.z * back * 3, 0.3, 4 * sc, 1, [1, 2.6, 6], [0.3, 0.5, 2], 0.9); }
+  const G = s.G, nz = G.nacZ + 6.4, W = Math.max(G.W, 0.9);
+  for (const [nx, y] of G.m.nac) for (const x of [-nx * W, nx * W]) { s.world(x, y, nz, tmp); FIRE.emit(tmp.x, tmp.y, tmp.z, tmp2.x * back + rand(-2, 2), rand(-2, 2), tmp2.z * back + rand(-2, 2), 0.2, 2.5 * thr * sc, 0.6, COL.exhaust, COL.exhaustE, 0.7); if (s.boostOn) FIRE.emit(tmp.x, tmp.y, tmp.z, tmp2.x * back * 3, 0, tmp2.z * back * 3, 0.3, 4 * sc, 1, [1, 2.6, 6], [0.3, 0.5, 2], 0.9); }
   // 부양 포드 아래 열기
-  if (Math.random() < 0.5) for (const x of [-3.3, 3.3]) { s.world(x, -4.8, rand(-6, 5.5), tmp); FIRE.emit(tmp.x, tmp.y, tmp.z, 0, -18, 0, 0.18, 1.8 * sc, 0.5, [1.2, 0.8, 2.5], [0.3, 0.2, 0.8], 0.5); }
-  if (s.speed > s.maxSpeed * 0.85 || Math.abs(s.bank) > 0.22) for (const x of [-14.3, 14.3]) { s.world(x, 0.4, 8, tmp); SMOKE.emit(tmp.x, tmp.y, tmp.z, 0, 0, 0, 1.2, 1.2, 3.5, COL.white, COL.white, 0.3); }
+  if (Math.random() < 0.5) for (const x of [-3.3, 3.3]) { s.world(x * G.W, -4.8, rand(G.f + 7, G.r - 7.5), tmp); FIRE.emit(tmp.x, tmp.y, tmp.z, 0, -18, 0, 0.18, 1.8 * sc, 0.5, [1.2, 0.8, 2.5], [0.3, 0.2, 0.8], 0.5); }
+  if (s.speed > s.maxSpeed * 0.85 || Math.abs(s.bank) > 0.22) for (const x of [-G.m.wing / 2 - 0.8, G.m.wing / 2 + 0.8]) { s.world(x, 0.4, G.wingZ, tmp); SMOKE.emit(tmp.x, tmp.y, tmp.z, 0, 0, 0, 1.2, 1.2, 3.5, COL.white, COL.white, 0.3); }
   const hpR = s.hp / s.maxHp;
   if (hpR < 0.55 && Math.random() < 0.7) { s.world(rand(-3, 3), 3, rand(-4, 8), tmp); SMOKE.emit(tmp.x, tmp.y, tmp.z, ...rv(4), rand(1.5, 2.5), 3 * sc, 14 * sc, COL.smokeD, [0.3, 0.28, 0.26], 0.7, 0.4, -6); }
   if (hpR < 0.3) { s.world(rand(-3, 3), 2.6, rand(-3, 6), tmp); FIRE.emit(tmp.x, tmp.y, tmp.z, ...rv(6), 0.35, 4 * sc, 1.5, COL.fireHot, COL.fireMid, 1); }
+}
+/* 방어막 붕괴 · 회복 연출 */
+export function shieldFx(s, kind) {
+  const n = Math.round((kind === 'break' ? 60 : 24) * Q.fx) + 6, sm = s.shMesh, G = s.G;
+  for (let i = 0; i < n; i++) {
+    const d = new THREE.Vector3().randomDirection();
+    tmp.set(d.x * sm.scale.x, d.y * sm.scale.y + sm.position.y, d.z * sm.scale.z + sm.position.z); s.model.localToWorld(tmp);
+    tmp2.copy(tmp).sub(s.pos).normalize().multiplyScalar(kind === 'break' ? rand(40, 110) : -rand(10, 30));
+    if (kind === 'break') FIRE.emit(tmp.x, tmp.y, tmp.z, tmp2.x + s.vel.x, tmp2.y, tmp2.z + s.vel.z, rand(0.5, 1.1), rand(1.5, 3.2) * s.scale, 0.2, [2.6, 0.5, 0.3], [0.8, 0.15, 0.1], 1, 0.8, 60);
+    else FIRE.emit(tmp.x, tmp.y, tmp.z, tmp2.x + s.vel.x, tmp2.y, tmp2.z + s.vel.z, rand(0.4, 0.8), rand(1.2, 2.2) * s.scale, 0.3, [0.4, 2.6, 0.9], [0.1, 1, 0.3], 0.9, 1);
+  }
+  void G;
+  if (camera.position.distanceTo(s.pos) < 900) sfx(kind === 'break' ? 'glass' : 'ui', kind === 'break' ? 1 : 0.6);
 }
 export function clearFx() {
   bullets.length = 0; for (const m of missiles) scene.remove(m.mesh); missiles.length = 0;

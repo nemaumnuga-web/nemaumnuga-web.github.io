@@ -175,6 +175,10 @@ export function sfx(kind, vol = 1) {
   try {
     ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
     const t = ac.currentTime, g = ac.createGain(); g.connect(ac.destination);
+    if (kind === 'glass') {
+      for (let i = 0; i < 6; i++) { const o = ac.createOscillator(), gg = ac.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(rand(1800, 4200), t + i * 0.025); gg.gain.setValueAtTime(0.05 * vol, t + i * 0.025); gg.gain.exponentialRampToValueAtTime(0.001, t + i * 0.025 + 0.25); o.connect(gg); gg.connect(ac.destination); o.start(t + i * 0.025); o.stop(t + i * 0.025 + 0.26); }
+      return;
+    }
     if (kind === 'shot' || kind === 'ui' || kind === 'coin') {
       const o = ac.createOscillator(); o.type = kind === 'shot' ? 'square' : 'sine';
       const f0 = kind === 'shot' ? 520 : kind === 'ui' ? 880 : 1320, f1 = kind === 'shot' ? 110 : kind === 'ui' ? 660 : 1760;

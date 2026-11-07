@@ -1,5 +1,5 @@
 // 월드: 하늘·낮밤·지형·포트·광맥
-import { THREE, Q, renderer, camera, rand, clamp, lerp, smooth, Particles, TEX_SOFT, TEX_SMOKE, canvasTex, put, finish, box, cyl, HPI, addProto, frameYield } from './core.js';
+import { THREE, Q, renderer, camera, rand, clamp, lerp, smooth, Particles, TEX_SOFT, TEX_SMOKE, canvasTex, put, finish, box, cyl, HPI, addProto, frameYield, mergeGeometries } from './core.js';
 import { Sky } from '../vendor/addons/objects/Sky.js';
 import { WORLD, PORT_DEFS, ORES, rollOre } from './data.js';
 
@@ -108,8 +108,117 @@ function buildTerrain(size, seg, sink) {
     cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
   }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0, flatShading: true }); mat.userData.envBase = 0.4; envMats.push(mat);
+  const dm = DETAIL.map.clone(), dn = DETAIL.nrm.clone(); for (const t of [dm, dn]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(size / 60, size / 60); t.needsUpdate = true; }
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dm, normalMap: dn, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.94, metalness: 0, flatShading: true }); mat.userData.envBase = 0.4; envMats.push(mat);
   const m = new THREE.Mesh(g, mat); m.receiveShadow = true; return m;
+}
+
+/* ---------- 디테일 텍스처 / 노멀맵 ---------- */
+export function nrmFromHeight(hc, strength = 2.5) {
+  const W = hc.width, H = hc.height, src = hc.getContext('2d').getImageData(0, 0, W, H).data;
+  const out = document.createElement('canvas'); out.width = W; out.height = H; const o = out.getContext('2d'), img = o.createImageData(W, H);
+  const at = (x, y) => src[(((y + H) % H) * W + ((x + W) % W)) * 4] / 255;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = (at(x + 1, y) - at(x - 1, y)) * strength, dy = (at(x, y + 1) - at(x, y - 1)) * strength, l = Math.hypot(dx, dy, 1), i = (y * W + x) * 4;
+    img.data[i] = (-dx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (dy / l * 0.5 + 0.5) * 255; img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[i + 3] = 255;
+  }
+  o.putImageData(img, 0, 0); return out;
+}
+const DETAIL = (() => {
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
+  const im = x.createImageData(N, N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const v = 0.5 * vnoise(i / 16, j / 16) + 0.3 * vnoise(i / 5 + 40, j / 5) + 0.2 * Math.sin((j + vnoise(i / 30, j / 30) * 30) / 3.5) * 0.5 + 0.1;   // 모래 물결 + 바위 결
+    const g = Math.round(205 + v * 50), k = (j * N + i) * 4; im.data[k] = g; im.data[k + 1] = g; im.data[k + 2] = g; im.data[k + 3] = 255;
+  }
+  x.putImageData(im, 0, 0);
+  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
+  const nrm = new THREE.CanvasTexture(nrmFromHeight(c, 3)); nrm.anisotropy = 8;
+  return { map, nrm };
+})();
+const WATER_NRM = (() => {
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d'), im = x.createImageData(N, N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const v = (Math.sin(i / N * Math.PI * 8 + vnoise(i / 20, j / 20) * 5) + Math.sin(j / N * Math.PI * 6 + vnoise(i / 14 + 9, j / 14) * 6)) * 0.25 + 0.5;
+    const g = Math.round(v * 255), k = (j * N + i) * 4; im.data[k] = g; im.data[k + 1] = g; im.data[k + 2] = g; im.data[k + 3] = 255;
+  }
+  x.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(nrmFromHeight(c, 4)); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(120, 120); return t;
+})();
+let waterMat = null, sunSprite = null;
+
+/* ---------- 부유섬 ---------- */
+export const islands = [];
+export function islandPush(s) {
+  for (const I of islands) {
+    const dx = s.pos.x - I.x, dz = s.pos.z - I.z, d = Math.hypot(dx, dz); if (d > I.r + s.radius) continue;
+    const top = I.y, bot = I.y - I.h;
+    if (s.pos.y > top - 6 && s.pos.y < top + s.hover && d < I.r * 0.95) { s.pos.y = top + s.hover; if (s.vel.y < 0) s.vel.y = 0; continue; }
+    if (s.pos.y <= top - 6 && s.pos.y > bot) {
+      const rr = I.r * Math.pow(clamp((s.pos.y - bot) / I.h, 0, 1), 0.7) + s.radius * 0.55;
+      if (d < rr && d > 0.01) { const k = (rr - d) / d; s.pos.x += dx * k; s.pos.z += dz * k; const vn = (s.vel.x * dx + s.vel.z * dz) / d; if (vn < 0) { s.vel.x -= dx / d * vn; s.vel.z -= dz / d * vn; } }
+    }
+  }
+}
+export function islandAt(x, z) { for (const I of islands) if (Math.hypot(x - I.x, z - I.z) < I.r * 0.9) return I; return null; }
+export function surfaceBelow(x, y, z) { let g = groundAt(x, z); for (const I of islands) if (y >= I.y - 3 && Math.hypot(x - I.x, z - I.z) < I.r * 0.92) g = Math.max(g, I.y); return g; }
+function makeIslands() {
+  const B = {}, centers = [];
+  const add = (x, z, r, y) => { centers.push({ x, z, r, y, h: r * rand(1.4, 2) }); };
+  for (let i = 0; i < 16; i++) { const a = rand(0, 6.28), d = rand(0, 1150); add(300 + Math.cos(a) * d, -500 + Math.sin(a) * d, rand(55, 135), rand(430, 680)); }
+  for (let i = 0; i < 6; i++) add(rand(-WORLD * 0.8, WORLD * 0.8), rand(-WORLD * 0.8, WORLD * 0.8), rand(50, 100), rand(500, 760));
+  for (const c of centers) {
+    if (ports.some(p => Math.hypot(p.x - c.x, p.z - c.z) < 500)) continue;
+    if (islands.some(o => Math.hypot(o.x - c.x, o.z - c.z) < o.r + c.r + 60)) continue;
+    c.y = Math.max(c.y, terrainH(c.x, c.z) + c.h + 120); islands.push(c);
+    const g = new THREE.CylinderGeometry(c.r, c.r * 0.08, c.h, 18, 7), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), k = 1 + (vnoise(Math.cos(a) * 3 + c.x, y / 25 + c.z) - 0.5) * 0.5;
+      if (y > c.h / 2 - 0.1) { p.setY(i, y + (vnoise(x / 20 + c.x, z / 20) - 0.5) * 6); p.setX(i, x * (Math.hypot(x, z) > c.r * 0.9 ? k : 1)); p.setZ(i, z * (Math.hypot(x, z) > c.r * 0.9 ? k : 1)); }
+      else { p.setX(i, x * k); p.setZ(i, z * k); }
+    }
+    g.translate(c.x, c.y - c.h / 2, c.z); g.computeVertexNormals();
+    const col = new Float32Array(p.count * 3), cc = new THREE.Color();
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i) - c.y;
+      if (y > -2) cc.set(0x8fa04a).offsetHSL(0, 0, (Math.random() - 0.5) * 0.06); else if (y > -7) cc.set(0xc9a36b); else cc.copy(STRATA[(Math.floor(-y / 14) + 3) % 8]);
+      col[i * 3] = cc.r; col[i * 3 + 1] = cc.g; col[i * 3 + 2] = cc.b;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.deleteAttribute('uv'); (B.rock = B.rock || []).push(g.toNonIndexed());
+    // 떠다니는 파편 바위
+    for (let k = 0; k < 4; k++) { const rg = new THREE.DodecahedronGeometry(rand(5, 14), 0); rg.translate(c.x + rand(-c.r, c.r) * 1.2, c.y - c.h * rand(0.4, 1.1), c.z + rand(-c.r, c.r) * 1.2); const n = rg.attributes.position.count, cl = new Float32Array(n * 3); for (let i = 0; i < n; i++) { cl[i * 3] = 0.6; cl[i * 3 + 1] = 0.33; cl[i * 3 + 2] = 0.2; } rg.setAttribute('color', new THREE.BufferAttribute(cl, 3)); rg.deleteAttribute('uv'); B.rock.push(rg); }
+  }
+  if (!B.rock) return;
+  const geo = mergeGeometries(B.rock, false); geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }); envMats.push(mat);
+  const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; scene.add(m);
+}
+
+/* ---------- 바위 아치 ---------- */
+function makeArches() {
+  const geos = [];
+  for (let k = 0, tries = 0; k < 9 && tries < 400; tries++) {
+    const x = rand(-WORLD * 0.85, WORLD * 0.85), z = rand(-WORLD * 0.85, WORLD * 0.85), h = terrainH(x, z);
+    if (h < 15 || ports.some(p => Math.hypot(p.x - x, p.z - z) < 450) || islands.some(I => Math.hypot(I.x - x, I.z - z) < I.r + 200)) continue;
+    const span = rand(170, 280), height = rand(120, 210), yaw = rand(0, 6.28), pts = [];
+    for (let i = 0; i <= 16; i++) { const a = Math.PI * i / 16; pts.push(new THREE.Vector3(Math.cos(a) * span / 2, Math.sin(a) * height - 20, 0)); }
+    const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, rand(14, 22), 8, false), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const n = (vnoise(p.getX(i) / 18 + k * 7, p.getY(i) / 18) - 0.5) * 9; p.setX(i, p.getX(i) + n); p.setZ(i, p.getZ(i) + n * 0.8); }
+    g.rotateY(yaw); g.translate(x, h, z); g.computeVertexNormals();
+    const col = new Float32Array(p.count * 3); for (let i = 0; i < p.count; i++) { const c = STRATA[Math.floor((p.getY(i)) / 20) % 8 | 0] || STRATA[0]; col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.deleteAttribute('uv'); geos.push(g.toNonIndexed()); k++;
+  }
+  if (!geos.length) return;
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }); envMats.push(mat);
+  const m = new THREE.Mesh(mergeGeometries(geos, false), mat); m.castShadow = m.receiveShadow = true; scene.add(m);
+}
+/* 난파선 위치 (모델은 main.js 에서 생성) */
+export const WRECKS = [];
+function pickWrecks() {
+  for (let k = 0, tries = 0; k < 7 && tries < 300; tries++) {
+    const x = 2350 + rand(-520, 520), z = -350 + rand(-650, 650), h = terrainH(x, z);
+    if (h < 6 || ports.some(p => Math.hypot(p.x - x, p.z - z) < 330) || WRECKS.some(w => Math.hypot(w.x - x, w.z - z) < 230)) continue;
+    WRECKS.push({ x, z, y: h, yaw: rand(0, 6.28), roll: rand(-0.5, 0.5), pitch: rand(-0.25, 0.1), scale: rand(3.2, 5) }); k++;
+  }
 }
 
 /* ---------- 파티클 ---------- */
@@ -203,14 +312,18 @@ function buildOreGeos() {
   }
 }
 function placeOre(node) {
-  for (let tries = 0; tries < 300; tries++) {
+  node.island = null; let rich = false;
+  if (node.onIsland && islands.length) {
+    const I = islands[Math.floor(Math.random() * islands.length)], a = rand(0, 6.28), d = rand(0, I.r * 0.45);
+    node.x = I.x + Math.cos(a) * d; node.z = I.z + Math.sin(a) * d; node.y = I.y; node.island = I; rich = true;
+  } else for (let tries = 0; tries < 300; tries++) {
     const x = rand(-WORLD * 0.9, WORLD * 0.9), z = rand(-WORLD * 0.9, WORLD * 0.9), h = terrainH(x, z);
     if (h < 12) continue;
     if (ports.some(p => Math.hypot(p.x - x, p.z - z) < 380)) continue;
     if (ores.some(o => o !== node && o.alive && Math.hypot(o.x - x, o.z - z) < 220)) continue;
-    node.x = x; node.z = z; node.y = h; break;
+    node.x = x; node.z = z; node.y = h; rich = WRECKS.some(w => Math.hypot(w.x - x, w.z - z) < 450); break;
   }
-  node.type = rollOre(); node.max = node.amount = Math.round(rand(40, 110) * (node.type === 'aether' ? 0.5 : 1));
+  node.type = rollOre(rich); node.max = node.amount = Math.round(rand(40, 110) * (node.type === 'aether' ? 0.5 : 1));
   node.alive = true; node.respawn = 0;
   node.group.position.set(node.x, node.y - 2, node.z); node.group.rotation.y = rand(0, 6);
   node.cry.material = oreMats[node.type]; node.group.visible = true; node.group.scale.setScalar(1);
@@ -220,7 +333,7 @@ function makeOres(n) {
     const g = new THREE.Group(), v = i % 4;
     const rock = new THREE.Mesh(rockGeos[v], rockMat), cry = new THREE.Mesh(crystalGeos[v], oreMats.copper);
     rock.castShadow = cry.castShadow = true; rock.receiveShadow = true; g.add(rock, cry); scene.add(g);
-    const node = { group: g, cry, alive: false }; ores.push(node); placeOre(node);
+    const node = { group: g, cry, alive: false, onIsland: i < n * 0.28 }; ores.push(node); placeOre(node);
   }
 }
 export function depleteOre(node) { node.alive = false; node.group.visible = false; node.respawn = rand(45, 80); }
@@ -231,12 +344,17 @@ function makePalms() {
   put(B, 'trunk', cyl(0.5, 0.9, 16, 6), 0, 8, 0, 0.12, 0, 0.1);
   for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; put(B, 'leaf', box(1.6, 0.2, 9), Math.cos(a) * 4 + 1, 15.6, Math.sin(a) * 4 + 1.6, 0.35, -a + HPI, 0); }
   const f = finish(B, []);
-  const N = 70, tr = new THREE.InstancedMesh(f.trunk, new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 0.9 }), N), lf = new THREE.InstancedMesh(f.leaf, new THREE.MeshStandardMaterial({ color: 0x4f6b2a, roughness: 0.8, side: THREE.DoubleSide }), N);
+  const N = 90 + islands.length * 4, tr = new THREE.InstancedMesh(f.trunk, new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 0.9 }), N), lf = new THREE.InstancedMesh(f.leaf, new THREE.MeshStandardMaterial({ color: 0x4f6b2a, roughness: 0.8, side: THREE.DoubleSide }), N);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(); let k = 0;
-  for (let t = 0; t < 2000 && k < N; t++) {
+  for (let t = 0; t < 2500 && k < 90; t++) {
     const p = ports[k % ports.length], a = rand(0, 6.28), r = rand(150, 420); const x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r, h = terrainH(x, z);
     if (h < 6 || Math.abs(h - p.ground) > 60) continue;
     const sc = rand(0.8, 1.4); m.compose(new THREE.Vector3(x, h - 0.5, z), q.setFromEuler(new THREE.Euler(0, rand(0, 6), 0)), s.set(sc, sc, sc));
+    tr.setMatrixAt(k, m); lf.setMatrixAt(k, m); k++;
+  }
+  for (const I of islands) for (let j = 0; j < 4 && k < N; j++) {
+    const a = rand(0, 6.28), r = rand(I.r * 0.4, I.r * 0.8), sc = rand(0.8, 1.3);
+    m.compose(new THREE.Vector3(I.x + Math.cos(a) * r, I.y - 1, I.z + Math.sin(a) * r), q.setFromEuler(new THREE.Euler(0, rand(0, 6), 0)), s.set(sc, sc, sc));
     tr.setMatrixAt(k, m); lf.setMatrixAt(k, m); k++;
   }
   tr.count = lf.count = k; tr.castShadow = lf.castShadow = true; scene.add(tr, lf);
@@ -245,7 +363,7 @@ function makeSpires() {
   const geo = new THREE.CylinderGeometry(0.55, 1, 1, 7, 3); const pp = geo.attributes.position;
   for (let i = 0; i < pp.count; i++) { const k = 1 + (hash(i, 3) - 0.5) * 0.35; pp.setX(i, pp.getX(i) * k); pp.setZ(i, pp.getZ(i) * k); }
   geo.computeVertexNormals();
-  const N = 200, mat = new THREE.MeshStandardMaterial({ color: 0xb0603a, roughness: 0.95, flatShading: true }); envMats.push(mat);
+  const N = 300, mat = new THREE.MeshStandardMaterial({ color: 0xb0603a, roughness: 0.95, flatShading: true }); envMats.push(mat);
   const im = new THREE.InstancedMesh(geo, mat, N);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(); let k = 0, tries = 0;
   while (k < N && tries++ < 5000) {
@@ -264,8 +382,8 @@ export async function buildWorld(progress) {
   FIRE = new Particles(scene, Math.round(9000 * Q.fx) + 1000, TEX_SOFT, true);
   SMOKE = new Particles(scene, Math.round(7000 * Q.fx) + 1000, TEX_SMOKE, false);
   CLOUD = new Particles(scene, 1400, TEX_SMOKE, false);
-  for (let i = 0; i < 60; i++) {
-    const cx = rand(-WORLD * 1.7, WORLD * 1.7), cz = rand(-WORLD * 1.7, WORLD * 1.7), cy = rand(950, 1400);
+  for (let i = 0; i < 80; i++) {
+    const low = i % 4 === 0, cx = rand(-WORLD * 1.7, WORLD * 1.7), cz = rand(-WORLD * 1.7, WORLD * 1.7), cy = low ? rand(560, 760) : rand(950, 1450);
     for (let k = 0; k < 18; k++) { const sh = rand(0.85, 1) * 2.05; CLOUD.emit(cx + rand(-260, 260), cy + rand(-30, 50) * (k % 3), cz + rand(-180, 180), 0, 0, 0, 1e9, rand(260, 480), 0, [sh, sh, sh * 0.98], [sh, sh, sh * 0.98], 1.15); }
   }
   CLOUD.update(0);
@@ -275,12 +393,14 @@ export async function buildWorld(progress) {
   const INNER = WORLD * 2.6;
   scene.add(buildTerrain(INNER, Q.seg, 0)); await frameYield();
   scene.add(buildTerrain(INNER * 3.2, 96, INNER / 2 - 40)); await frameYield();
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(INNER * 3.2, INNER * 3.2), new THREE.MeshStandardMaterial({ color: 0x2f6a6c, roughness: 0.12, metalness: 0.2, transparent: true, opacity: 0.88 }));
+  waterMat = new THREE.MeshStandardMaterial({ color: 0x1f5c66, roughness: 0.06, metalness: 0.25, normalMap: WATER_NRM, normalScale: new THREE.Vector2(0.6, 0.6), transparent: true, opacity: 0.9 });
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(INNER * 3.2, INNER * 3.2), waterMat);
   water.rotation.x = -HPI; water.position.y = 2; water.receiveShadow = true; scene.add(water); envMats.push(water.material);
-  makeSpires(); makePalms(); await frameYield();
+  pickWrecks(); makeIslands(); makeArches(); makeSpires(); makePalms(); await frameYield();
+  sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SOFT, color: new THREE.Color(3, 2.5, 1.8), blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false })); sunSprite.scale.setScalar(1500); scene.add(sunSprite);
   progress('BUILDING PORTS', 0.6);
   PORT_PROTO = buildPortProto(); for (const p of ports) buildPort(p);
-  buildOreGeos(); makeOres(34);
+  buildOreGeos(); makeOres(46);
   await frameYield();
   applyDay(true);
 }
@@ -318,7 +438,11 @@ export function updateWorld(dt, focus) {
   for (const p of ports) { p.ring.rotation.z = t * 0.6; p.ring.material.opacity = 0.5 + Math.sin(t * 3) * 0.25; p.lamp.intensity = DAY.night * 900; }
   for (const k in oreMats) oreMats[k].emissiveIntensity = ORES[k].glow * (1 + DAY.night * 1.5) + DAY.night * 0.3;
   for (const o of ores) if (!o.alive) { o.respawn -= dt; if (o.respawn <= 0) placeOre(o); }
+  if (waterMat) { waterMat.normalMap.offset.x = t * 0.004; waterMat.normalMap.offset.y = t * 0.0025; }
+  if (sunSprite) { sunSprite.position.copy(camera.position).addScaledVector(SUN_DIR, 7000); sunSprite.visible = DAY.el > -4; sunSprite.material.opacity = smooth(-4, 6, DAY.el) * (1 - WEATHER.storm * 0.8); }
+  for (const w of WRECKS) if (Math.random() < 0.25 && camera.position.distanceToSquared(tmpW.set(w.x, w.y, w.z)) < 4e6) SMOKE.emit(w.x + rand(-20, 20), w.y + 30, w.z + rand(-20, 20), rand(-3, 3) + WEATHER.wind.x * 8, rand(14, 22), rand(-3, 3), rand(5, 8), 18, 70, [0.16, 0.14, 0.13], [0.4, 0.37, 0.34], 0.5);
   FIRE.update(dt); SMOKE.update(dt);
 }
+const tmpW = new THREE.Vector3();
 export function nearestPort(pos) { let b = null, bd = 1e9; for (const p of ports) { const d = Math.hypot(p.x - pos.x, p.z - pos.z); if (d < bd) { bd = d; b = p; } } return [b, bd]; }
 export const homePort = () => ports[0];
