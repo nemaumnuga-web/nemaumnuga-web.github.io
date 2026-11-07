@@ -196,7 +196,16 @@ addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('mousemove', e => {
   if (mode === 'fly' && document.pointerLockElement === cv) { cam.yaw -= e.movementX * 0.0026; cam.pitch = clamp(cam.pitch + e.movementY * 0.002, -0.25, 1.1); cam.last = performance.now(); }
 });
-addEventListener('wheel', e => { if (mode === 'fly') cam.dist = clamp(cam.dist * (e.deltaY > 0 ? 1.1 : 0.9), 0.55, 2.2); }, { passive: true });
+addEventListener('wheel', e => { if (e.ctrlKey) return; if (mode === 'fly') cam.dist = clamp(cam.dist * (e.deltaY > 0 ? 1.1 : 0.9), 0.55, 2.2); }, { passive: true });
+/* 화면 고정: iOS Safari 핀치 확대·더블탭 확대·트랙패드 핀치를 막는다. 스크롤 가능한 패널만 예외 */
+const SCROLLABLE = '#solLog, #ppanel, #board, #loading, .card, #mapOv';
+const isScrollArea = t => !!(t && t.closest && t.closest(SCROLLABLE));
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+document.addEventListener('touchmove', e => { if (e.touches.length > 1 || !isScrollArea(e.target)) e.preventDefault(); }, { passive: false });
+document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => { const n = Date.now(); if (n - lastTouchEnd < 350 && !isScrollArea(e.target)) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
+document.addEventListener('dblclick', e => { if (!isScrollArea(e.target)) e.preventDefault(); });
 // 터치: 조이스틱 + 화면 드래그로 시점
 {
   const joy = $('joy'), knob = $('joyk'); let jid = null, lookId = null, lx = 0, ly = 0;
