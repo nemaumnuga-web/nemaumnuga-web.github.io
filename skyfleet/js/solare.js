@@ -319,30 +319,65 @@ export function agentUpdate(dt, s) {
   if (now() < AG.pausedUntil) return;
   // 1) 생존
   if (danger) { if (AG.goal?.kind !== 'port') { event('retreat', 3, 20); } return setGoal({ kind: 'port', why: '후퇴' }); }
-  const hostile = s.hostile ? s.hostile.ship : null;
   if (s.incomingMissile && s.incomingMissile < 380 && s.flareReady && perm >= 2) { ctx.flare(); }
+  else if (s.incomingMissile && s.incomingMissile < 260 && !s.flareReady && perm >= 2) { ctx.evade && ctx.evade(); }
   // 2) 화물이 찼으면 판매를 위해 귀항
-  if (s.cargoPct > 0.85) return setGoal({ kind: 'port', why: '화물' });
-  // 3) 도킹 상태 (정비 · 구매 · 출격)
-  // 4) 임무 진행
-  const m = s.mission; if (!m) return setGoal(hostile ? { kind: 'fight', target: hostile } : { kind: 'ore' });
-  switch (m.id) {
-    case 'launch': case 'arc': case 'ship': return setGoal(hostile && s.hostile.dist < 900 ? { kind: 'fight', target: hostile } : { kind: 'ore' });
-    case 'mine': return setGoal({ kind: 'ore' });
-    case 'dock': return setGoal({ kind: 'port' });
-    case 'sell': return s.storageKg > 0 ? setGoal({ kind: 'port' }) : setGoal({ kind: 'ore' });
-    case 'module': return s.ownedUnequipped ? setGoal({ kind: 'port' }) : setGoal({ kind: 'ore' });
-    case 'kill': return setGoal(hostile ? { kind: 'fight', target: hostile } : { kind: 'ore' });
-    case 'island': return setGoal({ kind: 'island' });
-    case 'wreck': return setGoal({ kind: 'wreck' });
-    case 'boss': return s.boss ? setGoal({ kind: 'fight', target: s.boss }) : setGoal({ kind: 'ore' });
-    default: return setGoal({ kind: 'ore' });
+  if (s.cargoPct > 0.85) return setGoal({ kind: 'port', why: '화물이 가득 찼어요' });
+  // 3) 임무 진행: 행동마다 점수를 매겨 가장 이득인 것을 고른다
+  const pick = chooseGoal(s);
+  return setGoal(pick);
+}
+/* 기억: 격추된 장소는 위험 지역으로 기억해 다음 행동에서 피한다 */
+export function rememberDeath(x, z) { cfg().deaths = [...(cfg().deaths || []), { x, z, t: Date.now() }].slice(-12); persist(); }
+function dangerAt(x, z) {
+  let d = 0; for (const k of cfg().deaths || []) { const dd = Math.hypot(k.x - x, k.z - z); if (dd < 500) d += 0.5 * (1 - dd / 500); } return Math.min(1, d);
+}
+/* 목표 점수 계산 (0 이상, 높을수록 좋음) */
+function chooseGoal(s) {
+  const m = s.mission ? s.mission.id : null, cands = [];
+  const hostile = s.hostile ? s.hostile : null;
+  // 전투: 내 체력·방어막이 상대보다 충분하면 공격 가치가 높다
+  if (hostile && hostile.dist < 1200) {
+    const mine = s.hpPct * 0.6 + s.shieldPct * 0.4, theirs = hostile.hpPct * 0.6 + hostile.shieldPct * 0.4;
+    const edge = mine - theirs;
+    let sc = 0.25 + 0.35 * (1 - hostile.hpPct) + Math.max(-0.4, edge) * 0.6 + (hostile.tier || 0) * 0.04;
+    if (m === 'kill') sc += 0.45;
+    if (m === 'launch' || m === 'arc' || m === 'ship') sc += 0.1;
+    if (s.hpPct < 0.5) sc -= 0.25;
+    if (hostile.dist > 900) sc -= 0.2;
+    cands.push([sc, { kind: 'fight', target: hostile.ship, why: `${hostile.name}와 교전` }]);
   }
+  // 광맥: 가치 / 거리 / 위험
+  if (s.bestOre) {
+    const o = s.bestOre, v = Math.min(1, o.value / 320);
+    let sc = 0.2 + 0.45 * v - 0.00025 * o.dist - dangerAt(o.x, o.z) * 0.8;
+    if (m === 'mine') sc += 0.5;
+    if (m === 'sell' && s.storageKg < 1) sc += 0.1;
+    if (s.cargoPct > 0.6) sc -= 0.2;
+    cands.push([sc, { kind: 'ore', node: o.node, why: `${o.nm} 광맥 (${o.rarity})` }]);
+  }
+  // 포트: 필요성에 따라
+  {
+    let sc = 0.1 + Math.max(0, s.cargoPct - 0.5) * 1.2 + (s.storageKg > 0 ? 0.15 : 0) + (s.ownedUnequipped ? 0.1 : 0) - 0.0002 * s.portDist;
+    if (m === 'dock') sc += 0.7; if (m === 'sell' && s.storageKg > 0) sc += 0.5; if (m === 'module' && s.ownedUnequipped) sc += 0.5;
+    if (s.hpPct < 0.7) sc += 0.2;
+    cands.push([sc, { kind: 'port', why: '정비·판매' }]);
+  }
+  // 보스: 체력이 충분할 때만
+  if (s.boss && s.hpPct > 0.7) { let sc = 0.3 + (m === 'boss' ? 0.6 : 0); cands.push([sc, { kind: 'fight', target: s.boss, why: '고르곤 격추' }]); }
+  // 탐험 목표 (임무 전용 가중치)
+  if (m === 'island') cands.push([0.9, { kind: 'island', why: '부유섬 임무' }]);
+  if (m === 'wreck') cands.push([0.9, { kind: 'wreck', why: '난파선 임무' }]);
+  cands.sort((a, b) => b[0] - a[0]);
+  // 끈기: 지금 목표가 충분히 나쁘지 않으면 바꾸지 않는다 (잦은 방향 전환 방지)
+  const cur = AG.goal && cands.find(c => c[1].kind === AG.goal.kind && (c[1].kind !== 'fight' || c[1].target === AG.goal.target));
+  if (cur && cur[0] > cands[0][0] - 0.15) return Object.assign({}, cur[1]);
+  return cands.length ? cands[0][1] : { kind: 'ore', why: '광맥 찾기' };
 }
 function setGoal(g) {
   if (!AG.on) return;
   const key = g.kind + (g.target ? (g.target._id || g.target.name) : '');
-  if (!AG.goal || AG.goal.key !== key) { AG.goal = Object.assign({}, g, { key }); ctx.goal(AG.goal); if (now() - AG.lastNote > 12) { AG.lastNote = now(); event('agentDone', 0, 12); } }
+  if (!AG.goal || AG.goal.key !== key) { AG.goal = Object.assign({}, g, { key }); ctx.goal(AG.goal); if (now() - AG.lastNote > 10) { AG.lastNote = now(); if (g.why) say(`${g.why}(으)로 이동할게요.`, 'calm', 0); } }
 }
 function hangarAuto(s, perm) {
   // 2단계: 판매·장착 / 3단계: 구매까지, 그리고 자동 출격

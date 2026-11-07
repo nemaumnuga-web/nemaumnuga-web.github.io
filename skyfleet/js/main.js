@@ -3,7 +3,7 @@ import { THREE, $, rand, pick, clamp, lerp, wrap, fmt, isTouch, QUALITY, camera,
 import { TIERS, MODS, modCost, ORES, RAR_COL, RANKS, rankOf, PAINTS, TIPS, CAPTAIN_NAMES, PIRATE_NAMES, WORLD, save, loadSave, persist, activeShip, ownsTier, buyTier, refillQuests, makeQuest, questProgress, priceOf, driftPrices, WEAPONS, MODULES, CHAPTERS, INTRO, ENDING, REGIONS, ownsLevel } from './data.js';
 import { scene, buildWorld, updateWorld, terrainH, groundAt, ports, ores, depleteOre, nearestPort, homePort, DAY, FIRE, SMOKE, WEATHER, islands, islandAt, WRECKS, surfaceBelow } from './world.js';
 import { Ship, blinkNav, makeShipModel } from './ships.js';
-import { initSolare, say as solSay, event as solEvent, tickSolare, chatOpen, toggleChat, agentUpdate, agentPause, agentReset, agentOn, agentState, setPermUI, refreshSolUI, cfg as solCfg, setLLM, llmText, permName, permDesc, PERM_NAMES } from './solare.js';
+import { rememberDeath as solRemember, initSolare, say as solSay, event as solEvent, tickSolare, chatOpen, toggleChat, agentUpdate, agentPause, agentReset, agentOn, agentState, setPermUI, refreshSolUI, cfg as solCfg, setLLM, llmText, permName, permDesc, PERM_NAMES } from './solare.js';
 import { S, explode, fireTurrets, fireMissile, updateBullets, updateMissiles, spawnDebris, updateDebris, dropCrate, updateCrates, mineBeam, shipFx, clearFx, dropFlares, incoming, updateFlares, shieldFx } from './fx.js';
 import { runAI } from './ai.js';
 import { hscene, hcam, buildHangar, setHangarShip, updateHangar } from './hangar.js';
@@ -139,7 +139,7 @@ S.hooks.damage = (t, amt, by, at) => {
       toast(`격추! 현상금 <b>+${bounty} CR</b> · 평판 +${xp}`); persist();
     }
   } else feed(`<span style="color:${FC[t.faction]}">${t.name}</span> 추락`);
-  if (t.isPlayer) onPlayerDeath();
+  if (t.isPlayer) { solRemember(t.pos.x, t.pos.z); onPlayerDeath(); }
 };
 S.hooks.mine = (s, node, dt) => {
   if (!node.alive) return;
@@ -271,6 +271,7 @@ function updatePlayer(dt) {
   if (AP.on) autopilot(p, dt);
   if (launchT > 0) { launchT -= dt; p.inLift = Math.max(p.inLift, launchT > 1.2 ? 1 : 0.4); }
   p.boosting = !!(key.x || inp.boost);
+  if (p.evadeT > 0) { p.evadeT -= dt; p.boosting = p.energy > 5; p.inTurn = Math.sign(Math.sin(p.evadeT * 9)) * 1; p.inLift = 0.6; }
   applyWind(p, dt);
   p.physics(dt, onImpact);
   // 근처 광맥
@@ -670,6 +671,7 @@ function autopilot(p, dt) {
 }
 function goalFromAgent(g) {
   const p = player; if (!p || !p.alive) return;
+  if (g.kind === 'ore' && g.node && g.node.alive) { setAP(g.node.x, g.node.y + 30 * p.scale, g.node.z, ORES[g.node.type].nm, 'ore', 'agent'); AP.node = g.node; return; }
   if (g.kind === 'fight') { AP.target = g.target; setAP(g.target.pos.x, g.target.pos.y, g.target.pos.z, g.target.name, 'fight', 'agent'); AP.target = g.target; return; }
   if (g.kind === 'ore') {
     let best = null, bd = 1e9; for (const o of ores) { if (!o.alive) continue; const d = Math.hypot(o.x - p.pos.x, o.z - p.pos.z); if (d < bd) { bd = d; best = o; } }
@@ -686,9 +688,13 @@ function solSnap() {
   const ch = CHAPTERS[save.story.ch], mission = ch && !save.story.done ? { id: ch.id, need: ch.need, have: save.story.have, nm: ch.nm } : null;
   const a = activeShip(), T = TIERS[a.tier];
   const ownedUnequipped = save.modules.some(id => !a.mods.includes(id)) && a.mods.length < T.slots;
-  return { alive: p.alive, mode, hpPct: p.hp / p.maxHp, shieldPct: p.shBroken > 0 ? 0 : p.shield / Math.max(1, p.maxShield), shBroken: p.shBroken > 0,
+  const oreList = ores.filter(o => o.alive).map(o => ({ o, d: Math.hypot(o.x - p.pos.x, o.z - p.pos.z) }));
+  let bestOre = null, bestV = -1;
+  for (const { o, d } of oreList) { if (d > 2600) continue; const v = ORES[o.type].cr * (o.amount / 100) / (1 + d / 500); if (v > bestV) { bestV = v; bestOre = { node: o, x: o.x, z: o.z, nm: ORES[o.type].nm, rarity: ORES[o.type].rar, value: ORES[o.type].cr, dist: d }; } }
+  const portDist = Math.min(...ports.map(pt => Math.hypot(pt.x - p.pos.x, pt.z - p.pos.z)));
+  return { alive: p.alive, mode, hpPct: p.hp / p.maxHp, bestOre, portDist, shieldPct: p.shBroken > 0 ? 0 : p.shield / Math.max(1, p.maxShield), shBroken: p.shBroken > 0,
     cargoPct: p.cargoKg / Math.max(1, p.cargoCap), cargoKg: p.cargoKg, storageKg: oreTotalKg(), incomingMissile: incoming(p), flareReady: p.flareCd <= 0,
-    hostile: h, boss: EV.boss && EV.boss.alive ? EV.boss : null, mission, missionKill: !!mission && mission.id === 'kill', ownedUnequipped, credits: save.credits };
+    hostile: h ? Object.assign(h, { hpPct: h.ship.hp / h.ship.maxHp, shieldPct: h.ship.shBroken > 0 ? 0 : h.ship.shield / Math.max(1, h.ship.maxShield), tier: TIERS[h.ship.tier].tier }) : null, boss: EV.boss && EV.boss.alive ? EV.boss : null, mission, missionKill: !!mission && mission.id === 'kill', ownedUnequipped, credits: save.credits };
 }
 function brief() {
   const s = solSnap(), m = s.mission ? `임무: ${s.mission.nm}(${Math.floor(s.mission.have)}/${s.mission.need})` : '임무 없음';
@@ -719,6 +725,7 @@ function buyBest() {
 }
 const solCtx = {
   mode: () => mode, brief,
+  evade() { if (player && player.alive) { player.evadeT = 1.4; } },
   cancelAuto() { AP.on = false; },
   goal(g) { goalFromAgent(g); },
   autoPort() { if (mode !== 'fly' || !player.alive) return null; const [pt] = nearestPort(player.pos); setAP(pt.x, pt.deck + player.hover + 6, pt.z, pt.def.nm, 'port'); return pt.def.nm; },
