@@ -22,6 +22,8 @@ export const frameYield = () => new Promise(r => requestAnimationFrame(() => r()
 
 /* ---------- 품질 ---------- */
 export const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
+/* 깜박임 방지: 후처리(블룸·빛줄기·색보정) 없이 기본 렌더링. 기본값은 터치 기기에서 켜짐 */
+export const SAFE = (() => { try { const v = localStorage.getItem('skyfleet_safe'); return v === null ? isTouch : v === '1'; } catch (e) { return isTouch; } })();
 let qn = isTouch ? 'mid' : 'high';
 try { qn = localStorage.getItem('skyfleet_q') || qn; } catch (e) {}
 export const QUALITY = qn;
@@ -35,7 +37,7 @@ export { isPhone };
 
 /* ---------- 렌더러 ---------- */
 export const canvas = $('view');
-export const renderer = new THREE.WebGLRenderer({ canvas, antialias: !Q.bloom, powerPreference: 'high-performance' });
+export const renderer = new THREE.WebGLRenderer({ canvas, antialias: !Q.bloom || SAFE, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Q.pr);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.62;
@@ -69,7 +71,7 @@ void main(){
   col = (col - 0.18) * 1.06 + 0.18;
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }`;
-if (Q.bloom) {
+if (Q.bloom && !SAFE) {
   const sz = new THREE.Vector2(); const tmpR = { w: Math.max(2, innerWidth), h: Math.max(2, innerHeight) };
   // 터치(아이폰·아이패드): 실수 렌더 타깃과 다중 샘플링을 쓰지 않는다 — 사파리에서 검은 화면·깜박임의 원인
   const rt = new THREE.WebGLRenderTarget(Math.round(tmpR.w * Q.pr), Math.round(tmpR.h * Q.pr), { type: isTouch ? THREE.UnsignedByteType : THREE.HalfFloatType, samples: isTouch ? 0 : Q.msaa });
