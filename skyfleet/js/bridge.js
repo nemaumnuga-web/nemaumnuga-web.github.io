@@ -180,7 +180,7 @@ export function renderStrategy() {
   const advice = bhooks.status ? bhooks.status() : null;
   if (advice) { const a = document.getElementById('strategyAdvice'); if (a) a.textContent = advice; }
 }
-document.addEventListener('click', e => { if (e.target.id === 'stX') document.getElementById('strategyPanel').classList.remove('on'); });
+
 
 /* ---------- 홀로 지도 ---------- */
 function drawTableMap(t) {

@@ -1043,3 +1043,15 @@ requestAnimationFrame(frame);
 boot().catch(e => { console.error(e); $('ldPhase').textContent = '오류: ' + e.message; });
 
 window.__sf = { __tp: __teleport, __bs: __state, S, applyElement: (...a) => S.hooks.elemHit(...a), solSnap, outposts, get save() { return save; }, EV, WEATHER, AP, story, solCtx, get mode() { return mode; }, get player() { return player; }, ports, ores, launch: () => launch(), enterHangar: p => enterHangar(p || homePort()), key, inp, DAY, cam };
+
+/* 모든 X(닫기) 버튼: 클릭을 가로채서 확실히 닫는다 */
+document.addEventListener('click', e => {
+  const x = e.target.closest && e.target.closest('.x'); if (!x) return;
+  e.preventDefault(); e.stopPropagation();
+  if (x.id === 'ppx') { $('ppanel').hidden = true; document.querySelectorAll('#ptabs button').forEach(b => b.classList.remove('on')); }
+  else if (x.id === 'mapX') $('mapOv').classList.remove('on');
+  else if (x.id === 'bpClose') closeBasePanel();
+  else if (x.id === 'stX') $('strategyPanel').classList.remove('on');
+  else if (x.id === 'ccX') $('crewCard').classList.remove('on');
+  else { const p = x.closest('.panel,.card,.ov,#basePanel'); if (p) p.classList.remove('on'), p.hidden = true; }
+}, true);
