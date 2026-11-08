@@ -4,7 +4,7 @@
 // · 잡담은 브라우저 안의 Qwen3-0.6B(워커)가 답하고, 모델이 없으면 규칙 기반 답변
 // · 권한 단계 0~3: 관찰 → 제안 → 임무 자율 → 완전 자율
 import { $, pick, rand } from './core.js';
-import { save, persist } from './data.js';
+import { save, persist, STRATEGIES } from './data.js';
 
 const now = () => performance.now() / 1000;
 let ctx = null, typing = null, hideT = 0, queue = [], lastSaid = {};
@@ -321,41 +321,51 @@ function dangerAt(x, z) {
 }
 /* 목표 점수 계산 (0 이상, 높을수록 좋음) */
 function chooseGoal(s) {
+  const strat = save.strategy || 'balanced', W = (STRATEGIES[strat] || STRATEGIES.balanced).w;
   const m = s.mission ? s.mission.id : null, cands = [];
   const hostile = s.hostile ? s.hostile : null;
   // 전투: 내 체력·방어막이 상대보다 충분하면 공격 가치가 높다
-  if (hostile && hostile.dist < 1200) {
+  const reach = 1200 + (W.fight > 1.3 ? 2400 : 0);   // 소탕·방어 전략은 더 멀리서도 적을 찾아간다
+  if (hostile && hostile.dist < reach) {
     const mine = s.hpPct * 0.6 + s.shieldPct * 0.4, theirs = hostile.hpPct * 0.6 + hostile.shieldPct * 0.4;
     const edge = mine - theirs;
     let sc = 0.25 + 0.35 * (1 - hostile.hpPct) + Math.max(-0.4, edge) * 0.6 + (hostile.tier || 0) * 0.04;
     if (m === 'kill') sc += 0.45;
     if (m === 'launch' || m === 'arc' || m === 'ship') sc += 0.1;
     if (s.hpPct < 0.5) sc -= 0.25;
-    if (hostile.dist > 900) sc -= 0.2;
-    cands.push([sc, { kind: 'fight', target: hostile.ship, why: `${hostile.name}와 교전` }]);
+    if (W.fight < 0.7) sc -= 0.25;     // 채굴·탐험 전략은 위협이 아니면 싸움을 피한다
+    if (hostile.dist > 900) sc -= 0.2 * Math.min(1, 2 / W.fight);
+    cands.push([Math.max(0.05, sc) * W.fight, { kind: 'fight', target: hostile.ship, why: `${hostile.name}와 교전` }]);
   }
   // 광맥: 가치 / 거리 / 위험
   if (s.bestOre) {
     const o = s.bestOre, v = Math.min(1, o.value / 320);
-    let sc = 0.2 + 0.45 * v - 0.00025 * o.dist - dangerAt(o.x, o.z) * 0.8;
+    let sc = 0.2 + 0.45 * v - 0.00012 * o.dist - dangerAt(o.x, o.z) * 0.8;
+    if (W.ore > 1.3) sc += 0.35;        // 채굴 전략: 광맥이 멀어도 기꺼이 간다
     if (m === 'mine') sc += 0.5;
     if (m === 'sell' && s.storageKg < 1) sc += 0.1;
     if (s.cargoPct > 0.6) sc -= 0.2;
-    cands.push([sc, { kind: 'ore', node: o.node, why: `${o.nm} 광맥 (${o.rarity})` }]);
+    cands.push([Math.max(0.05, sc) * W.ore, { kind: 'ore', node: o.node, why: `${o.nm} 광맥 (${o.rarity})` }]);
   }
   // 포트: 필요성에 따라
   {
     let sc = 0.1 + Math.max(0, s.cargoPct - 0.5) * 1.2 + (s.storageKg > 0 ? 0.15 : 0) + (s.ownedUnequipped ? 0.1 : 0) - 0.0002 * s.portDist;
     if (m === 'dock') sc += 0.7; if (m === 'sell' && s.storageKg > 0) sc += 0.5; if (m === 'module' && s.ownedUnequipped) sc += 0.5;
     if (s.hpPct < 0.7) sc += 0.2;
-    cands.push([sc, { kind: 'port', why: '정비·판매' }]);
+    cands.push([sc * W.port, { kind: 'port', why: '정비·판매' }]);
   }
   // 보스: 체력이 충분할 때만
-  if (s.boss && s.hpPct > 0.7) { let sc = 0.3 + (m === 'boss' ? 0.6 : 0); cands.push([sc, { kind: 'fight', target: s.boss, why: '고르곤 격추' }]); }
+  if (s.boss && s.hpPct > 0.7) { let sc = 0.3 + (m === 'boss' ? 0.6 : 0); cands.push([sc * W.boss, { kind: 'fight', target: s.boss, why: '고르곤 격추' }]); }
   // 탐험 목표 (임무 전용 가중치)
   if (m === 'island') cands.push([0.9, { kind: 'island', why: '부유섬 임무' }]);
   if (m === 'wreck') cands.push([0.9, { kind: 'wreck', why: '난파선 임무' }]);
+  // 전략: 탐험 · 기지 방어
+  if (strat === 'explore' && !m) { const k = (Math.floor(now() / 60) % 3); cands.push([0.55 * W.explore, [{ kind: 'island', why: '부유섬 탐험' }, { kind: 'wreck', why: '난파선 탐험' }, { kind: 'outpost', why: '기지 순찰' }][k]]); }
+  if (strat === 'defend' && s.ownBase) cands.push([0.7 * W.fight + (s.raid ? 1.2 : 0), { kind: 'outpost', why: s.raid ? `${s.ownBase.nm} 방어` : `${s.ownBase.nm} 경계` }]);
+  if (s.raid && s.ownBase) cands.push([1.3, { kind: 'outpost', why: `${s.ownBase.nm} 습격 대응` }]);
+  if (!cands.some(c => c[1].kind !== 'port') && s.hpPct > 0.8 && s.cargoPct < 0.5 && s.storageKg <= 0) cands.push([0.3, { kind: 'patrol', why: '순찰' }]);
   cands.sort((a, b) => b[0] - a[0]);
+  AG.dbg = cands.map(c => c[1].kind + ':' + c[0].toFixed(2) + (c[1].why ? '(' + c[1].why + ')' : '')).join(' | ');
   // 끈기: 지금 목표가 충분히 나쁘지 않으면 바꾸지 않는다 (잦은 방향 전환 방지)
   const cur = AG.goal && cands.find(c => c[1].kind === AG.goal.kind && (c[1].kind !== 'fight' || c[1].target === AG.goal.target));
   if (cur && cur[0] > cands[0][0] - 0.15) return Object.assign({}, cur[1]);

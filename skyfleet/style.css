@@ -407,3 +407,45 @@ body[data-mode=hangar] #solare.on{transform:none}
 .ugrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}.ucard{padding:7px}.ucard p{font-size:10px}.ucard .ui{font-size:18px}
 #tBase{left:calc(var(--sl) + 354px);top:var(--st);bottom:auto;width:40px;height:30px;font-size:10px}
 }
+
+#tMorph{left:24px;bottom:530px;background:rgba(34,211,211,.28)}
+@media (max-height:520px) and (pointer:coarse){#tMorph{left:calc(var(--sl) + 396px);top:var(--st);bottom:auto;width:40px;height:30px;font-size:10px}}
+.pips i.on{background:var(--teal)}
+
+/* ============ 선내 지휘본부 ============ */
+#bridgeUI{display:none}
+body[data-mode=bridge] #bridgeUI{display:block}
+body[data-mode=bridge] #port,body[data-mode=bridge] #hud{display:none}
+#bridgeUI>*{pointer-events:auto}
+#bridgeUI{position:fixed;inset:0;z-index:7;pointer-events:none}
+#brTop{left:16px;top:16px;padding:12px 18px}
+#brTop small{font-family:var(--num);color:var(--teal);letter-spacing:.2em;font-size:11px;display:block}#brTop b{font-size:22px}#brTop span{display:block;font-size:12px;color:var(--dim);margin-top:2px}
+#brBack{position:fixed;left:16px;bottom:16px}
+#brHint{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:rgba(4,8,9,.82);border-left:3px solid var(--teal);padding:7px 18px;font-size:15px;display:none;white-space:nowrap}
+#brKeys{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);font-size:11px;color:rgba(255,255,255,.5);white-space:nowrap}
+#brTouch{display:none}
+body.touch #brTouch{display:block}body.touch #brKeys{display:none}
+#brJoy{position:fixed;left:30px;bottom:70px;width:150px;height:150px;border-radius:50%;border:2px solid rgba(34,211,211,.5);background:rgba(0,0,0,.3);pointer-events:auto}
+#brJoy i{position:absolute;left:50%;top:50%;width:62px;height:62px;margin:-31px;border-radius:50%;border:3px solid var(--teal);background:rgba(34,211,211,.2)}
+#brInteract{position:fixed;right:40px;bottom:80px;width:104px;height:104px}#brCam{position:fixed;right:40px;bottom:200px;width:80px;height:60px}
+#strategyPanel{right:16px;top:16px;width:min(420px,calc(100vw - 32px));padding:16px 18px;display:none;max-height:calc(100vh - 32px);overflow:auto;clip-path:none}
+#strategyPanel.on{display:block}#strategyPanel h3{margin:0 0 6px;font-family:var(--stencil);letter-spacing:.2em;color:var(--teal)}
+.strat{display:grid;grid-template-columns:34px 1fr;grid-template-rows:auto auto;gap:0 10px;width:100%;text-align:left;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#fff;padding:10px 12px;margin-top:6px;align-items:center}
+.strat i{grid-row:1/3;font-size:24px;font-style:normal}.strat b{font-size:15px}.strat small{font-size:11px;color:var(--dim);line-height:1.4}
+.strat.on{border-color:var(--teal);background:rgba(34,211,211,.14)}
+#crewCard{right:16px;bottom:16px;width:min(340px,calc(100vw - 32px));padding:16px 18px;display:none;clip-path:none}
+#crewCard.on{display:block}.cch{display:flex;gap:12px;align-items:center}.cci{font-size:34px}.cch b{font-size:20px;display:block}.cch small{color:var(--dim)}
+#crewCard p{font-size:13px;color:#cfe2e4;margin:8px 0}.ccb{background:rgba(34,211,211,.12);padding:6px 10px;font-size:13px}.ccn{font-size:11px;color:var(--dim);margin:4px 0 8px}.ccq{color:var(--dim)!important;font-style:italic}
+.bridgeB{background:rgba(34,211,211,.18)!important}
+@media (max-height:520px) and (pointer:coarse){
+#brTop{left:var(--sl);top:var(--st);padding:6px 12px}#brTop b{font-size:15px}#brTop span{display:none}
+#brBack{left:var(--sl);bottom:var(--sb);padding:6px 10px;font-size:12px}
+#brJoy{left:var(--sl);bottom:calc(var(--sb) + 46px);width:104px;height:104px}#brJoy i{width:44px;height:44px;margin:-22px}
+#brInteract{right:var(--sr);bottom:var(--sb);width:72px;height:72px}#brCam{right:var(--sr);bottom:calc(var(--sb) + 84px);width:48px;height:36px}
+#brHint{bottom:34%;font-size:12px;padding:4px 10px}
+#strategyPanel,#crewCard{right:var(--sr);top:var(--st);bottom:var(--sb);width:min(380px,56vw);max-height:none}
+.strat{padding:6px 9px;margin-top:4px}.strat small{font-size:10px}.strat i{font-size:18px}
+}
+
+.ptabs{flex-wrap:nowrap}.ptabs button{min-width:0;padding:12px 4px;font-size:13px;white-space:nowrap}
+#toBridge{flex:1.15}

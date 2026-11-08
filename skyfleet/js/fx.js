@@ -2,7 +2,8 @@
 import { THREE, Q, camera, rand, rv, clamp, sfx, box, cyl, put, finish, HPI, COL } from './core.js';
 import { scene, FIRE, SMOKE, flash, groundAt, surfaceBelow } from './world.js';
 import { MUZZLE } from './ships.js';
-import { WEAPONS } from './data.js';
+import { WEAPONS, ELEMENTS } from './data.js';
+const ELEM_C = Object.fromEntries(Object.entries(ELEMENTS).map(([k, e]) => [k, new THREE.Color(e.col[0], e.col[1], e.col[2])]));
 
 export const S = { ships: [], units: [], player: null, crates: [], hooks: {}, shake: 0 };
 const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), prevP = new THREE.Vector3(), Z_NEG = new THREE.Vector3(0, 0, -1);
@@ -36,13 +37,14 @@ export function fireTurrets(s, point, spread = 0.012) {
     t.userData.cd = 1 / (s.gunRate * W.rate);
     const g = t.userData.gun, sp = spread * W.spread * (s.spreadMul || 1);
     for (let b = 0; b < W.barrels; b++) {
+      const el = s.elems && s.elems.length ? s.elems[(s.elemIdx = (s.elemIdx || 0) + 1) % s.elems.length] : null;   // 장착한 원소를 번갈아 발사
       const mz = W.barrels === 1 ? [0, 0, -5.4] : MUZZLE[b];
       const p0 = g.localToWorld(tmp.set(mz[0], mz[1], mz[2])).clone();
       for (let k = 0; k < W.pellets; k++) {
         if (bullets.length >= MAXB) break;
         const dir = tmp2.copy(point).sub(p0).normalize(); dir.x += rand(-sp, sp); dir.y += rand(-sp, sp); dir.z += rand(-sp, sp); dir.normalize();
         const v = dir.clone().multiplyScalar(W.speed * (s.bulletSpd || 1)).add(s.vel);
-        bullets.push({ pos: p0.clone(), vel: v, q: new THREE.Quaternion().setFromUnitVectors(Z_NEG, dir.clone()), life: W.life, owner: s, dmg: s.gunDmg * W.dmg, w: s.weapon || 'cannon' });
+        bullets.push({ pos: p0.clone(), vel: v, q: new THREE.Quaternion().setFromUnitVectors(Z_NEG, dir.clone()), life: W.life, owner: s, dmg: s.gunDmg * W.dmg * (s.form === 'tank' ? 1.35 : 1) * (el ? 1.15 : 1), elem: el, w: s.weapon || 'cannon' });
       }
       if (camera.position.distanceToSquared(p0) < 1.2e6) FIRE.emit(p0.x, p0.y, p0.z, s.vel.x, s.vel.y, s.vel.z, 0.06, (W.barrels === 1 ? 9 : 4) * s.scale, 1.5, W.barrels === 1 ? [3, 5, 6] : s.faction === 'pirate' ? COL.red : COL.cyan, COL.fireMid, 1);
     }
@@ -71,14 +73,14 @@ export function updateBullets(dt) {
     const hit = hitTest(prevP, b.pos, b.owner);
     const ground = b.pos.y < groundAt(b.pos.x, b.pos.z);
     if (hit) {
-      if (hit.isUnit) hit.hurt(b.dmg, b.owner); else S.hooks.damage(hit, b.dmg, b.owner, b.pos);
+      if (hit.isUnit) hit.hurt(b.dmg, b.owner); else if (b.elem && S.hooks.elemHit) S.hooks.elemHit(hit, b.dmg, b.owner, b.pos, b.elem); else S.hooks.damage(hit, b.dmg, b.owner, b.pos);
       for (let k = 0; k < 6 * Q.fx + 2; k++) { const v = rv(60); FIRE.emit(b.pos.x, b.pos.y, b.pos.z, v[0], v[1], v[2], rand(0.2, 0.5), 1.6, 0.3, COL.spark, COL.sparkE, 1, 1, 40); }
       FIRE.emit(b.pos.x, b.pos.y, b.pos.z, 0, 0, 0, 0.12, 6, 9, COL.fireHot, COL.fireMid, 1);
     } else if (ground) SMOKE.emit(b.pos.x, b.pos.y + 2, b.pos.z, 0, 10, 0, 1.2, 4, 12, COL.dust, COL.dustE, 0.3);
     if (hit || ground || b.life <= 0) { bullets[i] = bullets[bullets.length - 1]; bullets.pop(); }
   }
   let n = 0;
-  for (const b of bullets) { _bs.set(1, 1, 1); if (b.w === 'rail') _bs.set(1.8, 1.8, 2.6); else if (b.w === 'flak') _bs.set(1.1, 1.1, 0.45); _bm.compose(b.pos, b.q, _bs); bulletMesh.setMatrixAt(n, _bm); bulletMesh.setColorAt(n, b.w === 'rail' ? RAIL_COL : b.w === 'flak' ? FLAK_COL : B_COL[b.owner.faction]); n++; }
+  for (const b of bullets) { _bs.set(1, 1, 1); if (b.w === 'rail') _bs.set(1.8, 1.8, 2.6); else if (b.w === 'flak') _bs.set(1.1, 1.1, 0.45); _bm.compose(b.pos, b.q, _bs); bulletMesh.setMatrixAt(n, _bm); bulletMesh.setColorAt(n, b.elem ? ELEM_C[b.elem] : b.w === 'rail' ? RAIL_COL : b.w === 'flak' ? FLAK_COL : B_COL[b.owner.faction]); n++; }
   bulletMesh.count = n; bulletMesh.instanceMatrix.needsUpdate = true; if (bulletMesh.instanceColor) bulletMesh.instanceColor.needsUpdate = true;
 }
 
@@ -93,7 +95,8 @@ export function fireMissile(s, target) {
   for (let k = 0; k < (s.misCount || 1); k++) {
     const m = new THREE.Mesh(misGeo, misMat); s.world(((missiles.length + k) % 2 ? 5.6 : -5.6), 2.0 + k * 1.2, pz, m.position); scene.add(m);
     s.fwd(tmp); const v = tmp.clone().multiplyScalar(80).add(s.vel); v.y += 25 + k * 12; v.x += (k ? 1 : -1) * 15 * (s.misCount > 1);
-    missiles.push({ mesh: m, vel: v, life: 7, owner: s, dmg: s.misDmg, target, spd: 100 });
+    const el = s.elems && s.elems.length ? s.elems[(s.elemIdx = (s.elemIdx || 0) + 1) % s.elems.length] : null;
+    missiles.push({ mesh: m, vel: v, life: 7, owner: s, dmg: s.misDmg * (s.form === 'tank' ? 1.35 : 1), elem: el, target, spd: 100 });
   }
   if (s.isPlayer) sfx('shot', 1.6);
   return true;
@@ -112,7 +115,7 @@ export function updateMissiles(dt) {
     SMOKE.emit(bx, by, bz, ...rv(3), rand(1.4, 2.4), 2, rand(7, 11), [0.85, 0.83, 0.8], [0.7, 0.68, 0.66], 0.45, 0.6, -3);
     const hit = hitTest(prevP, mp, p.owner);
     const gone = p.life <= 0 || mp.y < groundAt(mp.x, mp.z);
-    if (hit) { explode(mp, 26); if (hit.isUnit) hit.hurt(p.dmg, p.owner); else S.hooks.damage(hit, p.dmg, p.owner, mp); }
+    if (hit) { explode(mp, 26); if (hit.isUnit) hit.hurt(p.dmg, p.owner); else if (p.elem && S.hooks.elemHit) S.hooks.elemHit(hit, p.dmg, p.owner, mp, p.elem); else S.hooks.damage(hit, p.dmg, p.owner, mp); }
     else if (gone) explode(mp, 18);
     if (hit || gone) { scene.remove(p.mesh); missiles.splice(i, 1); }
   }
@@ -211,6 +214,12 @@ export function shipFx(s, dt) {
   if (hpR < 0.55 && Math.random() < 0.7) { s.world(rand(-3, 3), 3, rand(-4, 8), tmp); SMOKE.emit(tmp.x, tmp.y, tmp.z, ...rv(4), rand(1.5, 2.5), 3 * sc, 14 * sc, COL.smokeD, [0.3, 0.28, 0.26], 0.7, 0.4, -6); }
   if (hpR < 0.3) { s.world(rand(-3, 3), 2.6, rand(-3, 6), tmp); FIRE.emit(tmp.x, tmp.y, tmp.z, ...rv(6), 0.35, 4 * sc, 1.5, COL.fireHot, COL.fireMid, 1); }
 }
+/* 변형 연출: 링 + 불꽃 + 효과음 */
+export function morphFx(s) {
+  flashRing(s.pos); for (let i = 0; i < 40 * Q.fx + 8; i++) { const v = rv(60); FIRE.emit(s.pos.x + rand(-6, 6), s.pos.y + rand(-2, 6), s.pos.z + rand(-6, 6), v[0], Math.abs(v[1]) * 0.8, v[2], rand(0.4, 1), rand(1.4, 3) * s.scale, 0.2, COL.cyan, COL.spark, 1, 1.2, 20); }
+  if (camera.position.distanceTo(s.pos) < 900) sfx('install', 1.2);
+}
+function flashRing(pos) { for (let i = 0; i < 24; i++) { const a = i / 24 * 6.283; FIRE.emit(pos.x + Math.cos(a) * 12, pos.y, pos.z + Math.sin(a) * 12, Math.cos(a) * 60, 6, Math.sin(a) * 60, 0.5, 3.2, 0.4, [0.6, 3.6, 4], [0.1, 0.8, 1], 0.9, 2); } }
 /* 방어막 붕괴 · 회복 연출 */
 export function shieldFx(s, kind) {
   const n = Math.round((kind === 'break' ? 60 : 24) * Q.fx) + 6, sm = s.shMesh, G = s.G;

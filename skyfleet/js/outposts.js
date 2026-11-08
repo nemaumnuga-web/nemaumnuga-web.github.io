@@ -167,7 +167,7 @@ class Unit {
 }
 /* 원소 반응 */
 function reactKey(a, b) { return REACTIONS[`${a}+${b}`] ? `${a}+${b}` : REACTIONS[`${b}+${a}`] ? `${b}+${a}` : null; }
-function hitShip(t, dmg, unit, at, elem) {
+export function applyElement(t, dmg, unit, at, elem) {
   if (!t.alive) return;
   let mul = (t.shredT > 0 ? 1.3 : 1), react = null;
   if (elem) {
@@ -178,17 +178,19 @@ function hitShip(t, dmg, unit, at, elem) {
     if (react) {
       mul *= react.mul; t.elemAura = null;
       hooks.reactText && hooks.reactText(t.pos, react.nm, ELEMENTS[elem].hex);
+      const ulv = unit.base ? unit.base.lv : 1 + ((unit.lv && unit.lv.guns) || 0) / 6;
       if (react.aoe) for (const o of S.ships) if (o !== t && o.alive && S.hooks.hostile(unit, o) && o.pos.distanceTo(t.pos) < react.aoe * 2) { S.hooks.damage(o, dmg * 0.6, unit, o.pos); if (elem === 'anemo' && cur) o.elemAura = { e: cur, t: 6 }; }
-      if (react.dot) t.dot = { dps: react.dot * (1 + unit.base.lv * 0.3), t: 4, by: unit };
+      if (react.dot) t.dot = { dps: react.dot * (1 + ulv * 0.3), t: 4, by: unit };
       if (react.slow) t.slowT = react.slow;
       if (react.shred) t.shredT = 6;
-      if (react.shield) for (const u of unit.base.units) u.crystal = (u.crystal || 0) + react.shield;
+      if (react.shield) { if (unit.base) for (const u of unit.base.units) u.crystal = (u.crystal || 0) + react.shield; else if (unit.maxShield) unit.shield = Math.min(unit.maxShield, unit.shield + react.shield * 2); }
       explode(at || t.pos, react.aoe ? 22 : 12, 'hit');
     } else if (elem !== 'anemo' && elem !== 'geo') t.elemAura = { e: elem, t: 8 };
   }
   const was = t.alive; S.hooks.damage(t, dmg * mul, unit, at);
-  if (was && !t.alive) { unit.kills++; hooks.unitKill && hooks.unitKill(unit, t); }
+  if (was && !t.alive && !unit.isPlayer) { unit.kills++; hooks.unitKill && hooks.unitKill(unit, t); }
 }
+S.hooks.elemHit = applyElement;
 
 /* ---------- 투사체 (빛 탄) ---------- */
 const bolts = [];
@@ -209,7 +211,7 @@ function updateBolts(dt) {
     let hit = null;
     for (const s of S.ships) { if (!s.alive || !S.hooks.hostile(b.unit, s)) continue; if (segDist2(prev, b.pos, s.pos) < (s.radius * 1.1) ** 2) { hit = s; break; } }
     if (hit) {
-      hitShip(hit, b.dmg, b.unit, b.pos, b.elem);
+      applyElement(hit, b.dmg, b.unit, b.pos, b.elem);
       if (b.splash) for (const s of S.ships) if (s !== hit && s.alive && S.hooks.hostile(b.unit, s) && s.pos.distanceTo(b.pos) < b.splash) S.hooks.damage(s, b.dmg * 0.5, b.unit, s.pos);
       for (let k = 0; k < 5; k++) FIRE.emit(b.pos.x, b.pos.y, b.pos.z, rand(-40, 40), rand(-40, 40), rand(-40, 40), rand(0.2, 0.4), 1.6, 0.3, b.col, COL.sparkE, 1, 1, 30);
     }

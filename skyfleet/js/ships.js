@@ -1,6 +1,6 @@
 // 함선: 파라메트릭 모델(9종) · 방어막 · 호버 비행 물리
 import { THREE, rand, clamp, lerp, wrap, canvasTex, put, finish, box, cyl, HPI, addProto } from './core.js';
-import { TIERS, PAINTS, WORLD, modFx } from './data.js';
+import { TIERS, PAINTS, WORLD, modFx, crewFx, save as SAVE } from './data.js';
 import { groundAt, islandPush, envMats } from './world.js';
 
 /* ---------- 재질 (판넬 텍스처 + 노멀맵) ---------- */
@@ -143,6 +143,7 @@ export function makeShipModel(cls, paint, faction, scaleMul = 1) {
   const root = new THREE.Group(), model = new THREE.Group(); root.add(model);
   model.scale.setScalar(TIERS[cls].scale * scaleMul);
   addProto(model, PROTOS[cls], mats);
+  model.children.forEach(c => { c.userData.shipPart = true; });   // 전차 변형 때 숨길 선체 파츠
   const turrets = G.turrets.map(p => {
     const t = new THREE.Group(); t.position.set(...p); addProto(t, TUR.base, mats);
     const g = new THREE.Group(); g.position.y = 1.25; addProto(g, TUR.gun, mats); t.add(g); t.userData.gun = g; t.userData.cd = rand(0, 0.3);
@@ -151,6 +152,25 @@ export function makeShipModel(cls, paint, faction, scaleMul = 1) {
   const radar = new THREE.Group(); radar.position.set(0, (G.m.bridge >= 3 ? 9.3 : G.m.bridge >= 2 ? 8.1 : 6.65) + 3.7, G.bridgeZ + 1); addProto(radar, RAD, mats); model.add(radar);
   return { root, model, turrets, radar };
 }
+
+/* ---------- 전차 형태 모델 ---------- */
+function buildTank(ship) {
+  const G = ship.G, mats = shipMats(ship.paint, ship.faction), g = new THREE.Group(), W = Math.max(G.W, 0.9), L = G.L;
+  const mk = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = true; g.add(m); return m; };
+  mk(new THREE.BoxGeometry(9.4 * W, 4.4, L * 0.78), mats.hull, 0, -0.4, 0.4);                       // 차체
+  mk(new THREE.BoxGeometry(8.6 * W, 2.4, 7), mats.armor, 0, -0.8, -L * 0.42, -0.5);                // 경사 장갑
+  mk(new THREE.BoxGeometry(9.8 * W, 0.7, L * 0.7), mats.armor, 0, 1.95, 0.4);                        // 상판
+  mk(new THREE.BoxGeometry(2, 0.3, L * 0.55), mats.team, 0, 2.4, 1.2);                             // 팀 색 줄
+  for (const s of [-1, 1]) {
+    mk(new THREE.BoxGeometry(3.4, 4.4, L * 0.98), mats.dark, s * 6.4 * W, -1.4, 0.3);                 // 무한궤도
+    mk(new THREE.BoxGeometry(0.3, 0.5, L * 0.9), mats.team, s * 8.2 * W, -0.2, 0.3);
+    for (let i = 0; i < 7; i++) mk(new THREE.CylinderGeometry(1.5, 1.5, 3.6, 12), mats.metal, s * 6.4 * W, -2.6, -L * 0.42 + i * (L * 0.84 / 6), 0, 0, HPI);
+    mk(new THREE.CylinderGeometry(0.8, 1, 5, 8), mats.dark, s * 3.6 * W, 1.4, L * 0.46, HPI, 0, 0);    // 배기관
+  }
+  mk(new THREE.BoxGeometry(3.4 * W, 1.4, 0.3), mats.glow, 0, -0.6, L * 0.42);                       // 후미 엔진 빛
+  g.userData.parts = true; return g;
+}
+export function morphFxPos(s) { return s.pos; }
 
 /* ---------- 방어막 셰이더 ---------- */
 const SH_GEO = new THREE.SphereGeometry(1, 48, 24);
@@ -173,8 +193,9 @@ function shieldColor(ratio, out) { return ratio > 0.5 ? out.copy(SH_COL.y).lerp(
 /* ---------- 함선 ---------- */
 const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _l = new THREE.Vector3(), _w = new THREE.Vector3();
 export class Ship {
-  constructor({ name, faction, tier = 0, paint = 'sand', lv = {}, pvp = false, isPlayer = false, weapon = 'cannon', scaleMul = 1, hpMul = 1, mods = [] }) {
-    Object.assign(this, { name, faction, tier, paint, lv, pvp, isPlayer, weapon, scaleMul, hpMul, mods });
+  constructor({ name, faction, tier = 0, paint = 'sand', lv = {}, pvp = false, isPlayer = false, weapon = 'cannon', scaleMul = 1, hpMul = 1, mods = [], elems = [] }) {
+    Object.assign(this, { name, faction, tier, paint, lv, pvp, isPlayer, weapon, scaleMul, hpMul, mods, elems });
+    this.form = 'ship'; this.formAnim = 0; this.formShown = 'ship'; this.elemIdx = 0; this.morphCd = 0;
     this.energy = 100; this.boosting = false; this.flareCd = 0;
     this.vel = new THREE.Vector3(); this.yaw = 0; this.yawVel = 0; this.bank = 0; this.pitchV = 0;
     this.cargo = {}; this.cargoKg = 0; this.alive = false; this.respawn = 0; this.kills = 0;
@@ -194,6 +215,8 @@ export class Ship {
     this.shMesh = new THREE.Mesh(SH_GEO, this.shMat);
     const G = this.G; this.shMesh.scale.set(G.m.wing / 2 + 2.5, 7.5 + G.m.bridge, G.L / 2 + 4.5); this.shMesh.position.set(0, 1.5, 0.5);
     this.shMesh.visible = false; this.shMesh.renderOrder = 4; this.model.add(this.shMesh);
+    this.baseScale = this.model.scale.x; this.shipParts = this.model.children.filter(c => c.userData.shipPart);
+    if (this.isPlayer) { this.tank = buildTank(this); this.tank.visible = false; this.model.add(this.tank); if (this.form === 'tank') { this.shipParts.forEach(c => c.visible = false); this.tank.visible = true; } }
     if (this.isPlayer) {
       // 전조등: 밤에 앞쪽 지형을 비춘다
       this.headlight = new THREE.SpotLight(0xfff1d6, 0, 460, 0.5, 0.75, 1.3); this.headlight.position.set(0, 1.5, this.G.f + 2); this.headlight.target.position.set(0, -34, this.G.f - 120);
@@ -209,13 +232,14 @@ export class Ship {
   }
   stats() {
     const T = TIERS[this.tier], l = this.lv, g = k => l[k] || 0, f = this.fx = modFx(this.mods);
+    if (this.isPlayer) { const c = crewFx(); for (const k in c) f[k] = (f[k] || 0) + c[k]; }   // 선원 보너스
     this.maxHp = Math.round(T.hp * (1 + 0.22 * g('armor')) * (this.hpMul || 1));
     this.maxShield = Math.round(T.shield * (1 + (f.shield || 0)) * (this.hpMul || 1));
     this.maxSpeed = T.speed * (1 + 0.06 * g('engine')) * (1 + (f.speed || 0)); this.accel = T.accel * (1 + 0.06 * g('engine')) * (1 + (f.accel || 0));
     this.turnRate = T.turn * (1 + 0.05 * g('engine')) * (1 + (f.turn || 0));
     this.cargoCap = Math.round(T.cargo * (1 + 0.2 * g('cargo')) * (1 + (f.cargo || 0)));
     this.drill = 1.3 * (1 + 0.5 * g('drill')) * (1 + (f.drill || 0)); this.mineRange = 1 + (f.mineRange || 0);
-    this.gunDmg = 2.2 + 0.9 * g('guns'); this.gunRate = (2.4 + 0.6 * g('guns')) * (1 + (f.rate || 0));
+    this.gunDmg = (2.2 + 0.9 * g('guns')) * (1 + (f.gunDmg || 0)); this.gunRate = (2.4 + 0.6 * g('guns')) * (1 + (f.rate || 0));
     this.bulletSpd = 1 + (f.bulletSpd || 0); this.spreadMul = Math.max(0.2, 1 + (f.spread || 0)); this.lockRange = 1000 * (1 + (f.lockRange || 0));
     this.misDmg = 40 + 15 * g('missile'); this.misCd = Math.max(2.5, 6 - 0.6 * g('missile')); this.misCount = 1 + (f.misCount || 0);
     this.hullDR = f.hullDR || 0; this.radarMul = 1 + (f.radar || 0); this.flareCdMax = 12 * (1 + (f.flareCd || 0));
@@ -226,6 +250,22 @@ export class Ship {
     this.shield = Math.min(this.shield || this.maxShield, this.maxShield);
   }
   get scale() { return TIERS[this.tier].scale * (this.scaleMul || 1); }
+  get canMorph() { return this.isPlayer && !!this.tank && (SAVE.founder || (this.fx && this.fx.morph)); }
+  setForm(f) {
+    if (!this.canMorph || this.form === f || this.morphCd > 0) return false;
+    this.form = f; this.formAnim = 1; this.morphCd = 2.5; this.events.push('morph'); return true;
+  }
+  updateForm(dt) {
+    if (this.morphCd > 0) this.morphCd -= dt;
+    if (!this.tank) return;
+    if (this.formAnim > 0) {
+      this.formAnim = Math.max(0, this.formAnim - dt * 1.3);
+      const k = 1 - this.formAnim, dip = Math.sin(Math.PI * k), b = this.baseScale;
+      this.model.scale.set(b * (1 + 0.14 * dip), b * (1 - 0.34 * dip), b * (1 + 0.14 * dip));
+      if (k > 0.5 && this.formShown !== this.form) { this.formShown = this.form; const t = this.form === 'tank'; this.shipParts.forEach(c => c.visible = !t); this.tank.visible = t; }
+      if (this.formAnim === 0) this.model.scale.setScalar(b);
+    }
+  }
   spawnAt(x, y, z, yaw) {
     this.pos.set(x, y, z); this.vel.set(0, 0, 0); this.yaw = yaw; this.yawVel = 0; this.hp = this.maxHp; this.alive = true; this.mesh.visible = true;
     this.cargo = {}; this.cargoKg = 0; this.lock = null; this.cdM = 1; this.energy = 100; this.flareCd = 0;
@@ -274,6 +314,8 @@ export class Ship {
     const boost = this.boosting && this.energy > 1 && this.inThrust > 0.2;
     if (boost) { vmax *= 1.6; acc *= 2.2; this.energy = Math.max(0, this.energy - 26 * (1 - (fx.boostEff || 0)) * dt); } else this.energy = Math.min(100, this.energy + 14 * (1 + (fx.boostRegen || 0)) * dt);
     this.boostOn = boost; this.flareCd -= dt;
+    const tank = this.form === 'tank'; if (tank) { vmax *= 0.72; acc *= 1.5; this.inLift = 0; }
+    this.updateForm(dt);
     this.fwd(_f); _r.set(-_f.z, 0, _f.x);
     this.vel.addScaledVector(_f, this.inThrust * acc * dt);
     this.vel.y += this.inLift * this.accel * 1.15 * dt;
@@ -284,20 +326,21 @@ export class Ship {
     this.vel.y *= Math.exp(-dt * (Math.abs(this.inLift) > 0.05 ? 0.5 : 3.2));
     const hs = Math.hypot(this.vel.x, this.vel.z); if (hs > vmax) { const k = lerp(1, vmax / hs, 1 - Math.exp(-dt * 4)); this.vel.x *= k; this.vel.z *= k; }
     this.vel.y = clamp(this.vel.y, -vmax * 0.7, vmax * 0.7);
-    this.yawVel = lerp(this.yawVel, this.inTurn * this.turnRate, 1 - Math.exp(-dt * 6.5));
+    this.yawVel = lerp(this.yawVel, this.inTurn * this.turnRate * (tank ? 1.3 : 1), 1 - Math.exp(-dt * 6.5));
     this.yaw = wrap(this.yaw + this.yawVel * dt);
     this.pos.addScaledVector(this.vel, dt);
     for (const k of ['x', 'z']) if (Math.abs(this.pos[k]) > WORLD) { this.vel[k] -= Math.sign(this.pos[k]) * 80 * dt; }
     const g = groundAt(this.pos.x, this.pos.z) + this.hover;
-    if (this.pos.y < g) { if (this.vel.y < -18 && onImpact) onImpact(this, -this.vel.y); this.pos.y = g; if (this.vel.y < 0) this.vel.y = 0; }
+    if (tank) { this.pos.y = lerp(this.pos.y, groundAt(this.pos.x, this.pos.z) + this.hover * 0.62, 1 - Math.exp(-dt * 7)); this.vel.y = 0; }
+    else if (this.pos.y < g) { if (this.vel.y < -18 && onImpact) onImpact(this, -this.vel.y); this.pos.y = g; if (this.vel.y < 0) this.vel.y = 0; }
     islandPush(this);
     if (this.pos.y > 1150) { this.pos.y = 1150; this.vel.y = Math.min(0, this.vel.y); }
     // 연출: 선회 시 크게 기울고, 가속 시 기수 숙임
     const tb = clamp(-this.yawVel / this.turnRate, -1, 1) * (0.42 + hs / (this.maxSpeed + 1) * 0.15) + clamp(sd / 40, -0.15, 0.15);
     this.bank = lerp(this.bank, -tb, 1 - Math.exp(-dt * 4));
     this.pitchV = lerp(this.pitchV, -this.inThrust * 0.08 * (1 - hs / (vmax + 1) * 0.5) + this.vel.y * 0.004, 1 - Math.exp(-dt * 3));
-    this.model.rotation.set(this.pitchV, 0, this.bank);
-    this.model.position.y = Math.sin(performance.now() * 0.0013 + this.yaw * 3) * 0.35 * this.scale;
+    this.model.rotation.set(tank ? this.pitchV * 0.25 : this.pitchV, 0, tank ? this.bank * 0.2 : this.bank);
+    this.model.position.y = tank ? 0 : Math.sin(performance.now() * 0.0013 + this.yaw * 3) * 0.35 * this.scale;
     this.mesh.rotation.set(0, this.yaw, 0);
     this.cdM -= dt;
     this.updateShield(dt);

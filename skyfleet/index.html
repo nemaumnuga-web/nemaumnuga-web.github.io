@@ -73,6 +73,7 @@
     <button class="tbtn rd" id="tLock">잠금<small>다음</small></button>
     <button class="tbtn rd" id="tBoost">부스트<small>누르기</small></button>
     <button class="tbtn rd" id="tFlare">플레어<small>회피</small></button>
+    <button class="tbtn sq" id="tMorph" style="display:none">변형<small>T</small></button>
     <button class="tbtn sq" id="tBase" style="display:none">기지<small>관리</small></button>
     <button class="tbtn sq" id="tBoard">순위<small>점수</small></button>
     <button class="tbtn sq" id="tUp">▲<small>위로</small></button>
@@ -98,6 +99,7 @@
       <button data-tab="paint">페인트</button><button data-tab="inv">인벤토리</button><button data-tab="quest">퀘스트<i class="dot" id="qDot" hidden></i></button>
       <button data-tab="upgrade">업그레이드</button><button data-tab="modules">모듈</button><button data-tab="market">시장</button><button data-tab="yard">조선소</button>
       <button data-tab="settings">설정</button>
+      <button class="bridgeB" id="toBridge">지휘본부</button>
       <button class="leave" id="leave">항구를 떠나기</button>
     </nav>
   </div>
@@ -107,6 +109,15 @@
 <div class="ov" id="dead"><div class="card"><h2 class="stencil red">SHIP DOWN</h2><p>격추당했습니다. <span id="deadInfo"></span></p><button class="btn big" id="deadGo">포트 앤톤으로 귀환</button></div></div>
 <div class="ov" id="mapOv"><div class="card wide"><button class="x" id="mapX">✕</button><h3>월드 지도</h3><canvas id="mapc" width="900" height="900"></canvas><p class="legend"><i class="lg port"></i>포트 <i class="lg ore"></i>광맥 <i class="lg pir"></i>해적 <i class="lg cap"></i>캡틴 <i class="lg me"></i>나</p></div></div>
 <div class="ov" id="board"><div class="card wide"><h3>순위표</h3><div id="boardB"></div><p class="legend">PC: Tab 키를 누르고 있는 동안 표시</p></div></div>
+<section id="bridgeUI">
+  <div class="panel" id="brTop"><small>선내 지휘본부</small><b id="brShip"></b><span>선원 5명 · 솔라레 AI · 전략 테이블</span></div>
+  <button class="btn ghost" id="brBack">← 격납고로</button>
+  <div id="brHint"></div>
+  <div id="brKeys">W/S 이동 · A/D 회전 · 화면 드래그로 시선 · E 상호작용 · C 1인칭/3인칭</div>
+  <div id="brTouch"><div id="brJoy"><i id="brJoyK"></i></div><button class="tbtn rd" id="brInteract" style="display:none">대화<small>E</small></button><button class="tbtn sq" id="brCam">시점</button></div>
+  <div id="strategyPanel" class="panel"><button class="x" id="stX">✕</button><h3>전략 테이블</h3><p id="strategyAdvice" style="color:var(--dim);font-size:12px;margin:0 0 8px"></p><div id="strategyList"></div></div>
+  <div id="crewCard" class="panel"></div>
+</section>
 <div id="basePanel"><div class="bph"><div><h3 id="bpTitle"></h3><span id="bpSub"></span><div class="bphp"><i id="bpHp"></i></div></div><button class="x" id="bpClose">✕</button></div><div id="bpBody"></div></div>
 <div id="rotate"><div class="ph"></div><b>가로로 돌려 주세요</b><span>하늘함대는 가로 화면에서 플레이해요</span></div>
 <div id="toast"></div>

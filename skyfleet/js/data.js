@@ -63,6 +63,7 @@ export const MODULES = {
   compress: { ic: '🗜️', nm: '화물 압축기', cost: 1500, cat: '유틸', ds: '적재량 +25%', fx: { cargo: 0.25 } },
   scanner:  { ic: '📡', nm: '광역 스캐너', cost: 900, cat: '유틸', ds: '레이더 범위 +60%', fx: { radar: 0.6 } },
   flares:   { ic: '✨', nm: '플레어 디스펜서', cost: 800, cat: '유틸', ds: '플레어 재사용 -45%', fx: { flareCd: -0.45 } },
+  morph:    { ic: '🛠️', nm: '변형 코어', cost: 6000, cat: '기동', ds: '함선 ⇄ 전차 변형 (T키) · 전차: 피해 -35% · 포 피해 +35%', fx: { morph: 1 } },
   magnet:   { ic: '🧲', nm: '회수 자석', cost: 700, cat: '유틸', ds: '전리품 회수 거리 ×3 · 현상금 +10%', fx: { magnet: 2, bounty: 0.1 } },
 };
 export function modFx(ids) {
@@ -83,7 +84,7 @@ export function rollOre(rich) { let r = Math.random() * 100 - (rich ? 35 : 0); f
 export const RAR_COL = { '흔함': '#c9b79a', '드묾': '#7fd3ff', '희귀': '#ffcc55', '전설': '#4ff0ff' };
 
 export const RANKS = [
-  { nm: '드리프터', xp: 0 }, { nm: '항해사', xp: 150 }, { nm: '용병', xp: 450 }, { nm: '함장', xp: 1000 }, { nm: '제독', xp: 2200 }, { nm: '하늘의 주인', xp: 4200 },
+  { nm: '드리프터', xp: 0 }, { nm: '항해사', xp: 150 }, { nm: '용병', xp: 450 }, { nm: '함장', xp: 1000 }, { nm: '제독', xp: 2200 }, { nm: '하늘의 주인', xp: 4200 }, { nm: '전설의 캡틴', xp: 9000 }, { nm: '하늘의 신', xp: 20000 },
 ];
 export function rankOf(xp) { let i = 0; while (i + 1 < RANKS.length && xp >= RANKS[i + 1].xp) i++; return i; }
 
@@ -147,9 +148,9 @@ export const ENDING = '아크라이트의 에테르 기관이 깨어나자, 붉�
 
 /* ---------- 저장 ---------- */
 const KEY = 'skyfleet_save_v2';
-function freshShip(cls) { return { tier: cls, lv: { guns: 0, missile: TIERS[cls].tier >= 1 ? 1 : 0, armor: 0, engine: 0, cargo: 0, drill: 0 }, weapon: 'cannon', mods: [] }; }
+function freshShip(cls) { return { tier: cls, lv: { guns: 0, missile: TIERS[cls].tier >= 1 ? 1 : 0, armor: 0, engine: 0, cargo: 0, drill: 0 }, weapon: 'cannon', mods: [], elems: [] }; }
 export function defaultSave() {
-  return { ver: 3, credits: 300, xp: 0, ships: [freshShip(0)], active: 0, paint: 'sand', pvp: false, storage: {}, prices: {}, quests: [], stats: { kills: 0, mined: 0, deaths: 0, bosses: 0 }, skyrunBest: 0, weapons: ['cannon'], modules: [], mute: false, solare: { voice: true, llm: false, perm: 0, mic: true }, story: { ch: 0, have: 0, intro: false, done: false }, camSteer: true, outposts: [] };
+  return { ver: 3, credits: 300, xp: 0, ships: [freshShip(0)], active: 0, paint: 'sand', pvp: false, storage: {}, prices: {}, quests: [], stats: { kills: 0, mined: 0, deaths: 0, bosses: 0 }, skyrunBest: 0, weapons: ['cannon'], modules: [], mute: false, solare: { voice: true, llm: false, perm: 0, mic: true }, story: { ch: 0, have: 0, intro: false, done: false }, camSteer: true, outposts: [], founder: false, elements: [], crew: {}, strategy: 'balanced' };
 }
 export let save = defaultSave();
 export function loadSave() {
@@ -159,7 +160,8 @@ export function loadSave() {
     for (const sh of save.ships) { sh.tier = map[sh.tier] ?? 0; sh.mods = sh.mods || []; sh.weapon = sh.weapon || 'cannon'; }
     save.modules = save.modules || []; save.story = save.story || { ch: 0, have: 0, intro: true, done: false }; save.ver = 3;
   }
-  for (const sh of save.ships) { sh.mods = sh.mods || []; sh.weapon = sh.weapon || 'cannon'; }
+  for (const sh of save.ships) { sh.mods = sh.mods || []; sh.weapon = sh.weapon || 'cannon'; sh.elems = sh.elems || []; }
+  save.elements = save.elements || []; save.crew = save.crew || {}; save.strategy = save.strategy || 'balanced';
   if (!save.quests || save.quests.length < 3) refillQuests();
   return save;
 }
@@ -229,4 +231,43 @@ export const UNIT_DEFS = {
   adept:   { ic: '✨', nm: '원소 능력자', role: '특수 · 원소 공격', cost: 2200, time: 14, hp: 160, air: true, speed: 60, range: 720, dmg: 26, rate: 0.8, ds: '7원소 중 하나를 다루는 능력자. 서로 다른 원소가 만나면 원소 반응이 일어남' },
   rover:   { ic: '🚙', nm: '호버 정찰차', role: '지상 · 순찰', cost: 500, time: 5, hp: 120, air: false, speed: 48, range: 480, dmg: 6, rate: 2.5, ds: '기지 주변 도로를 순찰하는 레이저 정찰차' },
   hauler:  { ic: '🚚', nm: '호버 화물 트럭', role: '지상 · 자원 운반', cost: 800, time: 7, hp: 200, air: false, speed: 34, range: 0, dmg: 0, rate: 0, ds: '근처 광맥에서 광석을 캐서 창고로 실어 나름 (자동 수입)' },
+};
+
+/* ---------- 캡틴 특권 (나만 쓰는 모드) ----------
+   설정에서 코드를 입력하면 켜진다. 코드는 해시만 들어 있고, 켜면 레벨 상한 30 · 원소 전부 · 모든 함선 · 슬롯 +4 */
+export const FOUNDER_HASH = '15517aa07137bd0da2f5ff29498fea70812d808a01143562cdcde85e2a18f986';
+export async function sha256(t) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+export const isFounder = () => !!save.founder;
+export const lvCap = () => (save.founder ? 30 : 5);
+export const slotCount = cls => TIERS[cls].slots + (save.founder ? 4 : 0);
+export const ELEM_COST = 2500;
+export const elemSlots = cls => (save.founder ? 7 : 1 + TIERS[cls].tier);
+export function activateFounder() {
+  save.founder = true;
+  save.credits = Math.max(save.credits, 9999999); save.xp = Math.max(save.xp, 30000);
+  for (const t of TIERS) if (!ownsTier(t.id)) save.ships.push(freshShip(t.id));
+  save.modules = Object.keys(MODULES); save.weapons = Object.keys(WEAPONS); save.elements = Object.keys(ELEMENTS);
+  for (const sh of save.ships) { for (const k in MODS) sh.lv[k] = Math.max(sh.lv[k] || 0, 25); sh.elems = Object.keys(ELEMENTS); if (sh.mods.length < slotCount(sh.tier)) for (const id of save.modules) { if (sh.mods.length >= slotCount(sh.tier)) break; if (!sh.mods.includes(id)) sh.mods.push(id); } }
+  persist();
+}
+export function deactivateFounder() { save.founder = false; for (const sh of save.ships) { for (const k in MODS) sh.lv[k] = Math.min(sh.lv[k] || 0, 5); sh.mods = sh.mods.slice(0, TIERS[sh.tier].slots); sh.elems = sh.elems.slice(0, elemSlots(sh.tier)); } persist(); }
+/* ---------- 선원 ---------- */
+export const CREW = [
+  { id: 'pilot', nm: '하루', role: '파일럿', ic: '🧑‍✈️', col: 0x3f86ff, st: [-6, 0, -9], ds: '선회와 속도를 책임진다', bonus: l => `선회 +${(l * 2).toFixed(0)}% · 속도 +${(l * 1.5).toFixed(0)}%`, fx: l => ({ turn: l * 0.02, speed: l * 0.015 }) },
+  { id: 'gunner', nm: '카이', role: '포술장', ic: '🎯', col: 0xff5a4a, st: [6, 0, -9], ds: '포탑의 화력과 연사를 높인다', bonus: l => `포 피해 +${(l * 3).toFixed(0)}% · 연사 +${(l * 2).toFixed(0)}%`, fx: l => ({ gunDmg: l * 0.03, rate: l * 0.02 }) },
+  { id: 'nav', nm: '노바', role: '항법사', ic: '🧭', col: 0x5fe8ff, st: [-9, 0, 2], ds: '레이더와 잠금 거리를 넓힌다', bonus: l => `레이더 +${(l * 8).toFixed(0)}% · 잠금 거리 +${(l * 4).toFixed(0)}%`, fx: l => ({ radar: l * 0.08, lockRange: l * 0.04 }) },
+  { id: 'medic', nm: '진', role: '의무관', ic: '🩺', col: 0x6bff9c, st: [9, 0, 2], ds: '전투가 없을 때 선체를 회복시킨다', bonus: l => `비전투 회복 +${(l * 0.25).toFixed(2)}%/초`, fx: l => ({ nano: l * 0.0025 }) },
+  { id: 'eng', nm: '미라', role: '기관장', ic: '🔧', col: 0xffb347, st: [0, 0, 30], ds: '방어막 회복과 부스트 효율을 높인다', bonus: l => `방어막 회복 +${(l * 5).toFixed(0)}% · 부스트 효율 +${(l * 2).toFixed(0)}%`, fx: l => ({ shRegen: l * 0.05, boostEff: l * 0.02 }) },
+];
+export const crewLevel = id => Math.min(save.founder ? 30 : 12, 1 + Math.floor(rankOf(save.xp) * 1.8) + (save.crew[id] || 0));
+export const crewUpCost = id => 800 * (1 + (save.crew[id] || 0));
+export function crewFx() { const f = {}; for (const c of CREW) { const x = c.fx(crewLevel(c.id)); for (const k in x) f[k] = (f[k] || 0) + x[k]; } return f; }
+/* ---------- 전략 ---------- */
+export const STRATEGIES = {
+  balanced: { nm: '균형', ic: '⚖️', ds: '임무와 상황에 따라 가장 이득인 행동을 고른다', w: { ore: 1, fight: 1, port: 1, boss: 1, explore: 1 } },
+  mine:     { nm: '채굴 작전', ic: '⛏️', ds: '고가 광맥 위주로 캐고, 화물이 차면 판매', w: { ore: 1.7, fight: 0.6, port: 1.1, boss: 0.4, explore: 0.8 } },
+  hunt:     { nm: '해적 소탕', ic: '⚔️', ds: '해적을 찾아 격추해 현상금을 번다', w: { ore: 0.5, fight: 1.8, port: 0.9, boss: 1.1, explore: 0.5 } },
+  boss:     { nm: '보스 사냥', ic: '☠️', ds: '해적 기함이 나오면 최우선으로 노린다', w: { ore: 0.6, fight: 1.2, port: 0.9, boss: 2.4, explore: 0.5 } },
+  defend:   { nm: '기지 방어', ic: '🛡️', ds: '전초기지 근처에서 습격에 대비 (전차 형태로 버팀)', w: { ore: 0.5, fight: 1.4, port: 0.8, boss: 0.5, explore: 0.3 } },
+  explore:  { nm: '탐험', ic: '🧭', ds: '부유섬·난파선 같은 새로운 곳을 둘러본다', w: { ore: 0.9, fight: 0.5, port: 0.8, boss: 0.4, explore: 2.2 } },
 };
