@@ -4,6 +4,7 @@ import { EffectComposer } from '../vendor/addons/postprocessing/EffectComposer.j
 import { RenderPass } from '../vendor/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '../vendor/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../vendor/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from '../vendor/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
 export { THREE, mergeGeometries };
 
@@ -24,11 +25,13 @@ export const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
 let qn = isTouch ? 'mid' : 'high';
 try { qn = localStorage.getItem('skyfleet_q') || qn; } catch (e) {}
 export const QUALITY = qn;
+const isPhone = isTouch && Math.min(screen.width, screen.height) < 700;
 export const Q = {
-  high: { pr: Math.min(devicePixelRatio, 2), shadow: 2048, bloom: true, seg: 256, fx: 1 },
-  mid: { pr: Math.min(devicePixelRatio, 1.5), shadow: 1024, bloom: true, seg: 192, fx: 0.7 },
-  low: { pr: 1, shadow: 0, bloom: false, seg: 128, fx: 0.4 },
-}[qn] || { pr: 1, shadow: 0, bloom: false, seg: 128, fx: 0.4 };
+  high: { pr: Math.min(devicePixelRatio, 2), shadow: 2048, bloom: true, seg: 256, fx: 1, msaa: 4, rays: 18, scatter: 1 },
+  mid: { pr: Math.min(devicePixelRatio, isPhone ? 1.8 : 1.5), shadow: 1024, bloom: true, seg: 192, fx: 0.7, msaa: 2, rays: 12, scatter: 0.7 },
+  low: { pr: 1, shadow: 0, bloom: false, seg: 128, fx: 0.4, msaa: 0, rays: 0, scatter: 0.35 },
+}[qn] || { pr: 1, shadow: 0, bloom: false, seg: 128, fx: 0.4, msaa: 0, rays: 0, scatter: 0.35 };
+export { isPhone };
 
 /* ---------- 렌더러 ---------- */
 export const canvas = $('view');
@@ -40,12 +43,42 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 if (Q.shadow) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
 export const camera = new THREE.PerspectiveCamera(65, 1, 0.5, 9500);
 
-let composer = null, renderPass = null;
+let composer = null, renderPass = null, rayPass = null, gradePass = null;
+/* 후처리 효과 상태 (게임에서 갱신) */
+export const FXS = { boost: 0, night: 0, sunX: 0.5, sunY: 0.5, rays: 0, vig: 0.35, sat: 1.1 };
+const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+const RAY_FS = (n) => `uniform sampler2D tDiffuse; uniform vec2 sun; uniform float intensity; uniform float aspect; varying vec2 vUv;
+void main(){
+  vec4 base = texture2D(tDiffuse, vUv);
+  if (intensity < 0.001) { gl_FragColor = base; return; }
+  vec2 dir = (sun - vUv) * 0.92 / float(${n});
+  vec2 uv = vUv; float decay = 1.0; vec3 acc = vec3(0.0);
+  for (int i = 0; i < ${n}; i++) { uv += dir; vec3 c = texture2D(tDiffuse, uv).rgb; float l = max(max(c.r, c.g), c.b); c *= smoothstep(2.4, 6.0, l); acc += c * decay; decay *= 0.935; }
+  float d = distance(vec2(vUv.x * aspect, vUv.y), vec2(sun.x * aspect, sun.y));
+  gl_FragColor = vec4(base.rgb + acc / float(${n}) * intensity * (0.55 + 0.45 * smoothstep(1.2, 0.0, d)), 1.0);
+}`;
+const GRADE_FS = `uniform sampler2D tDiffuse; uniform float boost; uniform float night; uniform float vig; uniform float sat; varying vec2 vUv;
+void main(){
+  vec2 c = vUv - 0.5; float r2 = dot(c, c);
+  vec2 off = c * r2 * (0.010 + boost * 0.07);
+  vec3 col = vec3(texture2D(tDiffuse, vUv - off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv + off).b);
+  if (boost > 0.02) { vec3 acc = col; for (int i = 1; i < 5; i++) acc += texture2D(tDiffuse, vUv - c * float(i) * 0.018 * boost).rgb; col = mix(col, acc / 5.0, 0.55 * boost); }
+  float l = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(l), col, sat);
+  col *= 1.0 - vig * smoothstep(0.12, 0.62, r2 * 2.0);
+  col = mix(col * vec3(1.07, 1.0, 0.90), col * vec3(0.82, 0.95, 1.22), night);
+  col = (col - 0.18) * 1.06 + 0.18;
+  gl_FragColor = vec4(max(col, 0.0), 1.0);
+}`;
 if (Q.bloom) {
-  composer = new EffectComposer(renderer);
+  const sz = new THREE.Vector2(); const tmpR = { w: Math.max(2, innerWidth), h: Math.max(2, innerHeight) };
+  const rt = new THREE.WebGLRenderTarget(Math.round(tmpR.w * Q.pr), Math.round(tmpR.h * Q.pr), { type: THREE.HalfFloatType, samples: Q.msaa });
+  composer = new EffectComposer(renderer, rt); void sz;
   renderPass = new RenderPass(new THREE.Scene(), camera);
   composer.addPass(renderPass);
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.4, 1.0));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.42, 0.4, 1.35));
+  if (Q.rays) { rayPass = new ShaderPass({ uniforms: { tDiffuse: { value: null }, sun: { value: new THREE.Vector2(0.5, 0.5) }, intensity: { value: 0 }, aspect: { value: 1 } }, vertexShader: VS, fragmentShader: RAY_FS(Q.rays) }); composer.addPass(rayPass); }
+  gradePass = new ShaderPass({ uniforms: { tDiffuse: { value: null }, boost: { value: 0 }, night: { value: 0 }, vig: { value: 0.35 }, sat: { value: 1.1 } }, vertexShader: VS, fragmentShader: GRADE_FS });
+  composer.addPass(gradePass);
   composer.addPass(new OutputPass());
 }
 export function resize() {
@@ -60,7 +93,11 @@ export function render(scene, cam, dt) {
   renderer.getDrawingBufferSize(_pScale);
   const sc = _pScale.y / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
   for (const ps of particleSystems) ps.mat.uniforms.scale.value = sc;
-  if (composer) { renderPass.scene = scene; renderPass.camera = cam; composer.render(dt); }
+  if (composer) {
+    if (gradePass) { const u = gradePass.uniforms; u.boost.value += (FXS.boost - u.boost.value) * Math.min(1, dt * 6); u.night.value = FXS.night; u.vig.value = FXS.vig; u.sat.value = FXS.sat; }
+    if (rayPass) { const u = rayPass.uniforms; u.sun.value.set(FXS.sunX, FXS.sunY); u.intensity.value = FXS.rays; u.aspect.value = innerWidth / innerHeight; }
+    renderPass.scene = scene; renderPass.camera = cam; composer.render(dt);
+  }
   else renderer.render(scene, cam);
 }
 

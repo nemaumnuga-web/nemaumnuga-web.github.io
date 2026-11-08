@@ -1,8 +1,8 @@
 // 하늘함대 — 메인: 로딩, 비행, 전투, 채굴, 도킹, 항구 UI
-import { THREE, $, rand, pick, clamp, lerp, wrap, fmt, isTouch, QUALITY, camera, render, frameYield, sleep, sfx, COL, engineSound, setMute } from './core.js';
+import { THREE, $, rand, pick, clamp, lerp, wrap, fmt, isTouch, QUALITY, camera, render, frameYield, sleep, sfx, COL, engineSound, setMute, FXS } from './core.js';
 import { TIERS, MODS, modCost, ORES, RAR_COL, RANKS, rankOf, PAINTS, TIPS, CAPTAIN_NAMES, PIRATE_NAMES, WORLD, save, loadSave, persist, activeShip, ownsTier, buyTier, refillQuests, makeQuest, questProgress, priceOf, driftPrices, WEAPONS, MODULES, CHAPTERS, INTRO, ENDING, REGIONS, ownsLevel } from './data.js';
 import { scene, buildWorld, updateWorld, terrainH, groundAt, ports, ores, depleteOre, nearestPort, homePort, DAY, FIRE, SMOKE, WEATHER, islands, islandAt, WRECKS, surfaceBelow } from './world.js';
-import { Ship, blinkNav, makeShipModel } from './ships.js';
+import { Ship, blinkNav, makeShipModel, setShipNight } from './ships.js';
 import { rememberDeath as solRemember, initSolare, say as solSay, event as solEvent, tickSolare, chatOpen, toggleChat, agentUpdate, agentPause, agentReset, agentOn, agentState, setPermUI, refreshSolUI, cfg as solCfg, setLLM, setModel, MODEL_NAMES, llmText, permName, permDesc, PERM_NAMES } from './solare.js';
 import { S, explode, fireTurrets, fireMissile, updateBullets, updateMissiles, spawnDebris, updateDebris, dropCrate, updateCrates, mineBeam, shipFx, clearFx, dropFlares, incoming, updateFlares, shieldFx } from './fx.js';
 import { runAI } from './ai.js';
@@ -871,7 +871,7 @@ function frame(now) {
   tickSolare(dt);
   if (mode === 'intro') { updateWorld(dt, camera.position); updateIntroCam(dt); render(scene, camera, dt); return; }
   blinkNav(now / 1000);
-  if (mode === 'hangar') { engineSound(0, false, false); if (player) agentUpdate(dt, solSnap()); updateHangar(dt); render(hscene, hcam, dt); return; }
+  if (mode === 'hangar') { FXS.rays = 0; FXS.boost = 0; FXS.night = 0.3; FXS.vig = 0.45; FXS.sat = 1.12; engineSound(0, false, false); if (player) agentUpdate(dt, solSnap()); updateHangar(dt); render(hscene, hcam, dt); return; }
   // fly / dead
   mineSoundT -= dt; priceT -= dt; if (priceT <= 0) { driftPrices(); priceT = 60; }
   if (!$('mapOv').classList.contains('on')) for (let step = 0; step < SUBSTEPS; step++) {
@@ -897,6 +897,8 @@ function frame(now) {
   updateWorld(dt, player.pos);
   if (player.alive) updateCamera(dt); else { camera.lookAt(player.pos); }
   updateSpeedLines(dt);
+  FXS.vig = 0.32 + (player.alive ? 0 : 0.25); FXS.boost = player.alive ? (player.boostOn ? 1 : clamp((player.speed / player.maxSpeed - 0.85) * 3, 0, 0.35)) : 0;
+  setShipNight(DAY.night); if (player.headlight) player.headlight.intensity = player.alive ? DAY.night * 2600 : 0;
   if (player) agentUpdate(dt, solSnap());
   hudFrame(dt);
   render(scene, camera, dt);
@@ -904,4 +906,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 boot().catch(e => { console.error(e); $('ldPhase').textContent = '오류: ' + e.message; });
 
-window.__sf = { S, get save() { return save; }, EV, WEATHER, AP, story, solCtx, get mode() { return mode; }, get player() { return player; }, ports, ores, launch: () => launch(), enterHangar: p => enterHangar(p || homePort()), key, inp, DAY, cam };
+window.__sf = { S, solSnap, get save() { return save; }, EV, WEATHER, AP, story, solCtx, get mode() { return mode; }, get player() { return player; }, ports, ores, launch: () => launch(), enterHangar: p => enterHangar(p || homePort()), key, inp, DAY, cam };

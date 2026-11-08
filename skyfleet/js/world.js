@@ -1,5 +1,5 @@
 // 월드: 하늘·낮밤·지형·포트·광맥
-import { THREE, Q, renderer, camera, rand, clamp, lerp, smooth, Particles, TEX_SOFT, TEX_SMOKE, canvasTex, put, finish, box, cyl, HPI, addProto, frameYield, mergeGeometries } from './core.js';
+import { FXS, THREE, Q, renderer, camera, rand, clamp, lerp, smooth, Particles, TEX_SOFT, TEX_SMOKE, canvasTex, put, finish, box, cyl, HPI, addProto, frameYield, mergeGeometries } from './core.js';
 import { Sky } from '../vendor/addons/objects/Sky.js';
 import { WORLD, PORT_DEFS, ORES, rollOre } from './data.js';
 
@@ -11,6 +11,8 @@ scene.fog = FOG;
 const SUN_DIR = new THREE.Vector3();
 function makeSky(scale) {
   const s = new Sky(); s.scale.setScalar(scale);
+  // 태양 원반이 만드는 극단적인 밝기를 제한해 블룸이 화면 전체를 덮지 않게 한다
+  s.material.fragmentShader = s.material.fragmentShader.replace('gl_FragColor = vec4( retColor, 1.0 );', 'gl_FragColor = vec4( min( retColor, vec3( 3.2 ) ), 1.0 );'); s.material.needsUpdate = true;
   const u = s.material.uniforms; u.turbidity.value = 6; u.rayleigh.value = 1.3; u.mieCoefficient.value = 0.006; u.mieDirectionalG.value = 0.86;
   return s;
 }
@@ -50,8 +52,8 @@ function applyDay(force) {
   const day = smooth(-4, 12, el), set = smooth(25, 4, el) * smooth(-6, 2, el);
   DAY.light = day; DAY.night = 1 - smooth(-8, 2, el); DAY.el = el;
   sun.intensity = 3.2 * day; sun.color.setHSL(0.09, 0.6, lerp(0.62, 0.85, smooth(4, 30, el)));
-  moon.intensity = 0.45 * DAY.night;
-  hemi.intensity = lerp(0.14, 0.55, day); hemi.color.set(day > 0.5 ? 0xbcd8ff : 0x4a5a88);
+  moon.intensity = 0.95 * DAY.night;
+  hemi.intensity = lerp(0.3, 0.55, day); hemi.color.set(day > 0.5 ? 0xbcd8ff : 0x4a5a88);
   const fc = FOG_NIGHT.clone().lerp(FOG_DAY, day).lerp(FOG_SET, set * 0.7);
   FOG.color.copy(fc);
   stars.material.opacity = DAY.night;
@@ -96,13 +98,14 @@ function buildTerrain(size, seg, sink) {
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); let h = terrainH(x, z); if (sink && Math.abs(x) < sink && Math.abs(z) < sink) h -= 60; p.setY(i, h); }
   g.computeVertexNormals();
   const n = g.attributes.normal, cols = new Float32Array(p.count * 3), c = new THREE.Color();
-  const sand = new THREE.Color(0xe2bd86), wet = new THREE.Color(0x5e3a24), tmp = new THREE.Color();
+  const sand = new THREE.Color(0xe2bd86), wet = new THREE.Color(0x5e3a24), tmp = new THREE.Color(), grass = new THREE.Color(0x7e8e42);
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), ny = n.getY(i);
     const band = Math.floor((y + vnoise(x * 0.004, z * 0.004) * 18) / 22);
     c.copy(STRATA[((band % 8) + 8) % 8]);
     tmp.copy(sand).offsetHSL(0, 0, (vnoise(x * 0.01, z * 0.01) - 0.5) * 0.08);
     c.lerp(tmp, smooth(0.8, 0.95, ny));
+    if (y > 4 && y < 46) c.lerp(grass, smooth(0.86, 0.98, ny) * smooth(46, 12, y) * (0.55 + vnoise(x * 0.006 + 3, z * 0.006) * 0.6));   // 강가 풀밭
     if (y < 10) c.lerp(wet, smooth(10, -5, y));
     c.offsetHSL(0, 0, (hash(i, 7) - 0.5) * 0.04);
     cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
@@ -144,7 +147,7 @@ const WATER_NRM = (() => {
   }
   x.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(nrmFromHeight(c, 4)); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(120, 120); return t;
 })();
-let waterMat = null, sunSprite = null;
+let waterMat = null, waterMat2 = null, sunSprite = null;
 
 /* ---------- 부유섬 ---------- */
 export const islands = [];
@@ -224,6 +227,67 @@ function pickWrecks() {
 /* ---------- 파티클 ---------- */
 export let FIRE, SMOKE, CLOUD;
 
+/* ---------- 지형 디테일: 바위 · 덤불 · 풀 (인스턴스) ---------- */
+function makeScatter() {
+  const N = { rock: Math.round(900 * Q.scatter), bush: Math.round(1100 * Q.scatter), tuft: Math.round(1300 * Q.scatter) };
+  const placed = [];
+  const spot = (minH, maxH, minNy) => {
+    for (let t = 0; t < 40; t++) {
+      const x = rand(-WORLD * 1.15, WORLD * 1.15), z = rand(-WORLD * 1.15, WORLD * 1.15), h = terrainH(x, z);
+      if (h < minH || h > maxH) continue; if (ports.some(p => Math.hypot(p.x - x, p.z - z) < 220)) continue;
+      const e = 8, nx = terrainH(x + e, z) - terrainH(x - e, z), nz = terrainH(x, z + e) - terrainH(x, z - e), ny = 1 / Math.hypot(nx / (2 * e), 1, nz / (2 * e));
+      if (ny < minNy) continue; return [x, h, z, ny];
+    } return null;
+  };
+  // 바위: 깨진 다면체
+  const rg = new THREE.IcosahedronGeometry(1, 1), rp = rg.attributes.position;
+  for (let i = 0; i < rp.count; i++) { const k = 0.75 + hash(i, 11) * 0.5; rp.setXYZ(i, rp.getX(i) * k, rp.getY(i) * k * 0.7, rp.getZ(i) * k); }
+  rg.computeVertexNormals();
+  const rock = new THREE.InstancedMesh(rg, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), N.rock); envMats.push(rock.material);
+  // 덤불: 뾰족한 원뿔 + 줄기
+  const bg = new THREE.ConeGeometry(1, 2.2, 5, 1); bg.translate(0, 1.1, 0);
+  const bush = new THREE.InstancedMesh(bg, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true }), N.bush); envMats.push(bush.material);
+  const tg = new THREE.PlaneGeometry(1, 1); tg.translate(0, 0.5, 0);
+  const tuft = new THREE.InstancedMesh(tg, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, side: THREE.DoubleSide, alphaTest: 0.5, map: TUFT_TEX }), N.tuft); envMats.push(tuft.material);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), c = new THREE.Color();
+  let k = 0;
+  while (k < N.rock) { const p = spot(6, 520, 0.25); if (!p) break; const s = rand(1.2, 7) * (p[3] < 0.7 ? 1.6 : 1); pos.set(p[0], p[1] + s * 0.15, p[2]); sc.set(s, s, s); m.compose(pos, q.setFromEuler(e.set(rand(0, 6), rand(0, 6), rand(0, 6))), sc); rock.setMatrixAt(k, m); c.copy(STRATA[(k * 7) % 8]).offsetHSL(0, -0.05, rand(-0.08, 0.04)); rock.setColorAt(k++, c); }
+  rock.count = k; rock.castShadow = Q.shadow > 0; rock.receiveShadow = true; scene.add(rock);
+  k = 0;
+  while (k < N.bush) { const p = spot(5, 160, 0.75); if (!p) break; const s = rand(0.7, 2.6); pos.set(p[0], p[1] - 0.2, p[2]); sc.set(s * rand(0.7, 1.2), s * rand(0.8, 1.5), s); m.compose(pos, q.setFromEuler(e.set(0, rand(0, 6), 0)), sc); bush.setMatrixAt(k, m); c.setHSL(rand(0.08, 0.2), rand(0.25, 0.45), rand(0.25, 0.36)); bush.setColorAt(k++, c); }
+  bush.count = k; bush.castShadow = false; bush.receiveShadow = true; scene.add(bush);
+  k = 0;
+  while (k < N.tuft) { const p = spot(4, 70, 0.85); if (!p) break; const s = rand(1.4, 3.4); pos.set(p[0], p[1] - 0.1, p[2]); sc.set(s, s * rand(0.7, 1.2), s); m.compose(pos, q.setFromEuler(e.set(0, rand(0, 6), 0)), sc); tuft.setMatrixAt(k, m); c.setHSL(rand(0.15, 0.26), rand(0.35, 0.6), rand(0.28, 0.4)); tuft.setColorAt(k++, c); }
+  tuft.count = k; scene.add(tuft); void placed;
+}
+const TUFT_TEX = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#fff'; for (let i = 0; i < 9; i++) { const bx = 6 + i * 6 + Math.random() * 3, h = 26 + Math.random() * 34; x.beginPath(); x.moveTo(bx - 3, 64); x.quadraticCurveTo(bx + Math.random() * 6 - 3, 64 - h * 0.6, bx + Math.random() * 10 - 5, 64 - h); x.quadraticCurveTo(bx + 1, 64 - h * 0.5, bx + 3, 64); x.fill(); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+
+/* ---------- 렌즈 플레어 (태양 반대편으로 이어지는 빛 알갱이) ---------- */
+const flareSprites = [];
+function makeFlare() {
+  const cols = [[1.6, 1.2, 0.7, 150], [0.6, 1.6, 1.4, 90], [1.4, 0.7, 0.5, 220], [0.5, 0.9, 1.7, 70], [1.2, 1.1, 0.8, 120]];
+  for (const [r, g, b, size] of cols) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SOFT, color: new THREE.Color(r, g, b), blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, fog: false, toneMapped: false, transparent: true, opacity: 0 }));
+    sp.scale.setScalar(size); sp.renderOrder = 20; sp.userData.size = size; scene.add(sp); flareSprites.push(sp);
+  }
+}
+const _fv = new THREE.Vector3();
+function updateFlare() {
+  _fv.copy(camera.position).addScaledVector(SUN_DIR, 5000).project(camera);
+  const vis = DAY.el > -2 && _fv.z < 1 && Math.abs(_fv.x) < 1.15 && Math.abs(_fv.y) < 1.15;
+  const k = vis ? smooth(-2, 8, DAY.el) * (1 - WEATHER.storm * 0.85) * (1 - smooth(0.7, 1.25, Math.hypot(_fv.x, _fv.y)) * 0.8) : 0;
+  FXS.sunX = clamp((_fv.x + 1) / 2, -0.5, 1.5); FXS.sunY = clamp((_fv.y + 1) / 2, -0.5, 1.5);
+  FXS.rays = Q.rays ? k * 0.3 : 0; FXS.night = DAY.night; FXS.sat = 1.08 + 0.08 * DAY.light;
+  flareSprites.forEach((sp, i) => {
+    const t = [0.4, 0.8, 1.3, 1.7, 2.1][i], nx = _fv.x * (1 - t), ny = _fv.y * (1 - t);
+    _fv.set(nx, ny, 0.9).unproject(camera); sp.position.copy(_fv);
+    const d = camera.position.distanceTo(sp.position); sp.scale.setScalar(sp.userData.size * d * 0.0016);
+    sp.material.opacity = k * (i === 0 ? 0.35 : 0.22) * (vis ? 1 : 0);
+    _fv.copy(camera.position).addScaledVector(SUN_DIR, 5000).project(camera);
+  });
+}
+
+
 /* ---------- 포트 ---------- */
 function deckTexture() {
   return canvasTex(1024, 1024, (x, W) => {
@@ -293,7 +357,13 @@ function buildPort(p) {
   ring.rotation.x = -HPI; ring.position.y = 9; g.add(ring);
   const lamp = new THREE.PointLight(0xffc070, 0, 200, 1.4); lamp.position.set(0, 30, 0); g.add(lamp);
   scene.add(g);
-  Object.assign(p, { group: g, deck: p.ground + 6, ring, beacon, lamp });
+  // 관제탑 서치라이트 (밤에만 회전하는 빛 원뿔)
+  const sweep = new THREE.Group(); sweep.position.set(-PAD - 18, 40, -PAD + 18);
+  for (const a0 of [0, Math.PI]) { const cone = new THREE.Mesh(new THREE.ConeGeometry(14, 160, 20, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.0, 1.4), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: true })); cone.geometry.translate(0, -80, 0); cone.rotation.z = Math.PI / 2 - 0.5; cone.rotation.y = a0; sweep.add(cone); }
+  g.add(sweep); sweep.visible = false;
+  // 착륙장 모서리 빛기둥
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const bm = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 2.4, 90, 10, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.4, 0.5), transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); bm.position.set(sx * (PAD + 2), 52, sz * (PAD + 2)); g.add(bm); }
+  Object.assign(p, { group: g, deck: p.ground + 6, ring, beacon, lamp, sweep });
 }
 
 /* ---------- 광맥 ---------- */
@@ -396,8 +466,12 @@ export async function buildWorld(progress) {
   waterMat = new THREE.MeshStandardMaterial({ color: 0x1f5c66, roughness: 0.06, metalness: 0.25, normalMap: WATER_NRM, normalScale: new THREE.Vector2(0.6, 0.6), transparent: true, opacity: 0.9 });
   const water = new THREE.Mesh(new THREE.PlaneGeometry(INNER * 3.2, INNER * 3.2), waterMat);
   water.rotation.x = -HPI; water.position.y = 2; water.receiveShadow = true; scene.add(water); envMats.push(water.material);
+  waterMat2 = new THREE.MeshStandardMaterial({ color: 0x4aa0b0, roughness: 0.05, metalness: 0.35, normalMap: WATER_NRM.clone(), normalScale: new THREE.Vector2(0.45, 0.45), transparent: true, opacity: 0.22, depthWrite: false });
+  waterMat2.normalMap.needsUpdate = true; waterMat2.normalMap.repeat.set(70, 70);
+  const water2 = new THREE.Mesh(new THREE.PlaneGeometry(INNER * 3.2, INNER * 3.2), waterMat2); water2.rotation.x = -HPI; water2.position.y = 2.6; scene.add(water2); envMats.push(waterMat2);
   pickWrecks(); makeIslands(); makeArches(); makeSpires(); makePalms(); await frameYield();
-  sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SOFT, color: new THREE.Color(3, 2.5, 1.8), blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false })); sunSprite.scale.setScalar(1500); scene.add(sunSprite);
+  makeScatter(); makeFlare();
+  sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SOFT, color: new THREE.Color(3.6, 2.9, 1.9), blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false })); sunSprite.scale.setScalar(560); scene.add(sunSprite);
   progress('BUILDING PORTS', 0.6);
   PORT_PROTO = buildPortProto(); for (const p of ports) buildPort(p);
   buildOreGeos(); makeOres(46);
@@ -439,6 +513,11 @@ export function updateWorld(dt, focus) {
   for (const k in oreMats) oreMats[k].emissiveIntensity = ORES[k].glow * (1 + DAY.night * 1.5) + DAY.night * 0.3;
   for (const o of ores) if (!o.alive) { o.respawn -= dt; if (o.respawn <= 0) placeOre(o); }
   if (waterMat) { waterMat.normalMap.offset.x = t * 0.004; waterMat.normalMap.offset.y = t * 0.0025; }
+  updateFlare();
+  if (waterMat2) { waterMat2.normalMap.offset.x = -t * 0.003; waterMat2.normalMap.offset.y = t * 0.0035; }
+  for (const p of ports) { if (p.sweep) { p.sweep.rotation.y = t * 0.8; p.sweep.visible = DAY.night > 0.15; p.sweep.children.forEach(c => c.material.opacity = 0.16 * DAY.night); } }
+  // 공중에 떠다니는 먼지 (속도감·깊이감)
+  const nd = Math.round(Q.fx * 3 * (1 - WEATHER.storm)); for (let i = 0; i < nd; i++) SMOKE.emit(camera.position.x + rand(-160, 160), camera.position.y + rand(-70, 70), camera.position.z + rand(-160, 160), WEATHER.wind.x * 12 + rand(-3, 3), rand(-1, 2), WEATHER.wind.z * 12 + rand(-3, 3), rand(3, 6), rand(0.8, 1.8), 0.4, [1, 0.92, 0.78], [1, 0.92, 0.78], 0.16 * DAY.light + 0.03);
   if (sunSprite) { sunSprite.position.copy(camera.position).addScaledVector(SUN_DIR, 7000); sunSprite.visible = DAY.el > -4; sunSprite.material.opacity = smooth(-4, 6, DAY.el) * (1 - WEATHER.storm * 0.8); }
   for (const w of WRECKS) if (Math.random() < 0.25 && camera.position.distanceToSquared(tmpW.set(w.x, w.y, w.z)) < 4e6) SMOKE.emit(w.x + rand(-20, 20), w.y + 30, w.z + rand(-20, 20), rand(-3, 3) + WEATHER.wind.x * 8, rand(14, 22), rand(-3, 3), rand(5, 8), 18, 70, [0.16, 0.14, 0.13], [0.4, 0.37, 0.34], 0.5);
   FIRE.update(dt); SMOKE.update(dt);

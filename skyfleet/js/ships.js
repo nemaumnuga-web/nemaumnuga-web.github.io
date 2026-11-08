@@ -61,6 +61,7 @@ export function shipMats(paintId, faction) {
   envMats.push(hull, armor, team);
   return (matCache[key] = Object.assign({ hull, armor, team }, SHARED));
 }
+export function setShipNight(n) { SHARED.glass.emissiveIntensity = 1.6 + n * 3.4; SHARED.glow.color.setRGB(5 + n * 1.5, 2.2 + n * 0.6, 0.7); }
 export function blinkNav(t) { const b = (t % 1.2) < 0.15 ? 1 : 0.15; SHARED.navR.color.setRGB(6 * b, 0.3 * b, 0.2 * b); SHARED.navG.color.setRGB(0.3 * b, 6 * b, 0.6 * b); }
 
 /* ---------- 파라메트릭 모델 ---------- */
@@ -194,6 +195,9 @@ export class Ship {
     const G = this.G; this.shMesh.scale.set(G.m.wing / 2 + 2.5, 7.5 + G.m.bridge, G.L / 2 + 4.5); this.shMesh.position.set(0, 1.5, 0.5);
     this.shMesh.visible = false; this.shMesh.renderOrder = 4; this.model.add(this.shMesh);
     if (this.isPlayer) {
+      // 전조등: 밤에 앞쪽 지형을 비춘다
+      this.headlight = new THREE.SpotLight(0xfff1d6, 0, 460, 0.5, 0.75, 1.3); this.headlight.position.set(0, 1.5, this.G.f + 2); this.headlight.target.position.set(0, -34, this.G.f - 120);
+      this.model.add(this.headlight, this.headlight.target);
       const ring = new THREE.Mesh(new THREE.TorusGeometry(16 * this.scale, 0.18, 6, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 3.5, 3.6), toneMapped: false, transparent: true, opacity: 0.85 }));
       ring.rotation.x = HPI; ring.position.y = 6 * this.scale; this.mesh.add(ring); this.ring = ring;
     }

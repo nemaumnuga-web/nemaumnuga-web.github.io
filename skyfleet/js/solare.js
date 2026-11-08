@@ -278,7 +278,7 @@ async function chatAnswer(q) {
 
 /* ---------- 자율 임무 에이전트 ---------- */
 const AG = { on: false, pausedUntil: 0, t: 0, goal: null, warned: false, lastNote: 0, pending: null, doneCount: 0 };
-export function agentState() { return { on: AG.on, goal: AG.goal, paused: now() < AG.pausedUntil }; }
+export function agentState() { return { on: AG.on, goal: AG.goal ? { kind: AG.goal.kind, why: AG.goal.why } : null, paused: now() < AG.pausedUntil }; }
 export function agentOn(silent) {
   AG.on = true; AG.goal = null; if (!silent) event('agentOn', 2, 1);
 }
@@ -398,5 +398,5 @@ export function initSolare(c) {
   if (!SR) $('solMic').disabled = true;
   if (cfg().llm) { ensureWorker(); } emitStatus();
   if (cfg().perm >= 2) AG.on = true;
-  window.__solare = { classify, submit, agentState, cfg };   // 테스트 훅
+  window.__solare = { classify, submit, agentState, cfg, chooseGoal, AG };   // 테스트 훅
 }
