@@ -127,7 +127,7 @@ body.touch #touch{display:block}
 .tbtn.rd{width:110px;height:110px;border-radius:50%}
 .tbtn.big{width:170px;height:170px;font-size:24px}
 .tbtn.on{background:rgba(34,211,211,.35)}
-@media (max-width:900px){#bp{width:200px}#cargo{width:260px}#radarBox{width:160px}#radar{width:160px;height:160px}#feed{display:none}#joy{left:30px;width:200px;height:200px}.tbtn.big{width:130px;height:130px}.tbtn.sq{width:90px;height:80px}.tbtn.rd{width:84px;height:84px}}
+@media (max-width:900px){#feed{display:none}.tbtn.sqX{width:90px;height:80px}.tbtn.rd{width:84px;height:84px}}
 body.touch #cargo{left:50%;transform:translateX(-50%);bottom:12px;width:min(420px,40vw)}
 body.touch #bp{width:220px}
 
@@ -204,7 +204,6 @@ input[type=range]{accent-color:var(--teal);width:100%}
 #board th{color:var(--dim);font-weight:500;padding:6px;border-bottom:1px solid var(--line)}
 #board td{padding:6px;border-bottom:1px solid rgba(255,255,255,.06)}
 #board tr.me{background:rgba(34,211,211,.15)}
-@media (max-width:900px){#tBoost{right:130px!important;bottom:200px!important}#tFlare{right:300px!important;bottom:120px!important}#tBoard{bottom:280px!important}}
 
 /* ---------- 방어막 HUD ---------- */
 .shs{display:flex;gap:3px;margin-top:10px;height:8px}
@@ -266,7 +265,6 @@ body[data-mode=hangar] #solBtn{left:auto;right:330px;top:30px}
 .slot.full{border:1px solid var(--teal);background:rgba(34,211,211,.1);color:#fff;font-size:22px}
 .slot small{font-size:9px;line-height:1.2}.slot em{font-style:normal;font-size:9px;color:var(--red)}
 .row.story{border-color:var(--teal);background:rgba(34,211,211,.07)}
-@media (max-width:900px){#obj{top:215px;width:200px}#solBtn{left:auto;right:180px;top:12px}#solare{bottom:280px}}
 
 .mic{width:44px;height:auto;background:rgba(34,211,211,.12);border:1px solid var(--line);color:#fff;font-size:18px;padding:0 10px;flex:none}
 .mic.rec{background:var(--red);border-color:var(--red);animation:blink .6s steps(2) infinite}
@@ -361,3 +359,24 @@ body[data-mode=hangar] #solare.on{transform:none}
 }
 /* 아주 낮은 화면 (iPhone SE 가로 등) */
 @media (max-height:380px) and (pointer:coarse){#radarBox,#obj{display:none}.tbtn.big{width:72px;height:72px}}
+
+/* 사파리 주소창이 보이는 낮은 가로 화면 (약 330px) */
+@media (max-height:360px) and (pointer:coarse){
+#obj,#radarBox,#feed{display:none!important}
+#bp{width:150px}#bp .hull{display:none}#bp .shs{height:5px}
+#cr{width:112px;height:30px}#cr b{font-size:15px}
+#clock{display:none}
+#solBtn{top:calc(var(--st) + 0px);padding:3px 7px 3px 4px;font-size:10px}
+#solare{top:calc(var(--st) + 26px)}
+.tbtn.big{width:66px;height:66px;font-size:14px}.tbtn.rd{width:44px;height:44px}.tbtn.sq{width:40px;height:36px}
+#joy{width:96px;height:96px;bottom:var(--sb)}#joy i{width:42px;height:42px;margin:-21px}
+#tBoost{right:var(--sr);bottom:calc(var(--sb) + 74px)}
+#tFlare{right:calc(var(--sr) + 52px);bottom:calc(var(--sb) + 74px);width:40px;height:40px}
+#tLock{right:calc(var(--sr) + 96px);bottom:calc(var(--sb) + 44px);width:40px;height:40px}
+#tDrop{right:calc(var(--sr) + 130px);bottom:var(--sb);width:40px;height:40px}
+#tMis{right:calc(var(--sr) + 80px);bottom:var(--sb);width:40px;height:40px}
+#tAct{right:var(--sr);bottom:var(--sb)}
+#tUp{left:calc(var(--sl) + 106px);bottom:calc(var(--sb) + 44px)}#tDn{left:calc(var(--sl) + 106px);bottom:var(--sb)}
+#cargo{bottom:var(--sb);width:200px;padding:4px 9px}.cbar{margin:3px 0 8px}
+#hint{bottom:40%}
+}
