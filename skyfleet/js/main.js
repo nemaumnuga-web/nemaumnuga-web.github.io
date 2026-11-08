@@ -73,7 +73,7 @@ function makePlayer() {
   scene.add(player.mesh); S.player = player;
   S.ships = S.ships.filter(s => !s.isPlayer); S.ships.unshift(player);
 }
-function aiCount() { return clamp(save.aiCount || 20, 20, 40); }
+function aiCount() { return clamp(save.aiCount || 20, 20, 80); }
 function rollLv(cls) { const tier = TIERS[cls].tier; const m = 1 + tier; const r = () => Math.floor(rand(0, m + 0.99)); return { guns: r(), missile: Math.max(tier >= 1 ? 1 : 0, r() - 1), armor: r(), engine: r(), cargo: r(), drill: r() }; }
 function spawnAI(s) {
   if (s.faction === 'pirate') {
@@ -90,13 +90,12 @@ function spawnAI(s) {
 function spawnAll() {
   for (const s of S.ships) if (!s.isPlayer) scene.remove(s.mesh);
   S.ships = player ? [player] : [];
-  const n = aiCount(), nPir = Math.round(n * 0.45), pt = activeShip().tier;
+  const n = aiCount(), nPir = Math.round(n * 0.4);
   const capNames = [...CAPTAIN_NAMES].sort(() => Math.random() - 0.5);
   for (let i = 0; i < n; i++) {
     const pirate = i < nPir;
-    const lvl = pirate ? clamp(Math.floor(TIERS[pt].tier + rand(-1.3, 0.9)), 0, 3) : clamp(Math.floor(rand(0, 3.2)), 0, 3);
-    const tier = pick(TIERS.filter(t => t.tier === lvl)).id;
-    const s = new Ship({ name: pirate ? PIRATE_NAMES[i % PIRATE_NAMES.length] : capNames[i % capNames.length], faction: pirate ? 'pirate' : 'captain', tier, paint: pirate ? pick(['night', 'crimson', 'steel']) : pick(PAINTS).id, lv: rollLv(tier), pvp: !pirate && Math.random() < 0.5, weapon: pirate && lvl >= 1 ? pick(['cannon', 'cannon', 'flak', 'rail']) : pick(['cannon', 'cannon', 'cannon', 'flak']) });
+    const tier = 8;   // 모든 AI 함선은 T5 아크라이트
+    const s = new Ship({ name: pirate ? PIRATE_NAMES[i % PIRATE_NAMES.length] : capNames[i % capNames.length], faction: pirate ? 'pirate' : 'captain', tier, paint: pirate ? pick(['night', 'crimson', 'steel']) : pick(PAINTS).id, lv: rollLv(tier), pvp: true, weapon: pick(['cannon', 'flak', 'rail']), elems: [] });
     s.ai.skill = rand(0.6, 1); scene.add(s.mesh); S.ships.push(s); spawnAI(s);
   }
   aiDirty = false;
@@ -105,10 +104,9 @@ function spawnAll() {
 /* ================= 전투 규칙 ================= */
 S.hooks.hostile = (a, b) => {
   if (!a || !b || a === b) return false;
-  if (a.faction === 'pirate' && b.faction === 'pirate') return false;
-  if (a.faction === 'pirate' || b.faction === 'pirate') return true;
-  if (a.isPlayer || b.isPlayer) { const o = a.isPlayer ? b : a; return !!(save.pvp && o.pvp); }
-  return false;
+  if (a.temp && b.temp) return false;
+  if (a.isUnit || b.isUnit) { const o = a.isUnit ? b : a; return o.faction === 'pirate' || (o.faction === 'captain' && o.pvp); }
+  return true;
 };
 let hitT = 0;
 export const SAFE_R = 420;
@@ -595,7 +593,7 @@ function openTab(tab) {
     B.querySelectorAll('[data-eun]').forEach(el => el.onclick = () => { a.elems = a.elems.filter(x => x !== el.dataset.eun); persist(); sfx('ui'); openTab('modules'); });
   } else if (tab === 'settings') {
     T('설정');
-    B.innerHTML = `<div class="kv" style="align-items:center"><span>그래픽 품질</span><select class="sel" id="qSel"><option value="high">높음</option><option value="mid">보통</option><option value="low">낮음</option></select><span>AI 함선 수 <b id="aiv">${aiCount()}</b>척</span><input type="range" id="aiR" min="20" max="40" step="2" value="${aiCount()}"><span>소리</span><button class="btn ghost" id="muteB">${save.mute ? '꺼짐 — 켜기' : '켜짐 — 끄기'}</button><span>AI 대화 모델</span><div><select class="sel" id="modS">${Object.entries(MODEL_NAMES).map(([k, n]) => `<option value="${k}" ${solCfg().model === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div><span>AI 대화</span><div><button class="btn ghost" id="llmB">${solCfg().llm ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><div style="font-size:12px;color:var(--dim);margin-top:6px" id="solLLMStat">${llmText()}</div></div><span>자율 권한</span><div><select class="sel" id="permS">${PERM_NAMES.map((n, i) => `<option value="${i}" ${solCfg().perm === i ? 'selected' : ''}>${i} · ${n}</option>`).join('')}</select><div style="font-size:12px;color:var(--dim);margin-top:6px">${permDesc(solCfg().perm)}</div></div><span>깜박임 방지</span><div><button class="btn ghost" id="safeB">${SAFE ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><div style="font-size:12px;color:var(--dim);margin-top:6px">사파리 검은 화면·깜박임이 보이면 켜세요. 후처리 효과가 꺼집니다. 적용하려면 새로고침</div></div><span>캡틴 특권</span><div>${isFounder() ? '<span style="color:var(--teal)">켜짐 — 레벨 상한 30 · 원소 전부 · 모든 함선</span> <button class="btn ghost" id="fdOff">해제</button>' : '<input id="fdIn" class="sel" type="password" placeholder="코드 입력" autocomplete="off" style="width:140px;user-select:text"> <button class="btn ghost" id="fdOn">적용</button>'}</div><span>카메라 방향 조종</span><button class="btn ghost" id="csB">${save.camSteer !== false ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><span>스토리</span><button class="btn ghost" id="introB">인트로 다시 보기</button><span>저장 초기화</span><button class="btn red" id="rst">모두 지우기</button></div><p style="color:var(--dim);font-size:12px;margin-top:16px">조작: W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 마우스 시점(클릭하면 고정) · 클릭 사격 · E 채굴 · R 잠금 · F 미사일 · X 부스트 · C 플레어 · G 화물 투하 · M 지도 · Tab 순위</p>`;
+    B.innerHTML = `<div class="kv" style="align-items:center"><span>그래픽 품질</span><select class="sel" id="qSel"><option value="high">높음</option><option value="mid">보통</option><option value="low">낮음</option></select><span>AI 함선 수 (전원 T5) <b id="aiv">${aiCount()}</b>척</span><input type="range" id="aiR" min="20" max="80" step="4" value="${aiCount()}"><span>소리</span><button class="btn ghost" id="muteB">${save.mute ? '꺼짐 — 켜기' : '켜짐 — 끄기'}</button><span>AI 대화 모델</span><div><select class="sel" id="modS">${Object.entries(MODEL_NAMES).map(([k, n]) => `<option value="${k}" ${solCfg().model === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div><span>AI 대화</span><div><button class="btn ghost" id="llmB">${solCfg().llm ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><div style="font-size:12px;color:var(--dim);margin-top:6px" id="solLLMStat">${llmText()}</div></div><span>자율 권한</span><div><select class="sel" id="permS">${PERM_NAMES.map((n, i) => `<option value="${i}" ${solCfg().perm === i ? 'selected' : ''}>${i} · ${n}</option>`).join('')}</select><div style="font-size:12px;color:var(--dim);margin-top:6px">${permDesc(solCfg().perm)}</div></div><span>깜박임 방지</span><div><button class="btn ghost" id="safeB">${SAFE ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><div style="font-size:12px;color:var(--dim);margin-top:6px">사파리 검은 화면·깜박임이 보이면 켜세요. 후처리 효과가 꺼집니다. 적용하려면 새로고침</div></div><span>캡틴 특권</span><div>${isFounder() ? '<span style="color:var(--teal)">켜짐 — 레벨 상한 30 · 원소 전부 · 모든 함선</span> <button class="btn ghost" id="fdOff">해제</button>' : '<input id="fdIn" class="sel" type="password" placeholder="코드 입력" autocomplete="off" style="width:140px;user-select:text"> <button class="btn ghost" id="fdOn">적용</button>'}</div><span>카메라 방향 조종</span><button class="btn ghost" id="csB">${save.camSteer !== false ? '켜짐 — 끄기' : '꺼짐 — 켜기'}</button><span>스토리</span><button class="btn ghost" id="introB">인트로 다시 보기</button><span>저장 초기화</span><button class="btn red" id="rst">모두 지우기</button></div><p style="color:var(--dim);font-size:12px;margin-top:16px">조작: W/S 추진 · A/D 회전 · Space/Shift 상승·하강 · 마우스 시점(클릭하면 고정) · 클릭 사격 · E 채굴 · R 잠금 · F 미사일 · X 부스트 · C 플레어 · G 화물 투하 · M 지도 · Tab 순위</p>`;
     $('qSel').value = QUALITY; $('qSel').onchange = e => { try { localStorage.setItem('skyfleet_q', e.target.value); } catch (er) {} location.reload(); };
     $('llmB').onclick = () => { setLLM(!solCfg().llm); openTab('settings'); };
     $('modS').onchange = e => { setModel(e.target.value); openTab('settings'); };
