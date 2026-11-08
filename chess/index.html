@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>체스 살롱</title>
+<meta name="theme-color" content="#0a1714">
+<meta name="description" content="친구와 한 판, 체스 살롱">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230f2a24'/><text x='32' y='46' font-size='40' text-anchor='middle' fill='%23d9b56a'>♛</text></svg>">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Josefin+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<script>
+/* 자동 업데이트: 캐시된 옛 화면이면 최신 버전으로 한 번 새로고침 (배포할 때 version.json과 V를 함께 올릴 것) */
+(function(){var V='15';try{fetch('version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){var n=String(j.v);if(n!==V){var u=new URL(location.href);if(u.searchParams.get('_v')!==n){u.searchParams.set('_v',n);location.replace(u.toString());}}}).catch(function(){});}catch(e){}})();
+</script>
+<link rel="stylesheet" href="style.css?v=15">
+</head>
+<body>
+<div class="bgfx" aria-hidden="true"></div>
+
+<!-- ============ HOME ============ -->
+<section id="home" class="screen active">
+  <div class="homebar">
+    <button class="icon bgmToggle" aria-label="배경음악"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></button>
+    <button class="icon sfxToggle" aria-label="효과음"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+  </div>
+  <header class="hero">
+    <div class="sun" aria-hidden="true"></div>
+    <div class="crest" data-crest><span>♛</span></div>
+    <p class="lat"><i></i>CHESS · SALON<i></i></p>
+    <h1>체스 살롱</h1>
+    <p class="tag">한 판 두고 가실래요? 차는 식기 전에, 승부는 끝나기 전에.</p>
+  </header>
+
+  <div class="namebox">
+    <label for="nick">닉네임</label>
+    <input id="nick" maxlength="10" placeholder="이름을 입력하세요" autocomplete="off">
+  </div>
+
+  <div class="modes">
+    <button class="mode" data-mode="ai">
+      <em>Contre la machine</em><span class="mi">♞</span><b>AI 대전</b><small>정통 체스 · 15단계 난이도</small>
+    </button>
+    <button class="mode" data-mode="aiskill">
+      <em>Les cartes</em><span class="mi">✦</span><b>스킬 대전</b><small>매 턴 카드 3장 중 1장</small>
+    </button>
+    <button class="mode" data-mode="on1">
+      <em>Tête-à-tête</em><span class="mi">⚔</span><b>친구와 1:1</b><small>링크 하나로 초대</small>
+    </button>
+    <button class="mode" data-mode="on2">
+      <em>En équipe</em><span class="mi">♜</span><b>친구와 2:2</b><small>한 팀이 번갈아 두기</small>
+    </button>
+    <button class="mode wide" data-mode="study">
+      <span class="mi">♗</span><span class="tx"><em>Salle d'étude</em><b>체스 공부방</b><small>연습 대국 · 왜 졌는지 복기 분석</small></span>
+    </button>
+    <button class="mode wide" data-mode="tech">
+      <span class="mi">♘</span><span class="tx"><em>Salle de technique</em><b>기술방</b><small>모션으로 배우는 체스 기술 · 예제를 풀며 한 단계씩</small></span>
+    </button>
+  </div>
+
+  <div class="joinbox">
+    <input id="joinCode" maxlength="6" placeholder="방 코드 입력" autocomplete="off" autocapitalize="characters">
+    <button id="joinBtn" class="btn ghost">입장</button>
+  </div>
+  <p class="foot"><i></i>Café de la Régence 이후로, 체스는 살롱에서<i></i></p>
+</section>
+
+<!-- ============ SETUP SHEET (AI) ============ -->
+<div id="setup" class="sheet" hidden>
+  <div class="sheet-card">
+    <h2 id="setupTitle">AI 대전</h2>
+    <div class="field">
+      <span>내 색</span>
+      <div class="seg" id="colorSeg">
+        <button data-v="w" class="on">♔ 백</button><button data-v="r">🎲 랜덤</button><button data-v="b">♚ 흑</button>
+      </div>
+    </div>
+    <div class="field">
+      <span>난이도 <b id="lvName">클럽</b></span>
+      <input type="range" id="lv" min="1" max="15" value="7">
+      <div class="lvticks"><i>새싹</i><i>심연</i></div>
+    </div>
+    <div class="row2">
+      <button class="btn ghost" data-close>취소</button>
+      <button class="btn gold" id="startAi">시작</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LOBBY ============ -->
+<section id="lobby" class="screen">
+  <div class="topbar">
+    <button class="icon" id="lobbyBack" aria-label="뒤로">←</button>
+    <div class="crest sm" data-crest><span>♛</span></div>
+    <span class="title" id="lobbyTitle">대기실</span>
+  </div>
+  <div class="roomcode">
+    <small>ROOM · 방 코드</small>
+    <b id="roomCode">-----</b>
+    <div class="row2">
+      <button class="btn gold" id="shareBtn">초대 링크 보내기</button>
+      <button class="btn ghost" id="copyBtn">복사</button>
+    </div>
+    <p class="status" id="netStatus">연결 중…</p>
+  </div>
+  <div class="seats" id="seats"></div>
+  <div class="opts" id="hostOpts">
+    <label class="switch"><input type="checkbox" id="optSkills"><i></i><span>스킬 카드 모드</span></label>
+  </div>
+  <button class="btn gold big" id="startOnline" disabled>게임 시작</button>
+  <p class="hint" id="lobbyHint">빈 자리는 AI로 채울 수 있어요</p>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="game" class="screen">
+  <div class="topbar">
+    <button class="icon" id="gameBack" aria-label="나가기">←</button>
+    <div class="crest sm" data-crest><span>♛</span></div>
+    <span class="title" id="gameTitle">체스 살롱</span>
+    <button class="icon bgmToggle" aria-label="배경음악"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></button>
+    <button class="icon sfxToggle" aria-label="효과음"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+  </div>
+
+  <div class="arena">
+    <div class="boardcol">
+      <div class="pbar top" id="pTop"></div>
+      <div class="boardwrap">
+        <div class="board" id="board">
+          <div class="squares" id="squares"></div>
+          <div class="pieces" id="pieces"></div>
+          <svg class="arrows" id="arrows" viewBox="0 0 8 8" preserveAspectRatio="none"></svg>
+          <div class="fxlayer" id="fxlayer"></div>
+        </div>
+        <div class="banner" id="banner" hidden></div>
+      </div>
+      <div class="pbar bot" id="pBot"></div>
+      <div class="tray" id="tray"></div>
+      <div class="fbchip" id="fbChip" hidden></div>
+      <div class="controls">
+        <button class="ctl" id="undoBtn"><span>↶</span>무르기</button>
+        <button class="ctl" id="flipBtn"><span>⇅</span>뒤집기</button>
+        <button class="ctl" id="hintBtn" hidden><span>💡</span>힌트</button>
+        <button class="ctl" id="emoteBtn"><span>☺</span>이모티콘</button>
+        <button class="ctl" id="resignBtn"><span>⚑</span>기권</button>
+      </div>
+    </div>
+    <aside class="side">
+      <div class="evalchip" id="evalChip" hidden></div>
+      <div class="tabs"><button class="on" data-tab="moves">기보</button><button data-tab="chat">채팅</button></div>
+      <ol class="moves" id="moves"></ol>
+      <div class="chat" id="chat" hidden>
+        <div class="chatlog" id="chatlog"></div>
+        <form id="chatForm"><input id="chatIn" maxlength="60" placeholder="메시지…" autocomplete="off"><button class="btn gold">↑</button></form>
+      </div>
+    </aside>
+  </div>
+  <div class="emotes" id="emotes" hidden>
+    <button>👏</button><button>😂</button><button>😱</button><button>🤔</button><button>🔥</button><button>😎</button><button>🙏</button><button>GG</button>
+  </div>
+</section>
+
+<!-- ============ REVIEW ============ -->
+<section id="review" class="screen">
+  <div class="topbar">
+    <button class="icon" id="rvBack" aria-label="뒤로">←</button>
+    <div class="crest sm" data-crest><span>♛</span></div>
+    <span class="title">복기 · 분석</span>
+  </div>
+  <div class="rvprog" id="rvProg" hidden><div class="bar"><i id="rvBar"></i></div><p id="rvProgTxt"></p></div>
+  <div class="rvarena">
+    <div class="rvmain">
+      <div class="boardwrap"><div class="board" id="rvBoard">
+        <div class="squares" id="rvSquares"></div><div class="pieces" id="rvPieces"></div>
+        <svg class="arrows" id="rvArrows" viewBox="0 0 8 8" preserveAspectRatio="none"></svg>
+      </div></div>
+      <div class="rvnav"><button id="rvFirst" aria-label="처음">⏮</button><button id="rvPrev" aria-label="이전">◀</button><button id="rvNext" aria-label="다음">▶</button><button id="rvLast" aria-label="마지막">⏭</button></div>
+      <svg id="rvGraph" viewBox="0 0 300 90"></svg>
+    </div>
+    <aside class="rvside">
+      <div class="rvcard" id="rvDetail"></div>
+      <div class="rvcard" id="rvSummary"></div>
+      <div class="rvmoves" id="rvMoves"></div>
+    </aside>
+  </div>
+</section>
+
+<!-- promotion picker -->
+<div id="promo" class="sheet" hidden><div class="sheet-card promo"><h3>승격할 기물</h3><div id="promoRow"></div></div></div>
+
+<!-- 기술방 -->
+<section id="techHome" class="screen">
+  <div class="topbar">
+    <button class="icon" id="thBack" aria-label="뒤로">←</button>
+    <div class="crest sm" data-crest><span>♘</span></div>
+    <span class="title">기술방</span>
+  </div>
+  <div id="thBody"></div>
+</section>
+<section id="techLesson" class="screen">
+  <div class="topbar">
+    <button class="icon" id="tBack" aria-label="목록으로">←</button>
+    <div class="crest sm" data-crest><span>♘</span></div>
+    <span class="title" id="tTitle">레슨</span>
+    <span class="lvchip" id="tLvChip"></span>
+  </div>
+  <div class="rvarena">
+    <div class="rvmain">
+      <div class="boardwrap"><div class="board" id="tBoard">
+        <div class="squares" id="tSquares"></div><div class="pieces" id="tPieces"></div>
+        <div class="tfx" id="tFxHi"></div>
+        <svg class="arrows" id="tArrows" viewBox="0 0 8 8" preserveAspectRatio="none"></svg>
+      </div></div>
+      <div class="tprog" id="tProg"><i id="tBar"></i></div>
+      <div class="tcap" id="tCap"></div>
+      <div class="tfb" id="tFb" hidden></div>
+      <div class="tctl" id="tCtlScene">
+        <button id="tPrevS" aria-label="이전 장면">◀ 이전</button><button id="tReplay">⟲ 다시 보기</button><button id="tPause" aria-label="일시정지">⏸</button><button id="tSkip">건너뛰기 ⏭</button>
+      </div>
+      <div class="tctl" id="tCtlDrill" hidden>
+        <button id="tHint">💡 힌트</button><button id="tShow">정답 보기</button>
+      </div>
+      <div class="tchoices" id="tChoices" hidden></div>
+    </div>
+    <aside class="rvside" id="tSide">
+      <div class="rvcard tcard2">
+        <div class="tstage"><span id="tStage"></span><span class="tdots" id="tDots"></span></div>
+        <div class="tgoal" id="tGoal"></div>
+        <button class="btn gold big" id="tAct" hidden>다음 ▶</button>
+      </div>
+    </aside>
+    <aside class="rvside" id="tDone" hidden>
+      <div class="rvcard tdonecard">
+        <div id="tDoneBody"></div>
+        <p class="tdmsg" id="tDoneMsg"></p>
+        <button class="btn gold big" id="tUp" hidden>수준 올리기 ▶</button>
+        <button class="btn gold big" id="tDoneNext" hidden>다음 레슨 ▶</button>
+        <button class="btn ghost thin" id="tDoneAgain">이 레슨 다시 하기</button>
+        <button class="btn ghost thin" id="tDoneList">목록으로</button>
+      </div>
+    </aside>
+  </div>
+</section>
+<div id="techLv" class="sheet" hidden>
+  <div class="sheet-card">
+    <h2 id="tLvTitle">어느 수준에서 시작할까요?</h2>
+    <p class="tlvsub" id="tLvSub"></p>
+    <div class="studyopts" id="tLvList"></div>
+    <button class="btn ghost thin" data-close>닫기</button>
+  </div>
+</div>
+<div id="tPromo" class="sheet" hidden>
+  <div class="sheet-card">
+    <h2>무엇으로 승급할까요?</h2>
+    <div class="promolist" id="tPromoList"></div>
+  </div>
+</div>
+
+<!-- study room -->
+<div id="study" class="sheet" hidden>
+  <div class="sheet-card">
+    <h2>체스 공부방</h2>
+    <div class="studyopts">
+      <button class="sopt" id="goPractice"><b>연습 대국</b><small>무르기 무제한 · 힌트 · 내가 둔 수를 바로 평가</small></button>
+      <button class="sopt" id="goReview"><b>지난 판 복기</b><small>엔진이 한 수씩 짚어서 왜 졌는지 알려줘요<i id="gameCount"></i></small></button>
+    </div>
+    <button class="btn ghost thin" data-close>닫기</button>
+  </div>
+</div>
+<div id="rvList" class="sheet" hidden>
+  <div class="sheet-card">
+    <h2>지난 판</h2>
+    <div id="gameList"></div>
+    <button class="btn ghost thin" data-close>닫기</button>
+  </div>
+</div>
+
+<!-- patch notes -->
+<div id="patch" class="sheet" hidden>
+  <div class="sheet-card patch">
+    <p class="plat">PATCH NOTES</p>
+    <h2 id="patchTitle">업데이트 안내</h2>
+    <ul id="patchList"></ul>
+    <button class="btn gold" id="patchOk">확인</button>
+  </div>
+</div>
+
+<!-- result -->
+<div id="result" class="sheet" hidden>
+  <div class="sheet-card result">
+    <div class="rcrest" id="rIcon">♛</div>
+    <h2 id="rTitle">승리!</h2>
+    <p id="rSub"></p>
+    <div class="row2">
+      <button class="btn ghost" id="rHome">홈으로</button>
+      <button class="btn gold" id="rAgain">다시 하기</button>
+    </div>
+    <button class="btn ghost thin" id="rSwap" hidden>색 바꿔서 다시</button>
+    <button class="btn ghost thin" id="rReview" hidden>복기 · 분석</button>
+  </div>
+</div>
+
+<!-- big announce -->
+<div id="announce" aria-live="polite"></div>
+<div id="toasts"></div>
+<div id="bubbles"></div>
+<canvas id="confetti"></canvas>
+
+<!-- ============ SECRET PANEL ============ -->
+<div id="secret" hidden>
+  <div class="sec-card">
+    <div class="sec-head"><b>비밀 조작실</b><button class="icon" id="secClose">✕</button></div>
+    <div class="sec-group g1">
+      <label class="switch hintsw"><input type="checkbox" data-rig="hint"><i></i><span>최선수 화살표 (나만 보임)</span></label>
+      <div class="hlbox">
+        <div class="hlhead"><small>최선수 엔진 성능</small><b id="hlName">Lv5</b></div>
+        <input type="range" id="hlRange" min="1" max="6" step="1" value="5" aria-label="최선수 엔진 성능">
+        <div class="hlticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
+        <small class="note" id="hlMeta"></small>
+      </div>
+      <label class="switch"><input type="checkbox" data-rig="bias"><i></i><span>카드 몰래 편향</span></label>
+      <label class="switch"><input type="checkbox" data-rig="dudFriend"><i></i><span>상대 카드 전부 꽝</span></label>
+      <label class="switch"><input type="checkbox" data-rig="legendMe"><i></i><span>내 카드 전설 확정</span></label>
+      <label class="switch"><input type="checkbox" data-rig="dumbAi"><i></i><span>AI 바보 만들기 (AI전)</span></label>
+    </div>
+    <div class="sec-group">
+      <small>기물 바꿔치기 — 누른 뒤 판에서 기물을 터치</small>
+      <div class="row2">
+        <button class="btn ghost" data-morph="p">상대 기물 → 폰</button>
+        <button class="btn ghost" data-morph="q">내 기물 → 퀸</button>
+      </div>
+    </div>
+    <div class="sec-group">
+      <small>각성 연출 — 모두의 화면에 뜹니다</small>
+      <div class="fxbtns">
+        <button data-fx="⚡ 상대가 각성했습니다">⚡ 각성</button>
+        <button data-fx="👑 체스의 신이 강림했습니다">👑 강림</button>
+        <button data-fx="🔥 전설의 기물이 깨어납니다">🔥 전설</button>
+        <button data-fx="🌀 차원의 균열이 열렸습니다">🌀 균열</button>
+      </div>
+      <form id="fxForm" class="fxform"><input id="fxIn" maxlength="30" placeholder="직접 문구 입력"><button class="btn gold">보내기</button></form>
+    </div>
+    <div class="sec-group">
+      <button class="btn ghost" id="rigLinkBtn" style="width:100%">친구용 조작 AI 링크 복사</button>
+      <small class="note">친구가 이 링크로 AI전을 하면 어떤 난이도를 골라도 AI가 최강이고, 카드도 AI 쪽으로 몰립니다.</small>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="app.js?v=15"></script>
+<script src="lessons.js?v=15"></script>
+<script src="lessons-adv.js?v=15"></script>
+<script src="tech.js?v=15"></script>
+</body>
+</html>

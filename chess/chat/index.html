@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>우리끼리</title>
+<style>
+  :root{
+    --bg:#f3f4fa; --surface:#ffffff; --surface2:#f7f8fc; --ink:#1b1d2a; --muted:#7b8096; --line:#e4e6f0;
+    --acc:#5b6cff; --acc2:#9b5cf6; --accsoft:#eceeff; --ok:#1fa971; --bad:#d9453a; --badsoft:#fdeceb;
+    --shadow:0 8px 28px rgba(40,50,110,.10); --shadow-s:0 1px 3px rgba(40,50,110,.10);
+    --me:linear-gradient(135deg,#5b6cff,#8a5cf6); --ai1:#14b8a6; --ai2:#3b82f6;
+    --r:18px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0d0f17; --surface:#171a25; --surface2:#1e2230; --ink:#eceef7; --muted:#8c92a8; --line:#272b3a;
+      --acc:#7b8aff; --acc2:#b183ff; --accsoft:#22274a; --ok:#3ccf91; --bad:#ff7a70; --badsoft:#3a1f22;
+      --shadow:0 8px 28px rgba(0,0,0,.45); --shadow-s:0 1px 3px rgba(0,0,0,.5);
+    }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--ink);font:15.5px/1.55 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  [hidden]{display:none!important}
+  button,input,textarea,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+  /* ── 공통 ── */
+  .grad{background:linear-gradient(135deg,var(--acc),var(--acc2))}
+  .btn{width:100%;margin-top:18px;padding:13px;border:0;border-radius:14px;color:#fff;font-weight:700;letter-spacing:.01em;background:linear-gradient(135deg,var(--acc),var(--acc2));box-shadow:0 6px 16px rgba(91,108,255,.35);transition:transform .08s,opacity .2s}
+  .btn:active{transform:scale(.985)}
+  .btn:disabled{opacity:.55}
+  .btn.ghost{background:var(--surface2);color:var(--ink);box-shadow:none;border:1px solid var(--line)}
+  .link{background:none;border:0;color:var(--muted);cursor:pointer;display:block;margin:16px auto 0;font-size:13.5px}
+  .link:hover{color:var(--acc)}
+  .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:10px;text-align:center}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:14px 0 6px}
+  input[type=text],input[type=password],select{width:100%;padding:12px 14px;border:1.5px solid var(--line);background:var(--surface2);border-radius:12px;outline:none;transition:border-color .15s,background .15s}
+  input:focus,select:focus,textarea:focus{border-color:var(--acc);background:var(--surface)}
+  .hint{font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.55}
+
+  /* ── 로그인 ── */
+  #login{min-height:100dvh;display:grid;place-items:center;padding:24px;background:
+    radial-gradient(900px 500px at 10% -10%,rgba(91,108,255,.22),transparent 60%),
+    radial-gradient(700px 480px at 110% 110%,rgba(155,92,246,.20),transparent 60%),var(--bg)}
+  .card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:32px 24px 26px;box-shadow:var(--shadow)}
+  .logo{width:60px;height:60px;border-radius:20px;color:#fff;display:grid;place-items:center;font-size:27px;font-weight:800;margin:0 auto 14px;box-shadow:0 10px 24px rgba(91,108,255,.4);transform:rotate(-5deg)}
+  h1{font-size:24px;text-align:center;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{text-align:center;color:var(--muted);font-size:13.5px;margin:0 0 10px}
+  .notice{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.6;background:var(--surface2);border-radius:12px;padding:11px 13px}
+
+  /* ── 앱 레이아웃 ── */
+  #app{height:100dvh;display:grid;grid-template-rows:auto 1fr auto;max-width:760px;margin:0 auto;background:var(--bg);position:relative}
+  @media (min-width:800px){ #app{border-left:1px solid var(--line);border-right:1px solid var(--line)} }
+  header{display:flex;align-items:center;gap:11px;padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top));background:color-mix(in srgb,var(--surface) 86%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line);z-index:5}
+  header .logo{width:38px;height:38px;border-radius:13px;font-size:18px;margin:0;box-shadow:0 4px 12px rgba(91,108,255,.35)}
+  header .ttl{flex:1;min-width:0}
+  header .t{font-weight:800;font-size:17px;letter-spacing:-.01em;line-height:1.2}
+  header .on{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent);flex:none}
+  .dot.off{background:var(--muted);box-shadow:none}
+
+  main{min-height:0;position:relative}
+  .pane{position:absolute;inset:0;display:flex;flex-direction:column;min-height:0}
+
+  /* ── 채팅 탭 ── */
+  #status{font-size:12.5px;color:var(--bad);text-align:center;padding:6px;background:var(--badsoft)}
+  #list{flex:1;overflow-y:auto;padding:14px 14px 8px;display:flex;flex-direction:column;gap:3px;overscroll-behavior:contain}
+  .day{align-self:center;font-size:11.5px;font-weight:600;color:var(--muted);background:var(--surface);border:1px solid var(--line);padding:3px 11px;border-radius:99px;margin:14px 0 8px}
+  .row{display:flex;gap:8px;align-items:flex-end;max-width:88%}
+  .row.mine{align-self:flex-end;flex-direction:row-reverse}
+  .row.cont{margin-top:0}
+  .row.first{margin-top:9px}
+  .av{width:32px;height:32px;border-radius:50%;color:#fff;font-weight:700;font-size:14px;display:grid;place-items:center;flex:none}
+  .av.sp{visibility:hidden}
+  .col{display:flex;flex-direction:column;min-width:0}
+  .row.mine .col{align-items:flex-end}
+  .who{font-size:12px;font-weight:600;color:var(--muted);margin:0 6px 3px}
+  .bub{display:flex;align-items:flex-end;gap:6px}
+  .row.mine .bub{flex-direction:row-reverse}
+  .txt{background:var(--surface);border:1px solid var(--line);padding:9px 13px;border-radius:18px 18px 18px 6px;white-space:pre-wrap;word-break:break-word;box-shadow:var(--shadow-s)}
+  .row.mine .txt{background:var(--me);color:#fff;border:0;border-radius:18px 18px 6px 18px}
+  .tm{font-size:10.5px;color:var(--muted);white-space:nowrap;padding-bottom:2px}
+
+  .composer{display:flex;gap:9px;align-items:flex-end;padding:10px 12px;background:color-mix(in srgb,var(--surface) 90%,transparent);border-top:1px solid var(--line)}
+  .composer textarea{flex:1;resize:none;max-height:130px;padding:11px 15px;border:1.5px solid var(--line);border-radius:22px;background:var(--surface2);outline:none;line-height:1.45}
+  .send{width:44px;height:44px;border-radius:50%;border:0;color:#fff;display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),var(--acc2));box-shadow:0 5px 14px rgba(91,108,255,.4);flex:none}
+  .send:disabled{opacity:.4;box-shadow:none}
+  .send.stop{background:var(--bad);box-shadow:0 5px 14px rgba(217,69,58,.4)}
+
+  /* ── AI 탭 ── */
+  .aibar{display:flex;flex-direction:column;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .airow{display:flex;gap:8px;align-items:center}
+  .airow select{flex:1;padding:9px 12px;font-size:14px}
+  .chip{font-size:12px;font-weight:600;padding:5px 10px;border-radius:99px;background:var(--accsoft);color:var(--acc);white-space:nowrap}
+  .chip.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+  .chip.bad{background:var(--badsoft);color:var(--bad)}
+  .iconbtn{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);display:grid;place-items:center;flex:none}
+  .privacy{font-size:11.5px;color:var(--muted);display:flex;gap:6px;align-items:center}
+  .privacy svg{width:14px;height:14px}
+  progress{width:100%;height:6px;border-radius:9px;overflow:hidden;accent-color:var(--acc)}
+
+  /* 모델 다운로드 카드 */
+  .dl{background:var(--surface2);border:1px solid var(--line);border-radius:18px;padding:14px 14px 14px}
+  .dlhead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .dlinfo{min-width:0}
+  .dlstate{font-weight:700;font-size:14.5px}
+  .dlname{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dlpct{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .bar{height:12px;border-radius:99px;background:var(--line);overflow:hidden;margin:10px 0 8px;position:relative}
+  .bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .3s ease;position:relative;overflow:hidden}
+  .bar.active i::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);transform:translateX(-100%);animation:sh 1.3s infinite}
+  .bar.done i{background:linear-gradient(90deg,var(--ok),#6ee7b7)}
+  .bar.fail i{background:var(--bad)}
+  @keyframes sh{to{transform:translateX(100%)}}
+  .dlsub{font-size:12px;color:var(--muted);min-height:18px;line-height:1.5}
+  .dlsub.bad{color:var(--bad)}
+  .dlbtn{margin-top:10px;padding:12px}
+  #alist{flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:12px;overscroll-behavior:contain}
+  .empty{margin:auto;text-align:center;padding:20px;max-width:340px}
+  .orb{width:76px;height:76px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--ai1),var(--ai2));box-shadow:0 14px 34px rgba(20,184,166,.38)}
+  .orb svg{width:34px;height:34px}
+  .empty h2{margin:0 0 6px;font-size:19px}
+  .sugs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:16px}
+  .sug{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:8px 14px;font-size:13.5px;box-shadow:var(--shadow-s)}
+  .sug:active{background:var(--accsoft)}
+  .arow{display:flex;gap:9px;max-width:92%;align-items:flex-start}
+  .arow.user{align-self:flex-end}
+  .aav{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;flex:none;background:linear-gradient(135deg,var(--ai1),var(--ai2))}
+  .aav svg{width:16px;height:16px}
+  .atxt{padding:10px 14px;border-radius:18px;white-space:pre-wrap;word-break:break-word;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-s);border-top-left-radius:6px}
+  .arow.user .atxt{background:var(--me);color:#fff;border:0;border-top-left-radius:18px;border-top-right-radius:6px}
+  .atxt.err{background:var(--badsoft);color:var(--bad);border-color:transparent}
+  .typing{display:inline-flex;gap:4px;padding:4px 0}
+  .typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:b 1.1s infinite ease-in-out}
+  .typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+  @keyframes b{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
+
+  /* ── 하단 탭 ── */
+  nav{display:flex;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 10px;padding-bottom:max(6px,env(safe-area-inset-bottom));z-index:5}
+  nav button{touch-action:manipulation;flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;color:var(--muted);font-size:11.5px;font-weight:600;border-radius:14px;transition:color .15s}
+  nav button.on{color:var(--acc)}
+  nav button.on svg{stroke-width:2.4}
+
+  /* ── 시트(요약·도우미·더보기) ── */
+  .modal{position:fixed;inset:0;background:rgba(10,12,24,.5);backdrop-filter:blur(3px);display:grid;place-items:end center;z-index:20;animation:f .15s}
+  .sheet{background:var(--surface);width:100%;max-width:600px;max-height:84dvh;overflow:auto;border-radius:26px 26px 0 0;padding:10px 20px calc(24px + env(safe-area-inset-bottom));box-shadow:var(--shadow);animation:u .22s ease-out}
+  .sheet::before{content:"";display:block;width:42px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 14px}
+  .sheet h2{font-size:18px;margin:0 0 6px}
+  @keyframes u{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
+  @keyframes f{from{opacity:0}to{opacity:1}}
+  .menu{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .mi{display:flex;align-items:center;gap:13px;width:100%;padding:14px;border:1px solid var(--line);background:var(--surface2);border-radius:16px;text-align:left;font-weight:600}
+  .mi small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+  .mi .ic{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:var(--accsoft);color:var(--acc);flex:none}
+  .mi.danger .ic{background:var(--badsoft);color:var(--bad)}
+  .chk{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--ink);margin:16px 0 6px;font-weight:600}
+  .chk input{width:20px;height:20px;accent-color:var(--acc)}
+  .s{border-left:3px solid;border-image:linear-gradient(var(--acc),var(--acc2)) 1;padding:2px 0 2px 12px;margin:14px 0;white-space:pre-wrap;word-break:break-word;font-size:14px}
+  .s small{display:block;color:var(--muted);margin-bottom:3px;font-weight:600}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 12l14-7-5 14-2.5-5.5L5 12z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  </defs>
+</svg>
+
+<section id="login" hidden>
+  <div class="card">
+    <div class="logo grad">友</div>
+    <h1>우리끼리</h1>
+    <p class="sub">친구들만 들어오는 방</p>
+    <form id="lf" autocomplete="off">
+      <label for="name">이름</label>
+      <input id="name" type="text" maxlength="12" autocomplete="username" required>
+      <label for="pw">비밀번호 (8자 이상)</label>
+      <input id="pw" type="password" maxlength="128" autocomplete="current-password" required>
+      <div id="invwrap" hidden>
+        <label for="inv">초대 코드</label>
+        <input id="inv" type="password" maxlength="64" autocomplete="off">
+      </div>
+      <button class="btn" id="go" type="submit">들어가기</button>
+    </form>
+    <button class="link" id="toggle" type="button">처음이에요 (가입)</button>
+    <div class="err" id="err"></div>
+    <p class="notice">대화는 서버에 저장됩니다. 오래된 대화는 친구 기기의 AI가 요약해서 보관하고, 요약본은 방 안의 모두가 볼 수 있어요.</p>
+  </div>
+</section>
+
+<section id="app" hidden>
+  <header>
+    <div class="logo grad">友</div>
+    <div class="ttl">
+      <div class="t">우리끼리</div>
+      <div class="on"><span class="dot off" id="conn"></span><span id="online">연결 중…</span></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- 채팅 -->
+    <div class="pane" id="pane-chat">
+      <div id="status" hidden></div>
+      <div id="list"></div>
+      <form id="send" class="composer">
+        <textarea id="msg" rows="1" maxlength="2000" placeholder="메시지 입력"></textarea>
+        <button class="send" type="submit" aria-label="보내기"><svg><use href="#i-send"/></svg></button>
+      </form>
+    </div>
+
+    <!-- AI 채팅 (각자 기기의 GPU) -->
+    <div class="pane" id="pane-ai" hidden>
+      <div class="aibar">
+        <div class="airow">
+          <select id="amodel" aria-label="AI 모델"></select>
+          <span class="chip" id="agpu">GPU 확인 중</span>
+          <button class="iconbtn" id="aclear" type="button" aria-label="새 대화"><svg><use href="#i-trash"/></svg></button>
+        </div>
+        <div class="privacy"><svg><use href="#i-lock"/></svg><span>내 기기의 GPU에서만 실행돼요. 이 대화는 서버·친구에게 전송되지 않아요.</span></div>
+        <div class="hint" id="astat" hidden style="margin:0"></div>
+        <div class="dl" id="dlcard" hidden>
+          <div class="dlhead">
+            <div class="dlinfo"><div class="dlstate" id="dlstate"></div><div class="dlname" id="dlname"></div></div>
+            <div class="dlpct" id="dlpct"></div>
+          </div>
+          <div class="bar" id="dlbarwrap" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i id="dlbar"></i></div>
+          <div class="dlsub" id="dlsub"></div>
+          <button class="btn dlbtn" id="dlbtn" type="button">모델 다운로드</button>
+        </div>
+      </div>
+      <div id="alist"></div>
+      <form id="aform" class="composer">
+        <textarea id="amsg" rows="1" maxlength="2000" placeholder="AI에게 물어보기"></textarea>
+        <button class="send" id="abtn" type="submit" aria-label="보내기"><svg><use href="#i-send"/></svg></button>
+      </form>
+    </div>
+  </main>
+
+  <nav>
+    <button type="button" class="on" data-tab="chat"><svg><use href="#i-chat"/></svg>채팅</button>
+    <button type="button" data-tab="ai"><svg><use href="#i-spark"/></svg>AI 채팅</button>
+    <button type="button" data-tab="more"><svg><use href="#i-more"/></svg>더보기</button>
+  </nav>
+</section>
+
+<div id="more" class="modal" hidden>
+  <div class="sheet">
+    <h2>더보기</h2>
+    <div class="menu">
+      <button class="mi" id="sumbtn" type="button"><span class="ic"><svg><use href="#i-book"/></svg></span><span>지난 대화 요약<small>오래된 대화를 AI가 정리해 둔 기록</small></span></button>
+      <button class="mi" id="hbtn" type="button"><span class="ic"><svg><use href="#i-cpu"/></svg></span><span>요약 도우미<small>이 기기의 GPU로 대화를 요약해요</small></span></button>
+      <button class="mi danger" id="out" type="button"><span class="ic"><svg><use href="#i-out"/></svg></span><span>나가기<small>이 기기에서 로그아웃</small></span></button>
+    </div>
+    <p class="hint" style="text-align:center;margin:14px 0 0">화면 버전 v6</p>
+  </div>
+</div>
+
+<div id="sum" class="modal" hidden>
+  <div class="sheet">
+    <h2>지난 대화 요약</h2>
+    <p class="hint">원문이 오래되면 AI가 요약해 보관한 내용이에요. 더 오래될수록 더 짧게 압축됩니다.</p>
+    <div id="sumlist"></div>
+    <button class="btn ghost" id="sumclose" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="helper" class="modal" hidden>
+  <div class="sheet">
+    <h2>요약 도우미</h2>
+    <p class="hint">대화가 쌓이면 오래된 부분을 <b>이 기기의 GPU</b>로 요약해서 보관해요. 방 전체에서 <b>한 기기만 켜면</b> 충분하고, 켜둔 기기에서 앱이 열려 있는 동안 자동으로 작동합니다. 요약 내용은 서버로 올라가 모두에게 보여요.</p>
+    <p id="gpu" class="hint"></p>
+    <label class="chk"><input type="checkbox" id="hon"> 이 기기에서 요약 맡기</label>
+    <label for="hmodel">모델</label>
+    <select id="hmodel"></select>
+    <p class="hint" style="margin-top:10px">처음 한 번 모델 파일을 내려받아요. <b>Wi-Fi 권장</b>. 이후엔 기기에 저장돼 다시 받지 않아요.</p>
+    <progress id="hprog" max="1" value="0" hidden></progress>
+    <p id="hstat" class="hint"></p>
+    <button class="btn ghost" id="hclose" type="button">닫기</button>
+  </div>
+</div>
+
+<script type="module" src="chat.js?v=6"></script>
+</body>
+</html>
