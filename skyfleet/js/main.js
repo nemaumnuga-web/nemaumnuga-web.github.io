@@ -6,7 +6,7 @@ import { Ship, blinkNav, makeShipModel, setShipNight } from './ships.js';
 import { rememberDeath as solRemember, initSolare, say as solSay, event as solEvent, tickSolare, chatOpen, toggleChat, agentUpdate, agentPause, agentReset, agentOn, agentState, setPermUI, refreshSolUI, cfg as solCfg, setLLM, setModel, MODEL_NAMES, llmText, permName, permDesc, PERM_NAMES } from './solare.js';
 import { S, explode, fireTurrets, fireMissile, updateBullets, updateMissiles, spawnDebris, updateDebris, dropCrate, updateCrates, mineBeam, shipFx, clearFx, dropFlares, incoming, updateFlares, shieldFx } from './fx.js';
 import { runAI } from './ai.js';
-import { hscene, hcam, buildHangar, setHangarShip, updateHangar } from './hangar.js';
+import { hscene, hcam, buildHangar, setHangarShip, updateHangar, setPortScene, hangarRepair, hangarInstall, refreshHangarMods } from './hangar.js';
 import { startSkyRun } from './skyrun.js';
 import { initOutposts, updateOutposts, outposts, sites, hooks as opHooks, buildOutpost, nearestOutpost, openBasePanel, closeBasePanel, basePanelOpen, renderBasePanel, isBuilt } from './outposts.js';
 import { outpostCost, UNIT_DEFS, ELEMENTS as ELEMS } from './data.js';
@@ -50,7 +50,7 @@ async function boot() {
   progress('LOADING PILOT PROFILE', 0.14); loadSave(); setMute(!!save.mute); refreshSolUI(); $('ldRoster').innerHTML = CAPTAIN_NAMES.slice(0, 12).map(n => `<li>${n}</li>`).join(''); await sleep(250);
   await buildWorld(progress);
   progress('ASSEMBLING SHIP', 0.78); await frameYield();
-  buildHangar(); setHangarShip(activeShip().tier, save.paint); buildMapImage(); await frameYield();
+  buildHangar(); setHangarShip(activeShip().tier, save.paint, activeShip().mods); buildMapImage(); await frameYield();
   buildWrecks(); initOutposts(); makePlayer(); spawnAll(); renderObjective(); await sleep(200);
   progress('ENTERING RED CANYON', 1); await sleep(500);
   [...$('ldSteps').children].forEach(li => li.className = 'done');
@@ -319,7 +319,7 @@ function dock(port) {
   const p = player; let val = 0;
   for (const [k, n] of Object.entries(p.cargo)) { save.storage[k] = (save.storage[k] || 0) + n; val += n * priceOf(k, port.def); }
   p.cargo = {}; p.cargoKg = 0; p.hp = p.maxHp;
-  persist(); sfx('ui'); story('dock', 1); enterHangar(port); solEvent('dock', 1, 5);
+  persist(); sfx('ui'); story('dock', 1); enterHangar(port); hangarRepair(); solEvent('dock', 1, 5);
   if (val) toast(`화물 보관 완료 — 시장 가치 <b>${fmt(val)} CR</b>`);
 }
 
@@ -483,7 +483,7 @@ $('mapOv').onclick = e => { if (e.target.id === 'mapOv') $('mapOv').classList.re
 function enterHangar(port) {
   dockPort = port; setMode('hangar'); $('ppanel').hidden = true; AP.on = false;
   if (aiDirty) spawnAll();
-  setHangarShip(activeShip().tier, save.paint); refreshPort();
+  setPortScene(port.def.id); setHangarShip(activeShip().tier, save.paint, activeShip().mods); refreshPort();
   for (const b of document.querySelectorAll('#ptabs button[data-tab]')) b.classList.remove('on');
 }
 function refreshPort() {
@@ -513,7 +513,7 @@ function openTab(tab) {
   if (tab === 'paint') {
     T('페인트');
     B.innerHTML = `<p class="ds" style="color:var(--dim)">선체 도색을 고르세요. 무료입니다.</p><div class="swatches">${PAINTS.map(p => `<button data-p="${p.id}" class="${save.paint === p.id ? 'on' : ''}" style="background:rgb(${p.c.map(v => Math.min(255, Math.round(v * 169))).join(',')})">${p.nm}</button>`).join('')}</div>`;
-    B.querySelectorAll('[data-p]').forEach(el => el.onclick = () => { save.paint = el.dataset.p; persist(); setHangarShip(a.tier, save.paint); openTab('paint'); });
+    B.querySelectorAll('[data-p]').forEach(el => el.onclick = () => { save.paint = el.dataset.p; persist(); setHangarShip(a.tier, save.paint, a.mods); openTab('paint'); });
   } else if (tab === 'upgrade') {
     T('업그레이드');
     save.weapons = save.weapons || ['cannon'];
@@ -555,7 +555,7 @@ function openTab(tab) {
       return `<div class="tcard ${act ? 'on' : ''}"><h4><small>${t.t}</small>${t.nm} <em class="role">${t.role}</em></h4>${btn}<p>${t.ds}<br>선체 ${t.hp} · 방어막 ${t.shield} · 속도 ${t.speed} m/s · 화물 ${fmt(t.cargo)}kg · 포탑 ${t.turrets}문 · 모듈 슬롯 ${t.slots}</p></div>`;
     }).join('')).join('');
     B.querySelectorAll('[data-buy]').forEach(el => el.onclick = () => { const t = TIERS[+el.dataset.buy]; if (save.credits < t.cost) return; save.credits -= t.cost; buyTier(t.id); persist(); sfx('coin'); toast(`<b>${t.nm}</b> 구매 완료!`); solEvent('newShip', 2, 1); if (t.tier >= 1) story('ship', 1); if (t.id === 8) story('arc', 1); aiDirty = true; setHangarShip(t.id, save.paint); refreshPort(); openTab('yard'); });
-    B.querySelectorAll('[data-use]').forEach(el => el.onclick = () => { save.active = save.ships.findIndex(s => s.tier === +el.dataset.use); persist(); setHangarShip(activeShip().tier, save.paint); refreshPort(); openTab('yard'); });
+    B.querySelectorAll('[data-use]').forEach(el => el.onclick = () => { save.active = save.ships.findIndex(s => s.tier === +el.dataset.use); persist(); setHangarShip(activeShip().tier, save.paint, activeShip().mods); refreshPort(); openTab('yard'); });
   } else if (tab === 'inv') {
     T('인벤토리');
     const st = Object.entries(save.storage).filter(([, n]) => n > 0);
@@ -571,9 +571,9 @@ function openTab(tab) {
         const own = save.modules.includes(id), eq = a.mods.includes(id), full = a.mods.length >= Tt.slots;
         const btn = eq ? `<button class="btn ghost" data-un="${id}">해제</button>` : own ? `<button class="btn" data-eq="${id}" ${full ? 'disabled' : ''}>${full ? '슬롯 없음' : '장착'}</button>` : `<button class="btn" data-mbuy="${id}" ${save.credits < m.cost ? 'disabled' : ''}>구매 ${fmt(m.cost)} C</button>`;
         return `<div class="row"><div class="ic">${m.ic}</div><div><div class="nm">${m.nm}${eq ? ' <small style="color:var(--teal)">장착 중</small>' : ''}</div><div class="ds">${m.ds}</div></div>${btn}</div>`; }).join('')).join('');
-    const re = () => { persist(); sfx('ui'); refreshPort(); openTab('modules'); };
-    B.querySelectorAll('[data-mbuy]').forEach(el => el.onclick = () => { const id = el.dataset.mbuy, m = MODULES[id]; if (save.credits < m.cost) return; save.credits -= m.cost; save.modules.push(id); if (a.mods.length < Tt.slots) { a.mods.push(id); story('module', 1); } toast(`<b>${m.nm}</b> 구매${a.mods.includes(id) ? '·장착' : ''} 완료`); re(); });
-    B.querySelectorAll('[data-eq]').forEach(el => el.onclick = () => { if (a.mods.length < Tt.slots && !a.mods.includes(el.dataset.eq)) { a.mods.push(el.dataset.eq); story('module', 1); } re(); });
+    const re = () => { persist(); sfx('ui'); refreshPort(); refreshHangarMods(a.mods); openTab('modules'); };
+    B.querySelectorAll('[data-mbuy]').forEach(el => el.onclick = () => { const id = el.dataset.mbuy, m = MODULES[id]; if (save.credits < m.cost) return; save.credits -= m.cost; save.modules.push(id); if (a.mods.length < Tt.slots) { a.mods.push(id); hangarInstall(id, a.mods.length - 1); story('module', 1); } toast(`<b>${m.nm}</b> 구매${a.mods.includes(id) ? '·장착' : ''} 완료`); re(); });
+    B.querySelectorAll('[data-eq]').forEach(el => el.onclick = () => { if (a.mods.length < Tt.slots && !a.mods.includes(el.dataset.eq)) { a.mods.push(el.dataset.eq); hangarInstall(el.dataset.eq, a.mods.length - 1); story('module', 1); } re(); });
     B.querySelectorAll('[data-un]').forEach(el => el.onclick = () => { a.mods = a.mods.filter(x => x !== el.dataset.un); re(); });
   } else if (tab === 'settings') {
     T('설정');
@@ -855,7 +855,7 @@ $('bpClose').onclick = () => closeBasePanel();
 opHooks.toast = m => toast(m);
 opHooks.onChange = () => { if (basePanelOpen()) renderBasePanel(); };
 opHooks.unitKill = (u, t) => { if (t.faction !== 'pirate') return; const lv = TIERS[t.tier].tier, b = Math.round(45 * (lv + 1)); save.credits += b; gainXp(5 * (lv + 1)); questProgress('kill', 1); story('kill', 1); persist(); };
-opHooks.reactText = (pos, nm, col) => { const el = document.createElement('div'); el.className = 'dn react'; el.style.color = col; el.textContent = nm; $('dmgn').appendChild(el); dnums.push({ t: null, pos: pos.clone().add(tmp2.set(0, 18, 0)), amt: 0, age: 0, el, label: nm }); };
+opHooks.reactText = (pos, nm, col) => { sfx('react'); const el = document.createElement('div'); el.className = 'dn react'; el.style.color = col; el.textContent = nm; $('dmgn').appendChild(el); dnums.push({ t: null, pos: pos.clone().add(tmp2.set(0, 18, 0)), amt: 0, age: 0, el, label: nm }); };
 opHooks.haul = (u, load) => { if (Math.random() < 0.35) toast(`🚚 화물 트럭이 ${ORES[load.type].nm} ${load.n}개를 창고에 보관했어요`); };
 opHooks.spawnRaid = o => {
   if (mode !== 'fly') return;
@@ -867,7 +867,7 @@ opHooks.spawnRaid = o => {
     const a = rand(0, 6.28); e.spawnAt(o.x + Math.cos(a) * 900, o.deck + rand(120, 220), o.z + Math.sin(a) * 900, a);
     e.ai.attacker = o; e.ai.attackT = 120; e.ai.target = o;
   }
-  banner('RAID', `⚠ ${o.nm}에 해적 습격대 ${n}척 접근!`, 4); solSay(`${o.nm}가 습격받고 있어요! 방어 유닛이 막는 동안 지원해 주세요.`, 'alert', 3);
+  sfx('siren'); banner('RAID', `⚠ ${o.nm}에 해적 습격대 ${n}척 접근!`, 4); solSay(`${o.nm}가 습격받고 있어요! 방어 유닛이 막는 동안 지원해 주세요.`, 'alert', 3);
 };
 
 /* ================= 날씨 · 이벤트 · 부가 HUD ================= */

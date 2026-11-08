@@ -48,7 +48,7 @@ export function fireTurrets(s, point, spread = 0.012) {
     }
     shot = true;
   }
-  if (shot && s.isPlayer) sfx('shot', s.weapon === 'rail' ? 2 : 1);
+  if (shot && s.isPlayer) sfx(s.weapon === 'rail' ? 'rail' : s.weapon === 'flak' ? 'flak' : 'shot');
   return shot;
 }
 function segDist2(a, b, c) {
@@ -222,7 +222,7 @@ export function shieldFx(s, kind) {
     else FIRE.emit(tmp.x, tmp.y, tmp.z, tmp2.x + s.vel.x, tmp2.y, tmp2.z + s.vel.z, rand(0.4, 0.8), rand(1.2, 2.2) * s.scale, 0.3, [0.4, 2.6, 0.9], [0.1, 1, 0.3], 0.9, 1);
   }
   void G;
-  if (camera.position.distanceTo(s.pos) < 900) sfx(kind === 'break' ? 'glass' : 'ui', kind === 'break' ? 1 : 0.6);
+  if (camera.position.distanceTo(s.pos) < 900) sfx(kind === 'break' ? 'glass' : 'shield', 0.8);
 }
 export function clearFx() {
   bullets.length = 0; for (const m of missiles) scene.remove(m.mesh); missiles.length = 0;

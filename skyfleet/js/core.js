@@ -71,7 +71,8 @@ void main(){
 }`;
 if (Q.bloom) {
   const sz = new THREE.Vector2(); const tmpR = { w: Math.max(2, innerWidth), h: Math.max(2, innerHeight) };
-  const rt = new THREE.WebGLRenderTarget(Math.round(tmpR.w * Q.pr), Math.round(tmpR.h * Q.pr), { type: THREE.HalfFloatType, samples: Q.msaa });
+  // 터치(아이폰·아이패드): 실수 렌더 타깃과 다중 샘플링을 쓰지 않는다 — 사파리에서 검은 화면·깜박임의 원인
+  const rt = new THREE.WebGLRenderTarget(Math.round(tmpR.w * Q.pr), Math.round(tmpR.h * Q.pr), { type: isTouch ? THREE.UnsignedByteType : THREE.HalfFloatType, samples: isTouch ? 0 : Q.msaa });
   composer = new EffectComposer(renderer, rt); void sz;
   renderPass = new RenderPass(new THREE.Scene(), camera);
   composer.addPass(renderPass);
@@ -211,24 +212,74 @@ export function engineSound(level, boost, on) {
     eng.g.gain.setTargetAtTime(0.018 + level * 0.025 + (boost ? 0.02 : 0), t, 0.2);
   } catch (e) {}
 }
+/* ---------- 소리 엔진: 마스터 컴프레서 + 잔향 버스 + 레이어 합성 ---------- */
+let bus = null, verbIn = null, noiseB = null;
+function audio() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  if (ac.state === 'suspended') ac.resume();
+  if (!bus) {
+    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.2; comp.connect(ac.destination);
+    bus = ac.createGain(); bus.gain.value = 0.85; bus.connect(comp);
+    verbIn = ac.createConvolver(); const n = ac.sampleRate * 2.4, ib = ac.createBuffer(2, n, ac.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ib.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.6); }
+    verbIn.buffer = ib; const vg = ac.createGain(); vg.gain.value = 0.28; verbIn.connect(vg); vg.connect(comp);
+    noiseB = ac.createBuffer(1, ac.sampleRate * 1.5, ac.sampleRate); const nd = noiseB.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  }
+  return ac;
+}
+// 소리 한 개를 버스로 보낸다 (wet: 잔향 양)
+function sendOut(node, wet = 0.25) { node.connect(bus); if (wet > 0) { const w = ac.createGain(); w.gain.value = wet; node.connect(w); w.connect(verbIn); } }
+function noiseSrc(dur) { const s = ac.createBufferSource(); s.buffer = noiseB; s.loop = true; s.start(ac.currentTime, Math.random() * 1); s.stop(ac.currentTime + dur); return s; }
+function ping(t, f, dur, type, peak, wet = 0.25, f2 = null) {
+  const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); sendOut(g, wet); o.start(t); o.stop(t + dur + 0.05);
+}
+function burst(t, dur, filt, f, q, peak, wet = 0.2, sweepTo = null) {
+  const s = noiseSrc(dur + 0.05), bf = ac.createBiquadFilter(), g = ac.createGain(); bf.type = filt; bf.frequency.setValueAtTime(f, t); if (sweepTo) bf.frequency.exponentialRampToValueAtTime(sweepTo, t + dur); bf.Q.value = q;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(bf); bf.connect(g); sendOut(g, wet);
+}
 export function sfx(kind, vol = 1) {
   if (muted) return;
   try {
-    ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
-    const t = ac.currentTime, g = ac.createGain(); g.connect(ac.destination);
-    if (kind === 'glass') {
-      for (let i = 0; i < 6; i++) { const o = ac.createOscillator(), gg = ac.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(rand(1800, 4200), t + i * 0.025); gg.gain.setValueAtTime(0.05 * vol, t + i * 0.025); gg.gain.exponentialRampToValueAtTime(0.001, t + i * 0.025 + 0.25); o.connect(gg); gg.connect(ac.destination); o.start(t + i * 0.025); o.stop(t + i * 0.025 + 0.26); }
-      return;
-    }
-    if (kind === 'shot' || kind === 'ui' || kind === 'coin') {
-      const o = ac.createOscillator(); o.type = kind === 'shot' ? 'square' : 'sine';
-      const f0 = kind === 'shot' ? 520 : kind === 'ui' ? 880 : 1320, f1 = kind === 'shot' ? 110 : kind === 'ui' ? 660 : 1760;
-      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 0.08);
-      g.gain.setValueAtTime((kind === 'shot' ? 0.04 : 0.06) * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12); o.connect(g); o.start(t); o.stop(t + 0.13);
-    } else {
-      const len = ac.sampleRate * 0.6, b = ac.createBuffer(1, len, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
-      const s = ac.createBufferSource(); s.buffer = b; const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'boom' ? 500 : kind === 'mine' ? 2400 : 1500;
-      g.gain.setValueAtTime((kind === 'boom' ? 0.45 : kind === 'mine' ? 0.03 : 0.12) * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + (kind === 'mine' ? 0.15 : 0.6)); s.connect(f); f.connect(g); s.start(t);
+    audio(); const t = ac.currentTime + 0.001, v = vol;
+    switch (kind) {
+      case 'shot':   // 기관포: 톱니파 스윕 + 금속 클릭 + 짧은 잔향
+        ping(t, 1100, 0.11, 'sawtooth', 0.07 * v, 0.2, 170); burst(t, 0.03, 'highpass', 2600, 0.7, 0.05 * v, 0.1); break;
+      case 'flak':   // 플랙포: 묵직한 펑 + 산탄 쉬익
+        ping(t, 300, 0.18, 'square', 0.06 * v, 0.2, 90); burst(t, 0.14, 'bandpass', 1400, 1.4, 0.12 * v, 0.3, 500); break;
+      case 'rail':   // 레일건: 전자기 충전 후 쩡 하는 발사음
+        ping(t, 2400, 0.22, 'sine', 0.08 * v, 0.4, 260); ping(t + 0.03, 4200, 0.4, 'sine', 0.03 * v, 0.5); burst(t, 0.06, 'highpass', 3000, 0.5, 0.08 * v, 0.4); break;
+      case 'hit':    // 피격: 짧은 딱 + 금속 울림
+        burst(t, 0.07, 'highpass', 1800, 0.6, 0.12 * v, 0.25); ping(t, 900, 0.12, 'triangle', 0.05 * v, 0.3, 380); break;
+      case 'boom':   // 폭발: 저음 충격 + 잔향 꼬리
+        ping(t, 95, 0.9, 'sine', 0.35 * v, 0.2, 32); burst(t, 1.1, 'lowpass', 900, 0.4, 0.4 * v, 0.45, 140); burst(t + 0.02, 0.2, 'highpass', 2200, 0.5, 0.08 * v, 0.3); break;
+      case 'mine':   // 채굴 레이저 톡
+        ping(t, 2400, 0.14, 'sine', 0.05 * v, 0.3); ping(t + 0.04, 3600, 0.12, 'sine', 0.03 * v, 0.3); break;
+      case 'coin':   // 보상: 벨 아르페지오
+        [880, 1320, 1760].forEach((f, i) => ping(t + i * 0.06, f, 0.5, 'triangle', 0.06 * v, 0.45)); break;
+      case 'ui':     // 버튼 클릭: 부드러운 틱
+        ping(t, 1040, 0.07, 'sine', 0.05 * v, 0.1, 1560); break;
+      case 'glass':  // 방어막 붕괴: 유리 조각 흩어짐
+        for (let i = 0; i < 7; i++) ping(t + i * 0.03, rand(1800, 4800), 0.3, 'triangle', 0.04 * v, 0.45); burst(t, 0.5, 'highpass', 4000, 0.5, 0.05 * v, 0.5); break;
+      case 'shield':  // 방어막 회복: 떠오르는 공명
+        ping(t, 420, 0.7, 'sine', 0.07 * v, 0.5, 1260); ping(t, 630, 0.7, 'sine', 0.04 * v, 0.5, 1890); break;
+      case 'install': // 모듈 장착: 상승 스윕 + 딸깍 + 벨
+        ping(t, 220, 0.55, 'sawtooth', 0.045 * v, 0.2, 1400); burst(t + 0.5, 0.08, 'bandpass', 2000, 2, 0.1 * v, 0.3); ping(t + 0.56, 1320, 0.6, 'sine', 0.06 * v, 0.5); break;
+      case 'repair':  // 정비: 용접 지직 (고주파 떨림)
+        { const s = noiseSrc(1.2), bf = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+          bf.type = 'bandpass'; bf.frequency.value = 2600; bf.Q.value = 3; lfo.frequency.value = 38; lg.gain.value = 0.05 * v; lfo.connect(lg); lg.connect(g.gain);
+          g.gain.value = 0.05 * v; s.connect(bf); bf.connect(g); sendOut(g, 0.25); lfo.start(t); lfo.stop(t + 1.2); ping(t, 240, 1.0, 'sine', 0.02 * v, 0.2); }
+        break;
+      case 'react':   // 원소 반응: 반짝이는 글리산도 + 맥놀이
+        ping(t, 500, 0.5, 'sine', 0.07 * v, 0.55, 1400); ping(t, 1200, 0.5, 'sine', 0.035 * v, 0.6, 1205); break;
+      case 'siren':   // 습격 경보
+        ping(t, 520, 0.5, 'square', 0.025 * v, 0.2, 700); ping(t + 0.55, 700, 0.5, 'square', 0.025 * v, 0.2, 520); break;
+      case 'warp':    // 등장 연출
+        ping(t, 160, 0.8, 'sawtooth', 0.04 * v, 0.4, 1600); break;
+      default:
+        ping(t, 1100, 0.11, 'sawtooth', 0.07 * v, 0.2, 170);
     }
   } catch (e) {}
 }
