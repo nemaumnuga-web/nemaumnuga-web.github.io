@@ -1,7 +1,7 @@
 // 게임 데이터 + 저장
 import { rand, pick, clamp } from './core.js';
 
-export const WORLD = 3400;   // 전장 반경 (m)
+export const WORLD = 4600;   // 전장 반경 (m) — 새 지역(네온 폐허·수정 평원)까지 확장
 
 /* ---------- 함선 (9종) ----------
    TIERS[id] 는 함선 클래스. tier 는 등급(0=T1 … 4=T5).
@@ -104,6 +104,7 @@ export const PORT_DEFS = [
 
 /* 지역 이름 (지도 표시) */
 export const REGIONS = [
+  { nm: '네온 폐허', x: -3150, z: -2900 }, { nm: '수정 평원', x: 3150, z: -3050 }, { nm: '남쪽 모래바다', x: -300, z: 3700 },
   { nm: '붉은 협곡', x: -400, z: 600 }, { nm: '부유 군도', x: 300, z: -500 }, { nm: '난파선 묘지', x: 2350, z: -350 },
   { nm: '유리 사막', x: -2300, z: -900 }, { nm: '은빛 강', x: 400, z: 2300 }, { nm: '해골 고원', x: -2400, z: 2200 },
 ];
@@ -148,7 +149,7 @@ export const ENDING = '아크라이트의 에테르 기관이 깨어나자, 붉�
 const KEY = 'skyfleet_save_v2';
 function freshShip(cls) { return { tier: cls, lv: { guns: 0, missile: TIERS[cls].tier >= 1 ? 1 : 0, armor: 0, engine: 0, cargo: 0, drill: 0 }, weapon: 'cannon', mods: [] }; }
 export function defaultSave() {
-  return { ver: 3, credits: 300, xp: 0, ships: [freshShip(0)], active: 0, paint: 'sand', pvp: false, storage: {}, prices: {}, quests: [], stats: { kills: 0, mined: 0, deaths: 0, bosses: 0 }, skyrunBest: 0, weapons: ['cannon'], modules: [], mute: false, solare: { voice: true, llm: false, perm: 0, mic: true }, story: { ch: 0, have: 0, intro: false, done: false }, camSteer: true };
+  return { ver: 3, credits: 300, xp: 0, ships: [freshShip(0)], active: 0, paint: 'sand', pvp: false, storage: {}, prices: {}, quests: [], stats: { kills: 0, mined: 0, deaths: 0, bosses: 0 }, skyrunBest: 0, weapons: ['cannon'], modules: [], mute: false, solare: { voice: true, llm: false, perm: 0, mic: true }, story: { ch: 0, have: 0, intro: false, done: false }, camSteer: true, outposts: [] };
 }
 export let save = defaultSave();
 export function loadSave() {
@@ -189,3 +190,43 @@ export function priceOf(ore, port) {
   return Math.max(1, Math.round(base * drift));
 }
 export function driftPrices() { for (const k in ORES) save.prices[k] = clamp((save.prices[k] ?? 1) * rand(0.94, 1.06), 0.7, 1.4); }
+
+/* ---------- 전초기지 · 유닛 ---------- */
+export const OUTPOST_SITES = [
+  { id: 'alpha', nm: '알파 전초기지', x: -3050, z: -2550, region: '네온 폐허' },
+  { id: 'bravo', nm: '브라보 전초기지', x: 3050, z: -2750, region: '수정 평원' },
+  { id: 'charlie', nm: '찰리 전초기지', x: -650, z: 3550, region: '남쪽 모래바다' },
+  { id: 'delta', nm: '델타 전초기지', x: 3950, z: 1650, region: '동쪽 고원' },
+  { id: 'echo', nm: '에코 전초기지', x: -3950, z: 1150, region: '서쪽 절벽' },
+  { id: 'fox', nm: '폭스트롯 전초기지', x: 450, z: -3850, region: '북쪽 능선' },
+  { id: 'golf', nm: '골프 전초기지', x: -250, z: 1050, region: '붉은 협곡' },
+  { id: 'hotel', nm: '호텔 전초기지', x: 2550, z: 2950, region: '은빛 강' },
+];
+export const outpostCost = n => 3000 + n * 1500;               // n = 이미 지은 수
+export const outpostUpCost = lv => [0, 4000, 9000][lv] || 0;     // Lv1→2, Lv2→3
+export const unitCap = lv => 6 + lv * 4;          // Lv1 10 · Lv2 14 · Lv3 18
+export const ELEMENTS = {
+  pyro:    { nm: '화염', code: '이그니스', col: [3.4, 1.1, 0.3], hex: '#ff6a2a' },
+  hydro:   { nm: '물', code: '아쿠아', col: [0.3, 1.4, 3.6], hex: '#3aa8ff' },
+  anemo:   { nm: '바람', code: '제피르', col: [0.5, 3.2, 2.2], hex: '#5fffc8' },
+  electro: { nm: '번개', code: '볼트', col: [2.4, 0.8, 3.6], hex: '#c06bff' },
+  dendro:  { nm: '풀', code: '실바', col: [1.0, 3.0, 0.4], hex: '#8cff4a' },
+  cryo:    { nm: '얼음', code: '프로스트', col: [1.4, 2.8, 3.6], hex: '#9ff0ff' },
+  geo:     { nm: '바위', code: '테라', col: [3.0, 2.2, 0.5], hex: '#ffc84a' },
+};
+/* 두 원소가 만나면 일어나는 반응 (원소 반응) */
+export const REACTIONS = {
+  'pyro+hydro': { nm: '증발', mul: 2 }, 'pyro+cryo': { nm: '융해', mul: 2 },
+  'electro+pyro': { nm: '과부하', mul: 1.6, aoe: 60 }, 'electro+hydro': { nm: '감전', mul: 1.3, dot: 6 },
+  'cryo+hydro': { nm: '빙결', mul: 1.2, slow: 3 }, 'cryo+electro': { nm: '초전도', mul: 1.5, shred: 0.3 },
+  'dendro+hydro': { nm: '개화', mul: 1.8, aoe: 40 }, 'dendro+pyro': { nm: '연소', mul: 1.2, dot: 8 },
+  'anemo': { nm: '확산', mul: 1.3, aoe: 80 }, 'geo': { nm: '결정화', mul: 1.2, shield: 40 },
+};
+export const UNIT_DEFS = {
+  escort:  { ic: '🛩️', nm: '호위함 「팔콘」', role: '비행 · 플레이어 호위', cost: 1200, time: 10, hp: 240, air: true, speed: 120, range: 650, dmg: 9, rate: 2.2, ds: '캡틴을 따라다니며 해적을 요격하는 소형 전투함' },
+  vtol:    { ic: '🚁', nm: '틸트로터 건십', role: '비행 · 기지 방어', cost: 900, time: 8, hp: 180, air: true, speed: 85, range: 600, dmg: 14, rate: 1.2, ds: '기지 주변을 선회하며 로켓으로 해적을 공격' },
+  trooper: { ic: '🪖', nm: '외골격 보병 분대', role: '지상 · 대공', cost: 600, time: 6, hp: 70, air: false, speed: 9, range: 520, dmg: 5, rate: 3, squad: 4, ds: '점프 제트로 뛰어다니는 4인 분대. 플라즈마 소총으로 대공 사격' },
+  adept:   { ic: '✨', nm: '원소 능력자', role: '특수 · 원소 공격', cost: 2200, time: 14, hp: 160, air: true, speed: 60, range: 720, dmg: 26, rate: 0.8, ds: '7원소 중 하나를 다루는 능력자. 서로 다른 원소가 만나면 원소 반응이 일어남' },
+  rover:   { ic: '🚙', nm: '호버 정찰차', role: '지상 · 순찰', cost: 500, time: 5, hp: 120, air: false, speed: 48, range: 480, dmg: 6, rate: 2.5, ds: '기지 주변 도로를 순찰하는 레이저 정찰차' },
+  hauler:  { ic: '🚚', nm: '호버 화물 트럭', role: '지상 · 자원 운반', cost: 800, time: 7, hp: 200, air: false, speed: 34, range: 0, dmg: 0, rate: 0, ds: '근처 광맥에서 광석을 캐서 창고로 실어 나름 (자동 수입)' },
+};

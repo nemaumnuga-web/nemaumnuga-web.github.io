@@ -73,6 +73,7 @@
     <button class="tbtn rd" id="tLock">잠금<small>다음</small></button>
     <button class="tbtn rd" id="tBoost">부스트<small>누르기</small></button>
     <button class="tbtn rd" id="tFlare">플레어<small>회피</small></button>
+    <button class="tbtn sq" id="tBase" style="display:none">기지<small>관리</small></button>
     <button class="tbtn sq" id="tBoard">순위<small>점수</small></button>
     <button class="tbtn sq" id="tUp">▲<small>위로</small></button>
     <button class="tbtn sq" id="tDn">▼<small>아래로</small></button>
@@ -106,6 +107,7 @@
 <div class="ov" id="dead"><div class="card"><h2 class="stencil red">SHIP DOWN</h2><p>격추당했습니다. <span id="deadInfo"></span></p><button class="btn big" id="deadGo">포트 앤톤으로 귀환</button></div></div>
 <div class="ov" id="mapOv"><div class="card wide"><button class="x" id="mapX">✕</button><h3>월드 지도</h3><canvas id="mapc" width="900" height="900"></canvas><p class="legend"><i class="lg port"></i>포트 <i class="lg ore"></i>광맥 <i class="lg pir"></i>해적 <i class="lg cap"></i>캡틴 <i class="lg me"></i>나</p></div></div>
 <div class="ov" id="board"><div class="card wide"><h3>순위표</h3><div id="boardB"></div><p class="legend">PC: Tab 키를 누르고 있는 동안 표시</p></div></div>
+<div id="basePanel"><div class="bph"><div><h3 id="bpTitle"></h3><span id="bpSub"></span><div class="bphp"><i id="bpHp"></i></div></div><button class="x" id="bpClose">✕</button></div><div id="bpBody"></div></div>
 <div id="rotate"><div class="ph"></div><b>가로로 돌려 주세요</b><span>하늘함대는 가로 화면에서 플레이해요</span></div>
 <div id="toast"></div>
 <!-- 인트로 / 스토리 -->

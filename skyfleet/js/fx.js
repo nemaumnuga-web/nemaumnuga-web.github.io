@@ -4,7 +4,7 @@ import { scene, FIRE, SMOKE, flash, groundAt, surfaceBelow } from './world.js';
 import { MUZZLE } from './ships.js';
 import { WEAPONS } from './data.js';
 
-export const S = { ships: [], player: null, crates: [], hooks: {}, shake: 0 };
+export const S = { ships: [], units: [], player: null, crates: [], hooks: {}, shake: 0 };
 const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), prevP = new THREE.Vector3(), Z_NEG = new THREE.Vector3(0, 0, -1);
 
 export function explode(pos, size, kind = 'boom') {
@@ -58,6 +58,8 @@ function segDist2(a, b, c) {
 }
 function hitTest(prev, cur, owner) {
   for (const s of S.ships) { if (!s.alive || s === owner || !S.hooks.hostile(owner, s)) continue; if (segDist2(prev, cur, s.pos) < s.radius * s.radius) return s; }
+  // 아군 기지·유닛도 맞을 수 있음 (해적 탄)
+  if (owner && owner.faction === 'pirate') for (const u of S.units) { if (!u.alive || (u.build > 0)) continue; if (segDist2(prev, cur, u.pos) < u.radius * u.radius) return u; }
   return null;
 }
 const _bm = new THREE.Matrix4(), _bs = new THREE.Vector3(1, 1, 1);
@@ -69,7 +71,7 @@ export function updateBullets(dt) {
     const hit = hitTest(prevP, b.pos, b.owner);
     const ground = b.pos.y < groundAt(b.pos.x, b.pos.z);
     if (hit) {
-      S.hooks.damage(hit, b.dmg, b.owner, b.pos);
+      if (hit.isUnit) hit.hurt(b.dmg, b.owner); else S.hooks.damage(hit, b.dmg, b.owner, b.pos);
       for (let k = 0; k < 6 * Q.fx + 2; k++) { const v = rv(60); FIRE.emit(b.pos.x, b.pos.y, b.pos.z, v[0], v[1], v[2], rand(0.2, 0.5), 1.6, 0.3, COL.spark, COL.sparkE, 1, 1, 40); }
       FIRE.emit(b.pos.x, b.pos.y, b.pos.z, 0, 0, 0, 0.12, 6, 9, COL.fireHot, COL.fireMid, 1);
     } else if (ground) SMOKE.emit(b.pos.x, b.pos.y + 2, b.pos.z, 0, 10, 0, 1.2, 4, 12, COL.dust, COL.dustE, 0.3);
@@ -110,7 +112,7 @@ export function updateMissiles(dt) {
     SMOKE.emit(bx, by, bz, ...rv(3), rand(1.4, 2.4), 2, rand(7, 11), [0.85, 0.83, 0.8], [0.7, 0.68, 0.66], 0.45, 0.6, -3);
     const hit = hitTest(prevP, mp, p.owner);
     const gone = p.life <= 0 || mp.y < groundAt(mp.x, mp.z);
-    if (hit) { explode(mp, 26); S.hooks.damage(hit, p.dmg, p.owner, mp); }
+    if (hit) { explode(mp, 26); if (hit.isUnit) hit.hurt(p.dmg, p.owner); else S.hooks.damage(hit, p.dmg, p.owner, mp); }
     else if (gone) explode(mp, 18);
     if (hit || gone) { scene.remove(p.mesh); missiles.splice(i, 1); }
   }

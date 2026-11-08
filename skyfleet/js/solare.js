@@ -159,6 +159,7 @@ export function classify(raw) {
     const k = has(s, '에테르', '결정') ? 'aether' : has(s, '금') ? 'gold' : has(s, '은') ? 'silver' : has(s, '구리') ? 'copper' : has(s, '철') ? 'iron' : null;
     return { k: 'cmd', id: 'ore', ore: k };
   }
+  if (has(s, '기지', '전초')) return { k: 'cmd', id: 'outpost' };
   if (has(s, '섬', '부유섬', '군도')) return { k: 'cmd', id: 'island' };
   if (has(s, '난파', '묘지')) return { k: 'cmd', id: 'wreck' };
   if (has(s, '임무', '스토리', '퀘스트', '할일', '목표', '뭐해야')) return { k: 'query', id: 'mission' };
@@ -207,6 +208,7 @@ function runCmd(id, c) {
     case 'port': { const r = x.autoPort(); return reply(r ? `${r}으로 자동 비행할게요. 조작하면 잠시 비켜 드려요.` : '출격한 뒤에 말씀해 주세요.'); }
     case 'ore': { const r = x.autoOre(c.ore); return reply(r || '근처에 그 광맥은 없어요. 시간이 지나면 새로 생겨요.'); }
     case 'island': return reply(x.gotoIsland() || '부유섬을 찾지 못했어요.');
+    case 'outpost': return reply(x.gotoOutpost() || '비행 중일 때 기지로 안내할 수 있어요.');
     case 'wreck': return reply(x.gotoWreck() || '난파선을 찾지 못했어요.');
     case 'boss': { const r = x.fightBoss(); return reply(r || '지금은 고르곤 신호가 없어요.'); }
     case 'flare': return reply(x.flare() ? '플레어 발사!' : '플레어는 아직 재장전 중이에요.');

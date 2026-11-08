@@ -380,3 +380,30 @@ body[data-mode=hangar] #solare.on{transform:none}
 #cargo{bottom:var(--sb);width:200px;padding:4px 9px}.cbar{margin:3px 0 8px}
 #hint{bottom:40%}
 }
+
+/* ============ 전초기지 ============ */
+#basePanel{position:fixed;z-index:44;right:16px;top:90px;bottom:16px;width:min(620px,calc(100vw - 32px));background:rgba(6,10,16,.94);border:1px solid rgba(184,140,255,.45);display:none;flex-direction:column;backdrop-filter:blur(8px)}
+#basePanel.on{display:flex}
+.bph{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 18px 10px;border-bottom:1px solid rgba(184,140,255,.3);position:relative}
+.bph h3{margin:0;font-family:var(--stencil);letter-spacing:.15em;color:#c9a8ff;font-size:20px}.bph span{font-size:12px;color:var(--dim)}
+.bphp{height:5px;background:rgba(255,255,255,.1);margin-top:8px;width:260px}.bphp i{display:block;height:100%;background:linear-gradient(90deg,#8a5cff,#5fe8ff)}
+#bpBody{flex:1;overflow:auto;padding:10px 18px 16px}
+#bpBody h4{margin:14px 0 6px;font-size:13px;color:#c9a8ff;letter-spacing:.1em}#bpBody h4 small{color:var(--dim);font-weight:400;margin-left:6px}
+.bpr{display:flex;gap:8px;flex-wrap:wrap}
+.bq{position:relative;background:rgba(255,255,255,.05);padding:6px 10px;margin-bottom:4px;font-size:13px;overflow:hidden}.bq i{position:absolute;left:0;bottom:0;height:3px;background:#b88cff}
+.ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.ucard{border:1px solid rgba(255,255,255,.1);background:linear-gradient(160deg,rgba(184,140,255,.08),rgba(34,211,211,.04));padding:10px;display:flex;flex-direction:column;gap:3px}
+.ucard .ui{font-size:24px}.ucard b{font-size:14px}.ucard small{color:#c9a8ff;font-size:11px}.ucard p{margin:2px 0 4px;font-size:11px;color:var(--dim);line-height:1.45;flex:1}
+.uf{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px;color:var(--dim)}.uf .btn{font-size:11px;padding:6px 8px}
+.elems{display:flex;flex-wrap:wrap;gap:3px;margin:2px 0 4px}.elems button{border:1px solid var(--c);background:transparent;color:var(--c);font-size:11px;padding:2px 6px}.elems button.on{background:var(--c);color:#041016;font-weight:800}
+.bpn{font-size:11px;color:var(--dim);line-height:1.6;margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px}
+.mk.base b{color:#d6bfff;font-size:13px}.mk.base small{background:#8a5cff;color:#fff}.mk.base .tri{border-top-color:#b88cff}.mk.base .hp i{background:#b88cff}
+.mk.site b{color:#ffcf8a;font-size:12px}.mk.site small{background:#ffb347;color:#2a1600}.mk.site .tri{border-top-color:#ffb347}
+.dn.react{font-family:var(--stencil);font-size:18px;letter-spacing:.1em;text-shadow:0 0 8px currentColor,0 1px 2px #000}
+#tBase{left:24px;bottom:460px;background:rgba(138,92,255,.35);border-color:#b88cff}
+@media (max-height:520px) and (pointer:coarse){
+#basePanel{right:var(--sr);top:var(--st);bottom:var(--sb);width:min(560px,70vw)}
+.bph{padding:8px 12px 6px}.bph h3{font-size:15px}.bphp{width:180px}#bpBody{padding:6px 12px 10px}
+.ugrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}.ucard{padding:7px}.ucard p{font-size:10px}.ucard .ui{font-size:18px}
+#tBase{left:calc(var(--sl) + 354px);top:var(--st);bottom:auto;width:40px;height:30px;font-size:10px}
+}

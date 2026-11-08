@@ -23,6 +23,8 @@ function steer(s, tx, ty, tz, speedFrac, dt) {
 function findTarget(s, range) {
   let best = null, bd = range;
   for (const o of S.ships) { if (!o.alive || o === s || !S.hooks.hostile(s, o)) continue; const d = o.pos.distanceTo(s.pos); if (d < bd) { bd = d; best = o; } }
+  // 해적은 아군 기지·유닛도 노린다 (기지는 조금 덜 우선)
+  if (s.faction === 'pirate') for (const o of S.units) { if (!o.alive || o.build > 0) continue; const d = o.pos.distanceTo(s.pos) * (o.def ? 1 : 1.3); if (d < bd) { bd = d; best = o; } }
   return best;
 }
 function combat(s, t, dt) {

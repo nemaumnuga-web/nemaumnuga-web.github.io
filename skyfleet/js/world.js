@@ -1,5 +1,5 @@
 // 월드: 하늘·낮밤·지형·포트·광맥
-import { FXS, THREE, Q, renderer, camera, rand, clamp, lerp, smooth, Particles, TEX_SOFT, TEX_SMOKE, canvasTex, put, finish, box, cyl, HPI, addProto, frameYield, mergeGeometries } from './core.js';
+import { FXS, THREE, Q, renderer, camera, rand, pick, clamp, lerp, smooth, Particles, TEX_SOFT, TEX_SMOKE, canvasTex, put, finish, box, cyl, HPI, addProto, frameYield, mergeGeometries } from './core.js';
 import { Sky } from '../vendor/addons/objects/Sky.js';
 import { WORLD, PORT_DEFS, ORES, rollOre } from './data.js';
 
@@ -91,6 +91,7 @@ export function groundAt(x, z) {
   for (const p of ports) if (Math.abs(x - p.x) < PAD && Math.abs(z - p.z) < PAD) return p.ground + 7;
   return Math.max(terrainH(x, z), 2);
 }
+const BASALT = new THREE.Color(0x3b3842), LAVENDER = new THREE.Color(0xa48fc0);
 const STRATA = [0x9a4a2a, 0xb8643a, 0xc98552, 0xa85634, 0xd9a36b, 0x8e4428, 0xc27445, 0xe0b27a].map(c => new THREE.Color(c));
 function buildTerrain(size, seg, sink) {
   const g = new THREE.PlaneGeometry(size, size, seg, seg); g.rotateX(-Math.PI / 2);
@@ -107,6 +108,7 @@ function buildTerrain(size, seg, sink) {
     c.lerp(tmp, smooth(0.8, 0.95, ny));
     if (y > 4 && y < 46) c.lerp(grass, smooth(0.86, 0.98, ny) * smooth(46, 12, y) * (0.55 + vnoise(x * 0.006 + 3, z * 0.006) * 0.6));   // 강가 풀밭
     if (y < 10) c.lerp(wet, smooth(10, -5, y));
+    { const dn = Math.hypot(x + 3150, z + 2900), dc = Math.hypot(x - 3150, z + 3050); if (dn < 1600) c.lerp(BASALT, smooth(1600, 700, dn) * 0.75); if (dc < 1600) c.lerp(LAVENDER, smooth(1600, 700, dc) * 0.6); }
     c.offsetHSL(0, 0, (hash(i, 7) - 0.5) * 0.04);
     cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
   }
@@ -261,6 +263,82 @@ function makeScatter() {
   tuft.count = k; scene.add(tuft); void placed;
 }
 const TUFT_TEX = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#fff'; for (let i = 0; i < 9; i++) { const bx = 6 + i * 6 + Math.random() * 3, h = 26 + Math.random() * 34; x.beginPath(); x.moveTo(bx - 3, 64); x.quadraticCurveTo(bx + Math.random() * 6 - 3, 64 - h * 0.6, bx + Math.random() * 10 - 5, 64 - h); x.quadraticCurveTo(bx + 1, 64 - h * 0.5, bx + 3, 64); x.fill(); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+
+
+/* ---------- 새 지역: 네온 폐허 (미래 도시 잔해) ---------- */
+const NEON_C = { x: -3150, z: -2900 }, CRYSTAL_C = { x: 3150, z: -3050 };
+let towerMat = null, traffic = null, holoBoards = [], crystalMats = [];
+const nearSite = (x, z, r) => [[-3050, -2550], [3050, -2750]].some(([sx, sz]) => Math.hypot(sx - x, sz - z) < r);
+function windowTex() {
+  return canvasTex(256, 512, (x, W, H) => {
+    x.fillStyle = '#0f1318'; x.fillRect(0, 0, W, H);
+    for (let j = 8; j < H - 8; j += 14) for (let i = 8; i < W - 8; i += 16) {
+      const r = Math.random(); if (r < 0.42) continue;
+      x.fillStyle = r < 0.62 ? 'rgba(80,230,255,.9)' : r < 0.78 ? 'rgba(255,90,210,.85)' : r < 0.9 ? 'rgba(255,200,110,.9)' : 'rgba(255,255,255,.75)';
+      x.fillRect(i, j, 10, 7);
+    }
+    x.fillStyle = 'rgba(0,0,0,.55)'; for (let k = 0; k < 18; k++) x.fillRect(Math.random() * W, Math.random() * H, Math.random() * 80, Math.random() * 120);   // 부서진 구역
+  });
+}
+function makeNeonRuins() {
+  const N = 72, tex = windowTex();
+  towerMat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.4, metalness: 0.7 }); envMats.push(towerMat);
+  const geo = new THREE.BoxGeometry(1, 1, 1); geo.translate(0, 0.5, 0);
+  const towers = new THREE.InstancedMesh(geo, towerMat, N);
+  const neonGeo = new THREE.BoxGeometry(1, 1, 1);
+  const neon = new THREE.InstancedMesh(neonGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), N * 2);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
+  let k = 0, n = 0;
+  for (let t = 0; t < 900 && k < N; t++) {
+    const a = rand(0, 6.28), r = Math.sqrt(Math.random()) * 1150, x = NEON_C.x + Math.cos(a) * r, z = NEON_C.z + Math.sin(a) * r;
+    if (nearSite(x, z, 180)) continue; const h0 = terrainH(x, z); if (h0 < 4) continue;
+    const w = rand(18, 46), d = rand(18, 46), h = rand(60, 320) * (r < 500 ? 1.3 : 1), lean = Math.random() < 0.3 ? rand(-0.14, 0.14) : 0;
+    q.setFromEuler(e.set(lean, rand(0, 3.14), lean * 0.5)); m.compose(p.set(x, h0 - 4, z), q, sc.set(w, h, d)); towers.setMatrixAt(k, m);
+    // 옥상·중간 네온 띠
+    for (const fy of [1, rand(0.35, 0.7)]) {
+      const top = new THREE.Vector3(0, h * fy, 0).applyQuaternion(q).add(p.set(x, h0 - 4, z));
+      m.compose(top, q, sc.set(w + 1.2, 1.4, d + 1.2)); neon.setMatrixAt(n, m);
+      col.setRGB(...(Math.random() < 0.5 ? [0.4, 3.8, 4.4] : [4.2, 0.6, 3.4])); neon.setColorAt(n++, col);
+    }
+    if (k % 7 === 0 && holoBoards.length < 12) {
+      const txt = pick(['에테르 관리국', 'NEO-ARC 7', 'SKY FLEET', '하늘 정거장', 'AETHER CO.', '경고 · 붕괴 구역', 'HOVER TAXI', '수정 에너지']);
+      const bt = canvasTex(512, 160, (c, W, H) => { c.clearRect(0, 0, W, H); c.strokeStyle = '#ff5ad2'; c.lineWidth = 6; c.strokeRect(6, 6, W - 12, H - 12); c.fillStyle = '#9ff'; c.font = 'bold 56px Pretendard, Orbitron, sans-serif'; c.textAlign = 'center'; c.fillText(txt, W / 2, 98); });
+      const bm = new THREE.Mesh(new THREE.PlaneGeometry(70, 22), new THREE.MeshBasicMaterial({ map: bt, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      bm.position.set(x, h0 + h + 30, z); bm.userData.spin = rand(0.15, 0.4) * (Math.random() < 0.5 ? -1 : 1); scene.add(bm); holoBoards.push(bm);
+    }
+    k++;
+  }
+  towers.count = k; neon.count = n; towers.castShadow = towers.receiveShadow = true; scene.add(towers, neon);
+  // 하늘 차선을 도는 호버카 무리
+  const cg = new THREE.BoxGeometry(4, 1.4, 8), cars = new THREE.InstancedMesh(cg, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), 60);
+  traffic = { mesh: cars, list: Array.from({ length: 60 }, (_, i) => ({ r: rand(250, 1000), y: rand(90, 320), sp: rand(0.05, 0.14) * (i % 2 ? 1 : -1), a: rand(0, 6.28), col: i % 3 === 0 ? [4, 0.8, 3] : i % 3 === 1 ? [0.5, 3.6, 4.2] : [4.2, 3, 1] })) };
+  traffic.list.forEach((c, i) => cars.setColorAt(i, col.setRGB(...c.col))); cars.frustumCulled = false; scene.add(cars);
+}
+/* ---------- 새 지역: 수정 평원 ---------- */
+function makeCrystalPlain() {
+  const geo = new THREE.OctahedronGeometry(1, 0); geo.scale(0.5, 1, 0.5);
+  for (const [c, e, n] of [[0x8a6cff, 0x6a3cff, 160], [0x5fe8ff, 0x22c8ff, 110]]) {
+    const mat = new THREE.MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: 0.9, roughness: 0.15, metalness: 0.4, flatShading: true }); crystalMats.push(mat); envMats.push(mat);
+    const im = new THREE.InstancedMesh(geo, mat, n); const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(); let k = 0;
+    for (let t = 0; t < 3000 && k < n; t++) {
+      const a = rand(0, 6.28), r = Math.sqrt(Math.random()) * 1250, x = CRYSTAL_C.x + Math.cos(a) * r, z = CRYSTAL_C.z + Math.sin(a) * r;
+      if (nearSite(x, z, 140)) continue; const h0 = terrainH(x, z); if (h0 < 4) continue;
+      const cl = 1 + Math.floor(Math.random() * 4);
+      for (let j = 0; j < cl && k < n; j++) { const hh = rand(8, 60) * (Math.random() < 0.08 ? 2.6 : 1); m.compose(p.set(x + rand(-14, 14), h0 + hh * 0.35, z + rand(-14, 14)), q.setFromEuler(eu.set(rand(-0.4, 0.4), rand(0, 6), rand(-0.4, 0.4))), s.set(hh * 0.45, hh, hh * 0.45)); im.setMatrixAt(k++, m); }
+    }
+    im.count = k; im.castShadow = true; scene.add(im);
+  }
+}
+const _tm = new THREE.Matrix4(), _tq = new THREE.Quaternion(), _tp = new THREE.Vector3(), _ts = new THREE.Vector3(1, 1, 1), _te = new THREE.Euler();
+function updateFuture(dt, t) {
+  if (towerMat) towerMat.emissiveIntensity = 0.5 + DAY.night * 2.4;
+  for (const m of crystalMats) m.emissiveIntensity = 0.7 + DAY.night * 2.2 + Math.sin(t * 1.5) * 0.15;
+  for (const b of holoBoards) b.rotation.y += dt * b.userData.spin;
+  if (traffic && camera.position.distanceTo(_tp.set(NEON_C.x, 200, NEON_C.z)) < 4000) {
+    traffic.list.forEach((c, i) => { c.a += c.sp * dt; const x = NEON_C.x + Math.cos(c.a) * c.r, z = NEON_C.z + Math.sin(c.a) * c.r; _tq.setFromEuler(_te.set(0, -c.a + (c.sp > 0 ? Math.PI : 0), 0)); _tm.compose(_tp.set(x, terrainH(x, z) + c.y, z), _tq, _ts); traffic.mesh.setMatrixAt(i, _tm); });
+    traffic.mesh.instanceMatrix.needsUpdate = true; traffic.mesh.visible = true;
+  } else if (traffic) traffic.mesh.visible = false;
+}
 
 /* ---------- 렌즈 플레어 (태양 반대편으로 이어지는 빛 알갱이) ---------- */
 const flareSprites = [];
@@ -470,7 +548,7 @@ export async function buildWorld(progress) {
   waterMat2.normalMap.needsUpdate = true; waterMat2.normalMap.repeat.set(70, 70);
   const water2 = new THREE.Mesh(new THREE.PlaneGeometry(INNER * 3.2, INNER * 3.2), waterMat2); water2.rotation.x = -HPI; water2.position.y = 2.6; scene.add(water2); envMats.push(waterMat2);
   pickWrecks(); makeIslands(); makeArches(); makeSpires(); makePalms(); await frameYield();
-  makeScatter(); makeFlare();
+  makeScatter(); makeFlare(); makeNeonRuins(); makeCrystalPlain();
   sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SOFT, color: new THREE.Color(3.6, 2.9, 1.9), blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false })); sunSprite.scale.setScalar(560); scene.add(sunSprite);
   progress('BUILDING PORTS', 0.6);
   PORT_PROTO = buildPortProto(); for (const p of ports) buildPort(p);
@@ -513,7 +591,7 @@ export function updateWorld(dt, focus) {
   for (const k in oreMats) oreMats[k].emissiveIntensity = ORES[k].glow * (1 + DAY.night * 1.5) + DAY.night * 0.3;
   for (const o of ores) if (!o.alive) { o.respawn -= dt; if (o.respawn <= 0) placeOre(o); }
   if (waterMat) { waterMat.normalMap.offset.x = t * 0.004; waterMat.normalMap.offset.y = t * 0.0025; }
-  updateFlare();
+  updateFlare(); updateFuture(dt, t);
   if (waterMat2) { waterMat2.normalMap.offset.x = -t * 0.003; waterMat2.normalMap.offset.y = t * 0.0035; }
   for (const p of ports) { if (p.sweep) { p.sweep.rotation.y = t * 0.8; p.sweep.visible = DAY.night > 0.15; p.sweep.children.forEach(c => c.material.opacity = 0.16 * DAY.night); } }
   // 공중에 떠다니는 먼지 (속도감·깊이감)

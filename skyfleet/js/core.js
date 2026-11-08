@@ -86,13 +86,13 @@ export function resize() {
   if (composer) composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
 }
-addEventListener('resize', resize); resize();
+addEventListener('resize', resize); if (window.visualViewport) visualViewport.addEventListener('resize', resize); resize();
 const _pScale = new THREE.Vector2();
 export const particleSystems = [];
 export function render(scene, cam, dt) {
   renderer.getDrawingBufferSize(_pScale);
   const sc = _pScale.y / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
-  for (const ps of particleSystems) ps.mat.uniforms.scale.value = sc;
+  const maxPx = Math.min(_pScale.y * 0.45, 420); for (const ps of particleSystems) { ps.mat.uniforms.scale.value = sc; ps.mat.uniforms.maxPx.value = maxPx; }
   if (composer) {
     if (gradePass) { const u = gradePass.uniforms; u.boost.value += (FXS.boost - u.boost.value) * Math.min(1, dt * 6); u.night.value = FXS.night; u.vig.value = FXS.vig; u.sat.value = FXS.sat; }
     if (rayPass) { const u = rayPass.uniforms; u.sun.value.set(FXS.sunX, FXS.sunY); u.intensity.value = FXS.rays; u.aspect.value = innerWidth / innerHeight; }
@@ -112,10 +112,14 @@ export const TEX_SMOKE = canvasTex(128, 128, x => {
 }, false);
 
 /* ---------- 파티클 (CPU 시뮬레이션 + 셰이더 포인트) ---------- */
-const P_VS = `attribute float size; attribute vec4 pcolor; varying vec4 vC; varying float vFog; uniform float scale; uniform float fogNear; uniform float fogFar;
-void main(){ vC=pcolor; vec4 mv=modelViewMatrix*vec4(position,1.); gl_PointSize=size*scale/-mv.z; gl_Position=projectionMatrix*mv; vFog=smoothstep(fogNear,fogFar,-mv.z); }`;
-const P_FS_ADD = `uniform sampler2D map; varying vec4 vC; varying float vFog; void main(){ vec4 t=texture2D(map,gl_PointCoord); gl_FragColor=vec4(vC.rgb, vC.a*t.a*(1.-vFog)); }`;
-const P_FS_NRM = `uniform sampler2D map; uniform vec3 fogColor; uniform float light; varying vec4 vC; varying float vFog; void main(){ vec4 t=texture2D(map,gl_PointCoord); gl_FragColor=vec4(mix(vC.rgb*light,fogColor,vFog), vC.a*t.a); }`;
+// 입자: 카메라 바로 앞/뒤의 입자는 그리지 않고 크기를 제한한다 (iOS에서 0 나누기로 생긴 거대한 검은 사각형 깜박임 방지)
+const P_VS = `attribute float size; attribute vec4 pcolor; varying vec4 vC; varying float vFog; uniform float scale; uniform float fogNear; uniform float fogFar; uniform float maxPx;
+void main(){ vC=pcolor; vec4 mv=modelViewMatrix*vec4(position,1.); float z=-mv.z;
+  if (z < 2.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vC.a = 0.0; vFog = 1.0; return; }
+  gl_PointSize = clamp(size*scale/z, 0.0, maxPx); vC.a *= smoothstep(2.0, 14.0, z) * smoothstep(maxPx*1.6, maxPx*0.8, size*scale/z);
+  gl_Position=projectionMatrix*mv; vFog=smoothstep(fogNear,fogFar,z); }`;
+const P_FS_ADD = `uniform sampler2D map; varying vec4 vC; varying float vFog; void main(){ if (vC.a <= 0.001) discard; vec4 t=texture2D(map,gl_PointCoord); gl_FragColor=vec4(max(vC.rgb,0.0), clamp(vC.a*t.a*(1.-vFog),0.0,1.0)); }`;
+const P_FS_NRM = `uniform sampler2D map; uniform vec3 fogColor; uniform float light; varying vec4 vC; varying float vFog; void main(){ if (vC.a <= 0.001) discard; vec4 t=texture2D(map,gl_PointCoord); float a=clamp(vC.a*t.a,0.0,1.0); if (a < 0.004) discard; gl_FragColor=vec4(max(mix(vC.rgb*light,fogColor,vFog),0.0), a); }`;
 export class Particles {
   constructor(scene, cap, tex, additive) {
     this.cap = cap; this.n = 0; this.d = new Float32Array(cap * 18); this.grav = new Float32Array(cap);
@@ -126,7 +130,7 @@ export class Particles {
     g.setAttribute('size', new THREE.BufferAttribute(this.sz, 1).setUsage(THREE.DynamicDrawUsage));
     g.setDrawRange(0, 0);
     this.mat = new THREE.ShaderMaterial({
-      uniforms: { map: { value: tex }, scale: { value: 500 }, fogNear: { value: 1500 }, fogFar: { value: 7800 }, fogColor: { value: new THREE.Color() }, light: { value: 1 } },
+      uniforms: { map: { value: tex }, maxPx: { value: 256 }, scale: { value: 500 }, fogNear: { value: 1500 }, fogFar: { value: 7800 }, fogColor: { value: new THREE.Color() }, light: { value: 1 } },
       vertexShader: P_VS, fragmentShader: additive ? P_FS_ADD : P_FS_NRM, transparent: true, depthWrite: false,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
