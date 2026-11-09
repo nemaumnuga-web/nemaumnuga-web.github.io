@@ -2,578 +2,106 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aura RNG · 아우라 뽑기</title>
-<style>
-  :root{
-    --bg:#07050f;
-    --panel:rgba(22,17,44,.72);
-    --line:rgba(255,255,255,.1);
-    --text:#f4f1ff;
-    --muted:#9d97b8;
-    --accent:#a78bfa;
-    --c1:#9aa4b2;
-    --c2:#4b5563;
-  }
-  *{box-sizing:border-box}
-  html{background:var(--bg)}
-  body{
-    margin:0;min-height:100vh;
-    font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
-    color:var(--text);
-    background:radial-gradient(ellipse at top,#1d1247 0,var(--bg) 60%) no-repeat;
-    background-color:var(--bg);
-    overflow-x:hidden;
-  }
-  .stars{
-    position:fixed;inset:0;z-index:-2;pointer-events:none;
-    background-image:
-      radial-gradient(1px 1px at 20px 30px,#fff9,transparent),
-      radial-gradient(1px 1px at 120px 80px,#fff7,transparent),
-      radial-gradient(2px 2px at 200px 150px,#c4b5fd99,transparent);
-    background-size:260px 220px;
-    animation:drift 140s linear infinite;
-    opacity:.8;
-  }
-  @keyframes drift{to{background-position:2600px 2200px}}
-
-  .wrap{
-    max-width:1000px;margin:0 auto;padding:24px 16px 48px;
-    display:grid;gap:24px;grid-template-columns:minmax(0,1fr);
-  }
-  @media (min-width:900px){ .wrap{grid-template-columns:1.05fr 1fr;align-items:start} }
-
-  header{grid-column:1/-1;text-align:center}
-  h1{
-    margin:0;font-size:clamp(28px,6vw,44px);letter-spacing:.12em;font-weight:900;
-    background:linear-gradient(90deg,#fde68a,#f0abfc,#67e8f9,#fde68a);
-    background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
-    animation:sheen 6s linear infinite;
-  }
-  @keyframes sheen{to{background-position:300% 0}}
-  .sub{margin:6px 0 0;color:var(--muted);font-size:14px}
-
-  .panel{
-    background:var(--panel);border:1px solid var(--line);border-radius:20px;
-    padding:20px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-    box-shadow:0 20px 60px rgba(0,0,0,.35);
-  }
-
-  /* ---------- roll stage ---------- */
-  .stage{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;position:relative}
-  .stage.shake{animation:shake .5s}
-  @keyframes shake{
-    10%,90%{transform:translateX(-2px)}
-    20%,80%{transform:translateX(4px)}
-    30%,50%,70%{transform:translateX(-6px)}
-    40%,60%{transform:translateX(6px)}
-  }
-
-  .orb-wrap{position:relative;isolation:isolate;width:min(62vw,290px);aspect-ratio:1/1;margin:12px 0 8px}
-  .orb-wrap::before{
-    content:"";position:absolute;inset:-18%;border-radius:50%;z-index:-1;
-    background:conic-gradient(from 0deg,transparent,var(--c1),transparent 40%,var(--c2),transparent 80%);
-    filter:blur(22px);opacity:.6;animation:spin 7s linear infinite;
-  }
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .orb{
-    position:absolute;inset:0;border-radius:50%;
-    background:
-      radial-gradient(circle at 34% 30%,#ffffffcc 0,transparent 16%),
-      radial-gradient(circle at 50% 50%,var(--c1) 0,var(--c2) 62%,#0a0716 100%);
-    box-shadow:
-      0 0 40px 6px color-mix(in srgb,var(--c1) 55%,transparent),
-      0 0 120px 24px color-mix(in srgb,var(--c2) 45%,transparent),
-      inset -18px -22px 40px rgba(0,0,0,.45);
-    transition:box-shadow .25s;
-    animation:bob 4s ease-in-out infinite;
-  }
-  @keyframes bob{50%{transform:translateY(-8px)}}
-  .orb.rolling{animation:wobble .16s ease-in-out infinite alternate}
-  @keyframes wobble{to{transform:rotate(3deg) scale(1.04)}}
-
-  .ring{
-    position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;
-    border-radius:50%;border:3px solid var(--c1);pointer-events:none;
-    animation:ring 1s ease-out forwards;
-  }
-  @keyframes ring{to{transform:scale(9);opacity:0}}
-
-  .rarity{
-    font-size:13px;font-weight:800;letter-spacing:.3em;text-transform:uppercase;
-    color:var(--c1);min-height:18px;
-  }
-  .aura-name{
-    font-size:clamp(24px,5vw,34px);font-weight:900;min-height:1.2em;
-    text-shadow:0 0 18px color-mix(in srgb,var(--c1) 70%,transparent);
-  }
-  .odds{color:var(--muted);font-size:14px;min-height:1.2em}
-  .badge{
-    display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800;
-    background:linear-gradient(90deg,#fde047,#f472b6);color:#2a0b2e;
-  }
-  .badge[hidden]{display:none}
-
-  button{
-    font:inherit;color:var(--text);cursor:pointer;
-    background:rgba(255,255,255,.07);border:1px solid var(--line);
-    border-radius:12px;padding:10px 14px;transition:transform .1s,background .2s,opacity .2s;
-  }
-  button:hover:not(:disabled){background:rgba(255,255,255,.14)}
-  button:active:not(:disabled){transform:scale(.97)}
-  button:disabled{opacity:.45;cursor:not-allowed}
-  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  button.on{background:rgba(167,139,250,.28);border-color:rgba(167,139,250,.6)}
-  button.ghost{color:var(--muted)}
-
-  .roll-btn{
-    margin-top:8px;padding:16px 40px;font-size:20px;font-weight:900;letter-spacing:.14em;
-    border:none;border-radius:16px;color:#16091f;
-    background:linear-gradient(135deg,#fde68a,#f0abfc 55%,#67e8f9);
-    box-shadow:0 10px 30px rgba(240,171,252,.35);
-  }
-  .roll-btn:hover:not(:disabled){background:linear-gradient(135deg,#fde68a,#f0abfc 55%,#67e8f9);filter:brightness(1.08)}
-  .roll-btn kbd{font-size:11px;font-weight:700;opacity:.7;margin-left:6px;letter-spacing:0}
-
-  .row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
-  .stats{
-    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;margin-top:10px;
-  }
-  .stat{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left}
-  .stat b{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:2px}
-  .stat span{font-size:17px;font-weight:800}
-
-  .history{
-    list-style:none;margin:10px 0 0;padding:0;width:100%;display:grid;gap:6px;
-  }
-  .history li{
-    display:flex;justify-content:space-between;align-items:center;gap:10px;
-    padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.04);
-    border-left:4px solid var(--c);font-size:14px;
-    animation:slidein .35s ease-out;
-  }
-  .history li i{font-style:normal;font-size:12px;color:var(--muted)}
-  @keyframes slidein{from{opacity:0;transform:translateY(-6px)}}
-
-  /* ---------- collection ---------- */
-  h2{margin:0 0 14px;font-size:18px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-  h2 small{font-size:13px;color:var(--muted);font-weight:600}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-  .aura-card{
-    position:relative;border-radius:16px;padding:14px;min-height:128px;
-    background:
-      radial-gradient(circle at 50% 0%,color-mix(in srgb,var(--c1) 35%,transparent),transparent 70%),
-      rgba(255,255,255,.04);
-    border:1px solid color-mix(in srgb,var(--c1) 40%,transparent);
-    display:flex;flex-direction:column;gap:4px;
-  }
-  .aura-card .r{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--c1)}
-  .aura-card .n{font-size:16px;font-weight:800}
-  .aura-card .o{font-size:12px;color:var(--muted)}
-  .aura-card .c{margin-top:auto;font-size:13px;font-weight:700}
-  .aura-card.locked{
-    background:rgba(255,255,255,.03);border-color:var(--line);
-  }
-  .aura-card.locked .r,.aura-card.locked .n{color:var(--muted)}
-  .aura-card.locked .n{filter:blur(4px);user-select:none}
-  .aura-card .dot{
-    position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;
-    background:radial-gradient(circle at 35% 30%,#fff,var(--c1) 35%,var(--c2) 100%);
-    box-shadow:0 0 14px var(--c1);
-  }
-  .aura-card.locked .dot{background:rgba(255,255,255,.08);box-shadow:none}
-
-  #flash{
-    position:fixed;inset:0;pointer-events:none;z-index:40;opacity:0;
-    background:radial-gradient(circle at 50% 45%,var(--c1),transparent 65%);
-  }
-  #flash.on{animation:flash .8s ease-out}
-  @keyframes flash{0%{opacity:.7}100%{opacity:0}}
-
-  #fx{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:50}
-
-  @media (prefers-reduced-motion: reduce){
-    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important}
-  }
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Aura RNG 3D</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="stars" aria-hidden="true"></div>
-<div id="flash" aria-hidden="true"></div>
-<canvas id="fx" aria-hidden="true"></canvas>
+<canvas id="view" aria-label="3D 아바타 미리보기. 드래그로 회전, 휠로 확대"></canvas>
 
-<main class="wrap">
-  <header>
-    <h1>✦ AURA RNG ✦</h1>
-    <p class="sub">HARD MODE · 최고 등급 확률 1 / 1조 · 확률은 실시간으로 계산됩니다</p>
+<div id="hud">
+  <header class="topbar">
+    <div class="brand">✦ AURA RNG <span>3D</span></div>
+    <div class="chips" id="chips"></div>
+    <div class="tools">
+      <button class="icon" id="camBtn" title="카메라 초기화 (R)">⟲</button>
+      <button class="icon" id="shotBtn" title="스크린샷 (P)">📷</button>
+      <button class="icon" id="hideBtn" title="UI 숨기기 (H)">👁</button>
+      <button class="icon" id="drawerBtn" title="도감 / 설정">☰</button>
+    </div>
   </header>
 
-  <section class="panel stage" id="stage">
-    <div class="orb-wrap">
-      <div class="orb" id="orb"></div>
+  <aside class="history-box">
+    <div class="box-title">최근 기록</div>
+    <ol id="history"></ol>
+  </aside>
+
+  <section class="rollbar">
+    <div class="result" id="result">
+      <div class="r-rarity" id="rRarity">준비 완료</div>
+      <div class="r-name" id="rName">굴려서 아우라를 얻으세요</div>
+      <div class="r-odds" id="rOdds">드래그로 회전 · 휠/핀치로 확대</div>
+      <div class="r-actions" id="rActions" hidden>
+        <span class="badge" id="rNew" hidden>NEW!</span>
+        <button id="equipBtn">장착</button>
+      </div>
     </div>
-    <div class="rarity" id="rarity">준비 완료</div>
-    <div class="aura-name" id="auraName">???</div>
-    <div class="odds" id="odds">&nbsp;</div>
-    <span class="badge" id="badge" hidden>NEW!</span>
-
-    <button class="roll-btn" id="rollBtn">굴리기 <kbd>Space</kbd></button>
-
+    <div class="preview-banner" id="previewBanner" hidden>
+      <span id="previewText"></span>
+      <button id="previewExit">되돌리기</button>
+    </div>
+    <button class="roll-btn" id="rollBtn"><span>ROLL</span><kbd>Space</kbd></button>
     <div class="row">
-      <button id="autoBtn">자동: 끔</button>
-      <button id="luckBtn">행운</button>
-      <button id="soundBtn">소리: 끔</button>
-      <button id="resetBtn" class="ghost">초기화</button>
+      <button id="autoBtn" title="A">자동</button>
+      <button id="quickBtn" title="Q">빠른 굴리기</button>
+      <button id="luckBtn"></button>
+    </div>
+  </section>
+
+  <aside class="drawer" id="drawer">
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="index" class="on">도감</button>
+      <button role="tab" data-tab="avatar">아바타</button>
+      <button role="tab" data-tab="settings">사운드 · 설정</button>
+    </nav>
+
+    <div class="tab-panel" data-panel="index">
+      <p class="hint">아무 아우라나 눌러 아바타에 <b>예시 장착</b>해 볼 수 있어요. 얻은 아우라는 장착 가능합니다.</p>
+      <div class="grid" id="grid"></div>
     </div>
 
-    <div class="stats" id="stats"></div>
+    <div class="tab-panel" data-panel="avatar" hidden>
+      <div class="field"><label for="cHead">피부 (머리·팔)</label><input type="color" id="cHead"></div>
+      <div class="field"><label for="cTorso">상의</label><input type="color" id="cTorso"></div>
+      <div class="field"><label for="cLegs">하의</label><input type="color" id="cLegs"></div>
+      <div class="box-title">프리셋</div>
+      <div class="presets" id="presets"></div>
+      <div class="box-title">동작</div>
+      <div class="presets">
+        <button data-pose="wave">손 흔들기</button>
+        <button data-pose="cheer">환호</button>
+        <button data-pose="dance">춤 (토글)</button>
+      </div>
+    </div>
 
-    <ol class="history" id="history" aria-label="최근 뽑기 기록"></ol>
-  </section>
+    <div class="tab-panel" data-panel="settings" hidden>
+      <div class="field"><label for="vMaster">전체 볼륨</label><input type="range" id="vMaster" min="0" max="1" step="0.01"></div>
+      <div class="field"><label for="vAmb">아우라 앰비언트</label><input type="range" id="vAmb" min="0" max="1" step="0.01"></div>
+      <div class="field"><label for="muteChk">음소거 (M)</label><input type="checkbox" id="muteChk"></div>
+      <div class="field"><label for="rotChk">자동 회전</label><input type="checkbox" id="rotChk"></div>
+      <div class="field"><label for="lowChk">저사양 모드 (블룸·그림자 끔)</label><input type="checkbox" id="lowChk"></div>
+      <div class="field"><label for="cutChk">희귀 등급 연출</label><input type="checkbox" id="cutChk"></div>
+      <div class="box-title">단축키</div>
+      <p class="hint">Space 굴리기 · A 자동 · Q 빠른 굴리기 · E 장착 · R 카메라 · P 스크린샷 · H UI 숨기기 · M 음소거</p>
+      <button class="danger" id="resetBtn">모든 기록 초기화</button>
+    </div>
+  </aside>
+</div>
 
-  <section class="panel">
-    <h2>도감 <small id="progress"></small></h2>
-    <div class="grid" id="inv"></div>
-  </section>
-</main>
+<div id="cutscene" hidden>
+  <div class="cs-rays"></div>
+  <div class="cs-text">
+    <div class="cs-rarity" id="csRarity"></div>
+    <div class="cs-name" id="csName"></div>
+    <div class="cs-odds" id="csOdds"></div>
+  </div>
+  <div class="cs-skip">클릭해서 건너뛰기</div>
+</div>
 
-<script>
-(() => {
-  // ---------- data ----------
-  // odds = "1 in N" base rarity. Lower probability = higher tier.
-  const AURAS = [
-    {name:'Breeze',         rarity:'Common',     odds:2,           c1:'#9aa4b2', c2:'#4b5563', fx:0},
-    {name:'Sprout',         rarity:'Uncommon',   odds:10,          c1:'#4ade80', c2:'#15803d', fx:0},
-    {name:'Ember',          rarity:'Rare',       odds:75,          c1:'#38bdf8', c2:'#1d4ed8', fx:0},
-    {name:'Nebula',         rarity:'Epic',       odds:600,         c1:'#c084fc', c2:'#6d28d9', fx:1},
-    {name:'Solar Flare',    rarity:'Legendary',  odds:7500,        c1:'#fde047', c2:'#b45309', fx:2},
-    {name:'Blood Moon',     rarity:'Mythic',     odds:100000,      c1:'#fb7185', c2:'#7f1d1d', fx:3},
-    {name:'Divine Halo',    rarity:'Divine',     odds:1500000,     c1:'#f0abfc', c2:'#a21caf', fx:3},
-    {name:'Celestial Rift', rarity:'Celestial',  odds:25000000,    c1:'#67e8f9', c2:'#0e7490', fx:4},
-    {name:'Eternal Dawn',   rarity:'Eternal',    odds:400000000,   c1:'#fef3c7', c2:'#d97706', fx:4},
-    {name:'Void Serpent',   rarity:'Void',       odds:5000000000,  c1:'#a78bfa', c2:'#1e1b4b', fx:5},
-    {name:'Cosmos',         rarity:'Cosmic',     odds:50000000000, c1:'#ffffff', c2:'#2563eb', fx:5},
-    {name:'Oblivion',       rarity:'Impossible', odds:1e12,        c1:'#ff2d55', c2:'#000000', fx:5},
-  ];
-  const LUCK_MAX = 12;
-  const KEY = 'aura-rng-hard-v2';
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="nogl" hidden>이 브라우저에서 WebGL을 사용할 수 없어 3D 화면을 표시할 수 없습니다. 굴리기와 도감은 계속 사용할 수 있어요.</div>
 
-  // ---------- state ----------
-  const defaultState = () => ({rolls:0, coins:0, luck:0, counts:{}, best:-1, playMs:0});
-  function load(){
-    try{
-      const s = JSON.parse(localStorage.getItem(KEY));
-      if(s && typeof s === 'object') return Object.assign(defaultState(), s);
-    }catch(e){}
-    return defaultState();
-  }
-  function save(){
-    try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
-  }
-  let state = load();
-
-  // ---------- odds ----------
-  // Luck boosts higher tiers only slightly: weight = (1/odds) * (1 + luck * 0.05 * tierIndex)
-  function weights(){
-    return AURAS.map((a,i) => (1/a.odds) * (1 + state.luck * 0.05 * i));
-  }
-  function pick(){
-    const w = weights();
-    const total = w.reduce((a,b) => a+b, 0);
-    let r = Math.random() * total;
-    for(let i=0;i<w.length;i++){
-      r -= w[i];
-      if(r < 0) return i;
-    }
-    return w.length - 1;
-  }
-  function oneIn(i){
-    const w = weights();
-    const total = w.reduce((a,b) => a+b, 0);
-    return Math.round(total / w[i]).toLocaleString('ko-KR');
-  }
-  const luckCost = () => Math.floor(250 * Math.pow(2.6, state.luck));
-
-  // ---------- DOM ----------
-  const $ = s => document.querySelector(s);
-  const orb = $('#orb'), orbWrap = $('.orb-wrap'), stage = $('#stage'), flash = $('#flash');
-  const rollBtn = $('#rollBtn'), autoBtn = $('#autoBtn'), luckBtn = $('#luckBtn');
-  const soundBtn = $('#soundBtn'), resetBtn = $('#resetBtn');
-  const el = (tag, cls, text) => {
-    const n = document.createElement(tag);
-    if(cls) n.className = cls;
-    if(text != null) n.textContent = text;
-    return n;
-  };
-
-  // ---------- rolling ----------
-  let rolling = false, auto = false, autoTimer = null;
-
-  function paint(a, preview){
-    orb.style.setProperty('--c1', a.c1);
-    orb.style.setProperty('--c2', a.c2);
-    orbWrap.style.setProperty('--c1', a.c1);
-    orbWrap.style.setProperty('--c2', a.c2);
-    stage.style.setProperty('--c1', a.c1);
-    flash.style.setProperty('--c1', a.c1);
-    $('#auraName').textContent = a.name;
-    $('#auraName').style.opacity = preview ? .6 : 1;
-    $('#rarity').textContent = a.rarity;
-    $('#rarity').style.setProperty('--c1', a.c1);
-  }
-
-  function roll(){
-    if(rolling) return;
-    rolling = true;
-    const idx = pick();                       // decide the result first (fair)
-    const dur = auto ? 900 : 1600;
-    const t0 = performance.now();
-    let last = 0;
-    orb.classList.add('rolling');
-    renderAll();
-
-    requestAnimationFrame(function frame(now){
-      const p = Math.min(1, (now - t0) / dur);
-      const step = 35 + p * 230;              // cycle slows down toward the reveal
-      if(now - last >= step || p >= 1){
-        last = now;
-        paint(AURAS[Math.floor(Math.random() * AURAS.length)], true);
-      }
-      if(p < 1) requestAnimationFrame(frame);
-      else finish(idx);
-    });
-  }
-
-  function finish(idx){
-    const a = AURAS[idx];
-    orb.classList.remove('rolling');
-    paint(a, false);
-
-    state.rolls++;
-    state.coins += idx + 1;
-    state.counts[a.name] = (state.counts[a.name] || 0) + 1;
-    if(idx > state.best) state.best = idx;
-    const isNew = state.counts[a.name] === 1;
-
-    $('#odds').textContent = `1 / ${oneIn(idx)} 확률`;
-    $('#badge').hidden = !isNew;
-
-    const li = el('li');
-    li.style.setProperty('--c', a.c1);
-    li.append(el('span', null, `${a.name}`), el('i', null, `${a.rarity} · 1/${oneIn(idx)}`));
-    const hist = $('#history');
-    hist.prepend(li);
-    while(hist.children.length > 8) hist.lastElementChild.remove();
-
-    celebrate(a, a.fx);
-    rolling = false;
-    save();
-    renderAll();
-
-    if(auto) autoTimer = setTimeout(() => { if(auto) roll(); }, 1000);
-  }
-
-  // ---------- effects ----------
-  const cv = $('#fx'), cx = cv.getContext('2d');
-  let parts = [];
-  function resizeCanvas(){
-    const d = window.devicePixelRatio || 1;
-    cv.width = innerWidth * d;
-    cv.height = innerHeight * d;
-    cx.setTransform(d, 0, 0, d, 0, 0);
-  }
-  addEventListener('resize', resizeCanvas);
-  resizeCanvas();
-
-  function burst(color, n, power){
-    const r = orbWrap.getBoundingClientRect();
-    const x = r.left + r.width / 2, y = r.top + r.height / 2;
-    for(let i = 0; i < n; i++){
-      const a = Math.random() * Math.PI * 2;
-      const s = (2 + Math.random() * 5) * power;
-      parts.push({x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s,
-        life: 1, dec: .010 + Math.random()*.02, r: 1.5 + Math.random()*3, c: color});
-    }
-  }
-  function loop(){
-    cx.clearRect(0, 0, innerWidth, innerHeight);
-    parts = parts.filter(p => p.life > 0);
-    for(const p of parts){
-      p.x += p.vx; p.y += p.vy; p.vy += .05; p.vx *= .985; p.life -= p.dec;
-      cx.globalAlpha = Math.max(0, p.life);
-      cx.fillStyle = p.c;
-      cx.beginPath();
-      cx.arc(p.x, p.y, p.r * p.life + .5, 0, Math.PI * 2);
-      cx.fill();
-    }
-    cx.globalAlpha = 1;
-    requestAnimationFrame(loop);
-  }
-  loop();
-
-  function ring(color){
-    const r = el('div', 'ring');
-    r.style.setProperty('--c1', color);
-    orbWrap.appendChild(r);
-    r.addEventListener('animationend', () => r.remove());
-  }
-
-  function celebrate(a, fx){
-    if(fx >= 1) burst(a.c1, 24 + fx * 16, 1 + fx * .25);
-    if(fx >= 2){
-      stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
-      flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
-    }
-    if(fx >= 3) ring(a.c1);
-    if(fx >= 4){
-      setTimeout(() => ring(a.c2), 180);
-      burst('#ffffff', 40, 1.6);
-    }
-    if(fx >= 5){
-      setTimeout(() => burst(a.c1, 60, 2.2), 260);
-    }
-    beep(fx);
-  }
-
-  // ---------- sound (synthesized, optional) ----------
-  let audio = null, soundOn = false;
-  function beep(fx){
-    if(!soundOn) return;
-    try{
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      const now = audio.currentTime;
-      const notes = fx >= 4 ? [523, 659, 784, 1046] : fx >= 2 ? [523, 784] : fx >= 1 ? [659] : [440];
-      notes.forEach((f, i) => {
-        const t = now + i * .09;
-        const o = audio.createOscillator(), g = audio.createGain();
-        o.type = 'triangle'; o.frequency.value = f;
-        g.gain.setValueAtTime(.0001, t);
-        g.gain.exponentialRampToValueAtTime(.16, t + .02);
-        g.gain.exponentialRampToValueAtTime(.0001, t + .5);
-        o.connect(g).connect(audio.destination);
-        o.start(t); o.stop(t + .55);
-      });
-    }catch(e){}
-  }
-
-  // ---------- render ----------
-  function renderStats(){
-    const bestName = state.best >= 0 ? AURAS[state.best].rarity : '-';
-    const mins = Math.floor(state.playMs / 60000), secs = Math.floor(state.playMs / 1000) % 60;
-    const items = [
-      ['총 굴리기', state.rolls.toLocaleString('ko-KR') + '회'],
-      ['코인', state.coins.toLocaleString('ko-KR') + ' 🪙'],
-      ['최고 등급', bestName],
-      ['플레이 시간', `${mins}분 ${String(secs).padStart(2,'0')}초`],
-    ];
-    const box = $('#stats');
-    box.innerHTML = '';
-    for(const [k, v] of items){
-      const d = el('div', 'stat');
-      d.append(el('b', null, k), el('span', null, v));
-      box.append(d);
-    }
-  }
-
-  function renderInv(){
-    const grid = $('#inv');
-    grid.innerHTML = '';
-    AURAS.forEach((a, i) => {
-      const n = state.counts[a.name] || 0;
-      const c = el('div', 'aura-card' + (n ? '' : ' locked'));
-      c.style.setProperty('--c1', a.c1);
-      c.style.setProperty('--c2', a.c2);
-      c.append(
-        el('span', 'dot'),
-        el('div', 'r', a.rarity),
-        el('div', 'n', n ? a.name : '???'),
-        el('div', 'o', `1 / ${oneIn(i)}`),
-        el('div', 'c', n ? `×${n}` : '미발견')
-      );
-      grid.append(c);
-    });
-    const found = Object.keys(state.counts).length;
-    $('#progress').textContent = `${found} / ${AURAS.length} 발견`;
-  }
-
-  function renderBtns(){
-    rollBtn.disabled = rolling;
-    autoBtn.textContent = auto ? '자동: 켬' : '자동: 끔';
-    autoBtn.classList.toggle('on', auto);
-    soundBtn.textContent = soundOn ? '소리: 켬' : '소리: 끔';
-    soundBtn.classList.toggle('on', soundOn);
-    const cost = luckCost();
-    if(state.luck >= LUCK_MAX){
-      luckBtn.textContent = '행운 MAX';
-      luckBtn.disabled = true;
-    }else{
-      luckBtn.textContent = `행운 Lv.${state.luck} → ${cost.toLocaleString('ko-KR')}🪙`;
-      luckBtn.disabled = rolling || state.coins < cost;
-    }
-  }
-
-  function renderAll(){
-    renderStats();
-    renderInv();
-    renderBtns();
-  }
-
-  // ---------- controls ----------
-  rollBtn.addEventListener('click', roll);
-
-  autoBtn.addEventListener('click', () => {
-    auto = !auto;
-    if(!auto){ clearTimeout(autoTimer); }
-    else if(!rolling){ roll(); }
-    renderBtns();
-  });
-
-  luckBtn.addEventListener('click', () => {
-    const cost = luckCost();
-    if(state.luck >= LUCK_MAX || state.coins < cost || rolling) return;
-    state.coins -= cost;
-    state.luck++;
-    save();
-    renderAll();
-  });
-
-  soundBtn.addEventListener('click', () => {
-    soundOn = !soundOn;
-    if(soundOn) beep(0);
-    renderBtns();
-  });
-
-  resetBtn.addEventListener('click', () => {
-    if(!confirm('모든 기록(도감, 코인, 행운)을 초기화할까요?')) return;
-    auto = false; clearTimeout(autoTimer);
-    state = defaultState();
-    save();
-    $('#history').innerHTML = '';
-    $('#badge').hidden = true;
-    $('#odds').innerHTML = '&nbsp;';
-    $('#auraName').textContent = '???';
-    $('#rarity').textContent = '준비 완료';
-    renderAll();
-  });
-
-  addEventListener('keydown', e => {
-    if((e.code === 'Space' || e.code === 'Enter') && e.target === document.body){
-      e.preventDefault();
-      roll();
-    }
-  });
-
-  // play time
-  setInterval(() => {
-    if(document.hidden) return;
-    state.playMs += 1000;
-    renderStats();
-    if(state.playMs % 10000 < 1000) save();
-  }, 1000);
-
-  // initial paint
-  renderAll();
-})();
-</script>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
