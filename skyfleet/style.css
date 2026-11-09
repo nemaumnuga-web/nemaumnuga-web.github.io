@@ -470,3 +470,39 @@ body.touch #brTouch{display:block}body.touch #brKeys{display:none}
   #cr{right:var(--sr)}
   body[data-mode=hangar] #solBtn{left:auto;right:calc(var(--sr) + 140px);top:var(--st)}
 }
+
+/* ==========================================================
+   위젯 위치 규칙 (한 곳에서 관리)
+   · 상단 띠: 배너 · 이벤트 · 토스트 (가운데 위)
+   · 왼쪽: 솔라레 말풍선 (왼쪽 중앙 근처)
+   · 오른쪽: 레이더 · 패널 · 카드
+   · 아래 가운데: 힌트 · 브리지 안내
+   ========================================================== */
+:root{--w-top:14px;--w-side:16px;--w-bot:16px}
+#banner{top:calc(var(--w-top) + 60px);z-index:20}
+#evbar{top:var(--w-top);z-index:20}
+#toast{top:calc(var(--w-top) + 118px);z-index:50}
+#solare{left:var(--w-side);top:auto;bottom:calc(var(--w-bot) + 170px);transform:none;max-width:min(420px,60vw)}
+#solare.on{transform:none}
+#hint{bottom:calc(var(--w-bot) + 80px);top:auto;z-index:15}
+#mwarn{top:calc(var(--w-top) + 56px);z-index:21}
+#radarBox{right:var(--w-side);top:calc(var(--w-top) + 84px)}
+#feed{right:calc(var(--w-side) + 240px);top:var(--w-top);max-width:280px}
+#basePanel,#strategyPanel,#crewCard,#ppanel{z-index:44}
+#crewCard{right:var(--w-side);bottom:var(--w-bot)}
+#strategyPanel{right:var(--w-side);top:var(--w-top)}
+@media (max-width:900px){#feed{display:none}#banner{width:70vw}}
+@media (max-height:520px) and (pointer:coarse){
+  :root{--w-top:6px;--w-side:10px;--w-bot:8px}
+  #banner{top:calc(var(--w-top) + 42px);width:50vw}
+  #toast{top:calc(var(--w-top) + 84px)}
+  #solare{bottom:calc(var(--w-bot) + 120px);left:var(--w-side)}
+  #hint{bottom:calc(var(--w-bot) + 70px)}
+}
+/* 항구 메뉴: 아무 화면에서도 '항구를 떠나기'가 보이도록 고정 */
+@media (max-height:520px) and (pointer:coarse){
+  .pbar{overflow:visible}
+  .ptabs{flex-wrap:nowrap}
+  .ptabs button{font-size:10px;padding:6px 2px;min-width:0}
+  .ptabs .leave{flex:1.6;min-width:72px}
+}
