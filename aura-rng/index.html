@@ -205,7 +205,7 @@
 <main class="wrap">
   <header>
     <h1>✦ AURA RNG ✦</h1>
-    <p class="sub">아우라를 뽑고 도감을 채워 보세요 · 확률은 실시간으로 계산됩니다</p>
+    <p class="sub">HARD MODE · 최고 등급 확률 1 / 1조 · 확률은 실시간으로 계산됩니다</p>
   </header>
 
   <section class="panel stage" id="stage">
@@ -242,20 +242,21 @@
   // ---------- data ----------
   // odds = "1 in N" base rarity. Lower probability = higher tier.
   const AURAS = [
-    {name:'Breeze',         rarity:'Common',     odds:2,       c1:'#9aa4b2', c2:'#4b5563', fx:0},
-    {name:'Sprout',         rarity:'Uncommon',   odds:5,       c1:'#4ade80', c2:'#15803d', fx:0},
-    {name:'Ember',          rarity:'Rare',       odds:15,      c1:'#38bdf8', c2:'#1d4ed8', fx:0},
-    {name:'Nebula',         rarity:'Epic',       odds:60,      c1:'#c084fc', c2:'#6d28d9', fx:1},
-    {name:'Solar Flare',    rarity:'Legendary',  odds:250,     c1:'#fde047', c2:'#b45309', fx:2},
-    {name:'Blood Moon',     rarity:'Mythic',     odds:1000,    c1:'#fb7185', c2:'#7f1d1d', fx:3},
-    {name:'Divine Halo',    rarity:'Divine',     odds:5000,    c1:'#f0abfc', c2:'#a21caf', fx:3},
-    {name:'Celestial Rift', rarity:'Celestial',  odds:25000,   c1:'#67e8f9', c2:'#0e7490', fx:4},
-    {name:'Eternal Dawn',   rarity:'Eternal',    odds:100000,  c1:'#fef3c7', c2:'#d97706', fx:4},
-    {name:'Void Serpent',   rarity:'Void',       odds:500000,  c1:'#a78bfa', c2:'#1e1b4b', fx:5},
-    {name:'Cosmos',         rarity:'Cosmic',     odds:2000000, c1:'#ffffff', c2:'#2563eb', fx:5},
+    {name:'Breeze',         rarity:'Common',     odds:2,           c1:'#9aa4b2', c2:'#4b5563', fx:0},
+    {name:'Sprout',         rarity:'Uncommon',   odds:10,          c1:'#4ade80', c2:'#15803d', fx:0},
+    {name:'Ember',          rarity:'Rare',       odds:75,          c1:'#38bdf8', c2:'#1d4ed8', fx:0},
+    {name:'Nebula',         rarity:'Epic',       odds:600,         c1:'#c084fc', c2:'#6d28d9', fx:1},
+    {name:'Solar Flare',    rarity:'Legendary',  odds:7500,        c1:'#fde047', c2:'#b45309', fx:2},
+    {name:'Blood Moon',     rarity:'Mythic',     odds:100000,      c1:'#fb7185', c2:'#7f1d1d', fx:3},
+    {name:'Divine Halo',    rarity:'Divine',     odds:1500000,     c1:'#f0abfc', c2:'#a21caf', fx:3},
+    {name:'Celestial Rift', rarity:'Celestial',  odds:25000000,    c1:'#67e8f9', c2:'#0e7490', fx:4},
+    {name:'Eternal Dawn',   rarity:'Eternal',    odds:400000000,   c1:'#fef3c7', c2:'#d97706', fx:4},
+    {name:'Void Serpent',   rarity:'Void',       odds:5000000000,  c1:'#a78bfa', c2:'#1e1b4b', fx:5},
+    {name:'Cosmos',         rarity:'Cosmic',     odds:50000000000, c1:'#ffffff', c2:'#2563eb', fx:5},
+    {name:'Oblivion',       rarity:'Impossible', odds:1e12,        c1:'#ff2d55', c2:'#000000', fx:5},
   ];
-  const LUCK_MAX = 20;
-  const KEY = 'aura-rng-v1';
+  const LUCK_MAX = 12;
+  const KEY = 'aura-rng-hard-v2';
 
   // ---------- state ----------
   const defaultState = () => ({rolls:0, coins:0, luck:0, counts:{}, best:-1, playMs:0});
@@ -272,9 +273,9 @@
   let state = load();
 
   // ---------- odds ----------
-  // Luck boosts higher tiers: weight = (1/odds) * (1 + luck * 0.25 * tierIndex)
+  // Luck boosts higher tiers only slightly: weight = (1/odds) * (1 + luck * 0.05 * tierIndex)
   function weights(){
-    return AURAS.map((a,i) => (1/a.odds) * (1 + state.luck * 0.25 * i));
+    return AURAS.map((a,i) => (1/a.odds) * (1 + state.luck * 0.05 * i));
   }
   function pick(){
     const w = weights();
@@ -291,7 +292,7 @@
     const total = w.reduce((a,b) => a+b, 0);
     return Math.round(total / w[i]).toLocaleString('ko-KR');
   }
-  const luckCost = () => Math.floor(40 * Math.pow(1.8, state.luck));
+  const luckCost = () => Math.floor(250 * Math.pow(2.6, state.luck));
 
   // ---------- DOM ----------
   const $ = s => document.querySelector(s);
@@ -325,7 +326,7 @@
     if(rolling) return;
     rolling = true;
     const idx = pick();                       // decide the result first (fair)
-    const dur = auto ? 380 : 1400;
+    const dur = auto ? 900 : 1600;
     const t0 = performance.now();
     let last = 0;
     orb.classList.add('rolling');
@@ -369,7 +370,7 @@
     save();
     renderAll();
 
-    if(auto) autoTimer = setTimeout(() => { if(auto) roll(); }, 450);
+    if(auto) autoTimer = setTimeout(() => { if(auto) roll(); }, 1000);
   }
 
   // ---------- effects ----------
