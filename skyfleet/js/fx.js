@@ -44,7 +44,7 @@ export function fireTurrets(s, point, spread = 0.012) {
         if (bullets.length >= MAXB) break;
         const dir = tmp2.copy(point).sub(p0).normalize(); dir.x += rand(-sp, sp); dir.y += rand(-sp, sp); dir.z += rand(-sp, sp); dir.normalize();
         const v = dir.clone().multiplyScalar(W.speed * (s.bulletSpd || 1)).add(s.vel);
-        bullets.push({ pos: p0.clone(), vel: v, q: new THREE.Quaternion().setFromUnitVectors(Z_NEG, dir.clone()), life: W.life, owner: s, dmg: s.gunDmg * W.dmg * (s.form === 'tank' ? 1.35 : 1) * (el ? 1.15 : 1), elem: el, w: s.weapon || 'cannon' });
+        bullets.push({ pos: p0.clone(), vel: v, q: new THREE.Quaternion().setFromUnitVectors(Z_NEG, dir.clone()), life: W.life, owner: s, dmg: s.gunDmg * W.dmg * (s.form === 'tank' ? 1.35 : 1) * (s.isPlayer && s.styleMul ? s.styleMul.dmg : 1) * (el ? 1.15 : 1), elem: el, w: s.weapon || 'cannon' });
       }
       if (camera.position.distanceToSquared(p0) < 1.2e6) FIRE.emit(p0.x, p0.y, p0.z, s.vel.x, s.vel.y, s.vel.z, 0.06, (W.barrels === 1 ? 9 : 4) * s.scale, 1.5, W.barrels === 1 ? [3, 5, 6] : s.faction === 'pirate' ? COL.red : COL.cyan, COL.fireMid, 1);
     }

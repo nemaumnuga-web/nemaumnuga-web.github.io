@@ -172,6 +172,71 @@ function buildTank(ship) {
 }
 export function morphFxPos(s) { return s.pos; }
 
+/* ---------- 외형(스타일): 같은 함선 등급을 다른 모양으로 ---------- */
+export const STYLES = {
+  ship:    { nm: '전투 비행선', ic: '🛳️', ds: '균형 잡힌 기본형. 포탑 갑판과 쌍발 엔진', mul: { speed: 1, turn: 1, dmg: 1 } },
+  fighter: { nm: '우주 전투기', ic: '🚀', ds: '날렵한 화살촉 동체와 후퇴익. 가장 빠르고 민첩', mul: { speed: 1.2, turn: 1.18, dmg: 0.95 } },
+  saucer:  { nm: '원반 비행체', ic: '🛸', ds: '빛나는 원반과 유리 돔. 제자리 선회가 매우 빠름', mul: { speed: 1.02, turn: 1.45, dmg: 1 } },
+  stealth: { nm: '스텔스 전익기', ic: '🔺', ds: '평평한 삼각 전익. 빠르고 날카로운 공격', mul: { speed: 1.12, turn: 1.05, dmg: 1.1 } },
+  cruiser: { nm: '우주 순양함', ic: '🛰️', ds: '쐐기형 거대 선체와 함교 탑. 화력 최강', mul: { speed: 0.92, turn: 0.9, dmg: 1.25 } },
+  ring:    { nm: '에테르 링선', ic: '💠', ds: '빛나는 코어 주위를 고리가 도는 신비한 함선', mul: { speed: 1.06, turn: 1.2, dmg: 1.12 } },
+};
+export const STYLE_KEYS = Object.keys(STYLES);
+function buildStyle(key, G, paint, faction) {
+  const mats = shipMats(paint, faction), g = new THREE.Group(), L = G.L, W = Math.max(G.W, 0.9), ws = G.m.wing;
+  const neon = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 3.6, 4.2), toneMapped: false });
+  const mk = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = true; g.add(m); return m; };
+  if (key === 'fighter') {
+    const nose = new THREE.ConeGeometry(3.4 * W, L * 0.62, 6); nose.rotateX(-HPI); mk(nose, mats.hull, 0, 0.4, -L * 0.22, 0, 0, Math.PI / 6);
+    mk(new THREE.CylinderGeometry(3.4 * W, 3.0 * W, L * 0.42, 6), mats.armor, 0, 0.4, L * 0.3, HPI, 0, Math.PI / 6);
+    const cano = new THREE.SphereGeometry(1.8, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2); cano.scale(1, 0.7, 2.6); mk(cano, mats.glass, 0, 2.4, -L * 0.08);
+    for (const sd of [-1, 1]) {
+      const wing = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, -L * 0.15), new THREE.Vector3(sd * ws * 0.62, 0, L * 0.32), new THREE.Vector3(0, 0, L * 0.36)]);
+      wing.setIndex([0, 1, 2, 2, 1, 0]); wing.computeVertexNormals(); mk(wing, mats.hull, sd * 2.6, 0, 0);
+      mk(new THREE.BoxGeometry(ws * 0.5, 0.18, 0.4), neon, sd * ws * 0.3, 0.2, L * 0.33);
+      mk(new THREE.BoxGeometry(0.3, 5, 5), mats.team, sd * 3, 3.2, L * 0.4, 0, 0, sd * 0.35);
+    }
+    for (const x of [-2.4, 0, 2.4]) { mk(new THREE.CylinderGeometry(1.2, 1.4, 3, 12), mats.dark, x, 0.4, L * 0.52, HPI); mk(new THREE.CylinderGeometry(1, 1, 0.2, 12), mats.glow, x, 0.4, L * 0.54, HPI); }
+  } else if (key === 'saucer') {
+    const R = Math.max(ws * 0.5, L * 0.45);
+    const disc = new THREE.SphereGeometry(R, 40, 14); disc.scale(1, 0.18, 1); mk(disc, mats.hull, 0, 0, 0);
+    mk(new THREE.TorusGeometry(R * 0.98, 0.7, 8, 64), mats.armor, 0, 0, 0, HPI);
+    const dome = new THREE.SphereGeometry(R * 0.32, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2); mk(dome, mats.glass, 0, R * 0.12, 0);
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; mk(new THREE.SphereGeometry(0.7, 8, 6), i % 2 ? neon : mats.glow, Math.cos(a) * R * 0.86, -0.4, Math.sin(a) * R * 0.86); }
+    mk(new THREE.CylinderGeometry(R * 0.35, R * 0.45, 2, 32), mats.dark, 0, -R * 0.14, 0); mk(new THREE.CylinderGeometry(R * 0.3, R * 0.3, 0.2, 32), neon, 0, -R * 0.2, 0);
+  } else if (key === 'stealth') {
+    const tri = new THREE.Shape([new THREE.Vector2(0, -L * 0.6), new THREE.Vector2(ws * 0.62, L * 0.4), new THREE.Vector2(ws * 0.2, L * 0.3), new THREE.Vector2(0, L * 0.44), new THREE.Vector2(-ws * 0.2, L * 0.3), new THREE.Vector2(-ws * 0.62, L * 0.4)]);
+    const geo = new THREE.ExtrudeGeometry(tri, { depth: 2.2, bevelEnabled: true, bevelSize: 0.5, bevelThickness: 0.6, bevelSegments: 1 }); geo.rotateX(HPI); geo.translate(0, 1.2, 0);
+    mk(geo, mats.dark, 0, 0, 0);
+    mk(new THREE.BoxGeometry(4, 1.4, L * 0.5), mats.armor, 0, 1.6, -L * 0.05); mk(new THREE.BoxGeometry(3, 0.5, 4), mats.glass, 0, 2.4, -L * 0.2);
+    for (const sd of [-1, 1]) { mk(new THREE.BoxGeometry(ws * 0.55, 0.12, 0.3), neon, sd * ws * 0.3, 1.25, L * 0.36, 0, sd * -0.25); mk(new THREE.BoxGeometry(5, 0.6, 1.2), mats.glow, sd * 4, 0.8, L * 0.4); }
+  } else if (key === 'cruiser') {
+    const w = new THREE.Shape([new THREE.Vector2(0, -L * 0.75), new THREE.Vector2(7 * W, L * 0.45), new THREE.Vector2(-7 * W, L * 0.45)]);
+    const geo = new THREE.ExtrudeGeometry(w, { depth: 5, bevelEnabled: true, bevelSize: 0.6, bevelThickness: 0.6, bevelSegments: 1 }); geo.rotateX(HPI); geo.translate(0, 2.5, 0);
+    mk(geo, mats.hull, 0, 0, 0);
+    mk(new THREE.BoxGeometry(5, 0.4, L * 0.9), mats.team, 0, 3.2, 0); mk(new THREE.BoxGeometry(6, 5, 7), mats.armor, 0, 5.5, L * 0.28); mk(new THREE.BoxGeometry(8, 1.2, 2.4), mats.armor, 0, 8.6, L * 0.28); mk(new THREE.BoxGeometry(6, 0.5, 0.2), mats.glass, 0, 6.8, L * 0.28 - 3.6);
+    for (const x of [-4.5, -1.5, 1.5, 4.5]) { mk(new THREE.CylinderGeometry(1.5, 1.7, 3, 12), mats.dark, x * W, -0.2, L * 0.47, HPI); mk(new THREE.CylinderGeometry(1.3, 1.3, 0.2, 12), mats.glow, x * W, -0.2, L * 0.49, HPI); }
+    for (const sd of [-1, 1]) mk(new THREE.BoxGeometry(0.2, 0.3, L * 0.8), neon, sd * 5.5 * W, 0.4, 0, 0, sd * 0.1);
+  } else if (key === 'ring') {
+    const R = Math.max(ws * 0.42, L * 0.4);
+    mk(new THREE.IcosahedronGeometry(R * 0.32, 1), mats.armor, 0, 0, 0);
+    const core = mk(new THREE.SphereGeometry(R * 0.22, 20, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 3.4, 4.2), toneMapped: false }), 0, 0, 0);
+    const r1 = mk(new THREE.TorusGeometry(R * 0.8, 1, 8, 48), mats.hull, 0, 0, 0, HPI), r2 = mk(new THREE.TorusGeometry(R * 0.62, 0.5, 8, 48), neon, 0, 0, 0, 0.4, 0, 0.6);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; mk(new THREE.BoxGeometry(1.6, 1.6, 4), mats.dark, Math.cos(a) * R * 0.8, 0, Math.sin(a) * R * 0.8, 0, -a); }
+    mk(new THREE.CylinderGeometry(1.4, 2, 4, 12), mats.dark, 0, 0, R * 0.42, HPI); mk(new THREE.CylinderGeometry(1.3, 1.3, 0.2, 12), mats.glow, 0, 0, R * 0.55, HPI);
+    g.userData.spin = [r1, r2]; void core;
+  }
+  return g;
+}
+export function applyLook(model, shipParts, looks, key) { shipParts.forEach(c => c.visible = key === 'ship'); for (const k in looks) looks[k].visible = k === key; }
+/* 격납고 미리보기용: 모델에 외형을 입힌다 */
+export function styleModel(m, cls, paint, key) {
+  if (!key || key === 'ship') return;
+  const parts = m.model.children.filter(c => c.userData.shipPart), lk = buildStyle(key, GEOMS[cls], paint, 'player');
+  m.model.add(lk); parts.forEach(c => c.visible = false); m.look = lk;
+}
+
+
 /* ---------- 방어막 셰이더 ---------- */
 const SH_GEO = new THREE.SphereGeometry(1, 48, 24);
 const SH_VS = `varying vec3 vP; varying vec3 vN; varying vec3 vV;
@@ -195,7 +260,7 @@ const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _l = new THREE.Vector3
 export class Ship {
   constructor({ name, faction, tier = 0, paint = 'sand', lv = {}, pvp = false, isPlayer = false, weapon = 'cannon', scaleMul = 1, hpMul = 1, mods = [], elems = [] }) {
     Object.assign(this, { name, faction, tier, paint, lv, pvp, isPlayer, weapon, scaleMul, hpMul, mods, elems });
-    this.form = 'ship'; this.formAnim = 0; this.formShown = 'ship'; this.elemIdx = 0; this.morphCd = 0;
+    this.form = 'ship'; this.look = 'ship'; this.formAnim = 0; this.formShown = 'ship'; this.elemIdx = 0; this.morphCd = 0;
     this.energy = 100; this.boosting = false; this.flareCd = 0;
     this.vel = new THREE.Vector3(); this.yaw = 0; this.yawVel = 0; this.bank = 0; this.pitchV = 0;
     this.cargo = {}; this.cargoKg = 0; this.alive = false; this.respawn = 0; this.kills = 0;
@@ -216,7 +281,12 @@ export class Ship {
     const G = this.G; this.shMesh.scale.set(G.m.wing / 2 + 2.5, 7.5 + G.m.bridge, G.L / 2 + 4.5); this.shMesh.position.set(0, 1.5, 0.5);
     this.shMesh.visible = false; this.shMesh.renderOrder = 4; this.model.add(this.shMesh);
     this.baseScale = this.model.scale.x; this.shipParts = this.model.children.filter(c => c.userData.shipPart);
-    if (this.isPlayer) { this.tank = buildTank(this); this.tank.visible = false; this.model.add(this.tank); if (this.form === 'tank') { this.shipParts.forEach(c => c.visible = false); this.tank.visible = true; } }
+    if (this.isPlayer) {
+      this.tank = buildTank(this); this.tank.visible = false; this.model.add(this.tank);
+      this.looks = { tank: this.tank };
+      for (const k of STYLE_KEYS) if (k !== 'ship' && (SAVE.founder || k === this.look)) { const g = buildStyle(k, this.G, this.paint, this.faction); g.visible = false; this.model.add(g); this.looks[k] = g; }
+      this.formShown = this.form === 'tank' ? 'tank' : this.look; applyLook(this.model, this.shipParts, this.looks, this.formShown);
+    }
     if (this.isPlayer) {
       // 전조등: 밤에 앞쪽 지형을 비춘다
       this.headlight = new THREE.SpotLight(0xfff1d6, 0, 460, 0.5, 0.75, 1.3); this.headlight.position.set(0, 1.5, this.G.f + 2); this.headlight.target.position.set(0, -34, this.G.f - 120);
@@ -251,10 +321,18 @@ export class Ship {
   }
   get scale() { return TIERS[this.tier].scale * (this.scaleMul || 1); }
   get canMorph() { return this.isPlayer && !!this.tank && (SAVE.founder || (this.fx && this.fx.morph)); }
+  get forms() { return SAVE.founder ? [...STYLE_KEYS, 'tank'] : [...new Set([this.baseLook || 'ship', 'tank'])]; }
+  get shownKey() { return this.form === 'tank' ? 'tank' : this.look; }
   setForm(f) {
-    if (!this.canMorph || this.form === f || this.morphCd > 0) return false;
-    this.form = f; this.formAnim = 1; this.morphCd = 2.5; this.events.push('morph'); return true;
+    if (!this.canMorph || this.morphCd > 0) return false;
+    if (f === 'base') f = this.baseLook || 'ship';
+    if (f !== 'tank' && !this.looks[f] && f !== 'ship') return false;
+    if (f === this.shownKey) return false;
+    if (f === 'tank') this.form = 'tank'; else { this.form = 'ship'; this.look = f; }
+    this.formAnim = 1; this.morphCd = 1.6; this.events.push('morph'); return true;
   }
+  nextForm() { const L = this.forms, i = L.indexOf(this.shownKey); return this.setForm(L[(i + 1) % L.length]); }
+  get styleMul() { return (STYLES[this.form === 'tank' ? 'ship' : this.look] || STYLES.ship).mul; }
   updateForm(dt) {
     if (this.morphCd > 0) this.morphCd -= dt;
     if (!this.tank) return;
@@ -262,7 +340,7 @@ export class Ship {
       this.formAnim = Math.max(0, this.formAnim - dt * 1.3);
       const k = 1 - this.formAnim, dip = Math.sin(Math.PI * k), b = this.baseScale;
       this.model.scale.set(b * (1 + 0.14 * dip), b * (1 - 0.34 * dip), b * (1 + 0.14 * dip));
-      if (k > 0.5 && this.formShown !== this.form) { this.formShown = this.form; const t = this.form === 'tank'; this.shipParts.forEach(c => c.visible = !t); this.tank.visible = t; }
+      if (k > 0.5 && this.formShown !== this.shownKey) { this.formShown = this.shownKey; applyLook(this.model, this.shipParts, this.looks, this.formShown); }
       if (this.formAnim === 0) this.model.scale.setScalar(b);
     }
   }
@@ -315,6 +393,8 @@ export class Ship {
     if (boost) { vmax *= 1.6; acc *= 2.2; this.energy = Math.max(0, this.energy - 26 * (1 - (fx.boostEff || 0)) * dt); } else this.energy = Math.min(100, this.energy + 14 * (1 + (fx.boostRegen || 0)) * dt);
     this.boostOn = boost; this.flareCd -= dt;
     const tank = this.form === 'tank'; if (tank) { vmax *= 0.72; acc *= 1.5; this.inLift = 0; }
+    else if (this.isPlayer) { const sm = this.styleMul; vmax *= sm.speed; acc *= sm.speed; }
+    if (this.looks && this.looks[this.formShown] && this.looks[this.formShown].userData.spin) this.looks[this.formShown].userData.spin.forEach((r, i) => { r.rotation.z += dt * (i ? -1.6 : 0.9); });
     this.updateForm(dt);
     this.fwd(_f); _r.set(-_f.z, 0, _f.x);
     this.vel.addScaledVector(_f, this.inThrust * acc * dt);
@@ -326,7 +406,7 @@ export class Ship {
     this.vel.y *= Math.exp(-dt * (Math.abs(this.inLift) > 0.05 ? 0.5 : 3.2));
     const hs = Math.hypot(this.vel.x, this.vel.z); if (hs > vmax) { const k = lerp(1, vmax / hs, 1 - Math.exp(-dt * 4)); this.vel.x *= k; this.vel.z *= k; }
     this.vel.y = clamp(this.vel.y, -vmax * 0.7, vmax * 0.7);
-    this.yawVel = lerp(this.yawVel, this.inTurn * this.turnRate * (tank ? 1.3 : 1), 1 - Math.exp(-dt * 6.5));
+    this.yawVel = lerp(this.yawVel, this.inTurn * this.turnRate * (tank ? 1.3 : (this.isPlayer ? this.styleMul.turn : 1)), 1 - Math.exp(-dt * 6.5));
     this.yaw = wrap(this.yaw + this.yawVel * dt);
     this.pos.addScaledVector(this.vel, dt);
     for (const k of ['x', 'z']) if (Math.abs(this.pos[k]) > WORLD) { this.vel[k] -= Math.sign(this.pos[k]) * 80 * dt; }

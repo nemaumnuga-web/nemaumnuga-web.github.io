@@ -452,8 +452,6 @@ body.touch #brTouch{display:block}body.touch #brKeys{display:none}
 
 /* ===== X 버튼 전부 클릭되도록 (버그 수정) ===== */
 .x{position:absolute;right:10px;top:8px;z-index:5;width:34px;height:34px;display:grid;place-items:center;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:18px;line-height:1;cursor:pointer;pointer-events:auto!important;touch-action:manipulation}
-.panel,#basePanel,#ppanel,#strategyPanel,#crewCard,.card{position:relative}
-#strategyPanel,#crewCard{position:fixed}
 #bridgeUI>*{pointer-events:auto!important}
 #bridgeUI{pointer-events:none}
 #basePanel{pointer-events:auto}
@@ -506,3 +504,14 @@ body.touch #brTouch{display:block}body.touch #brKeys{display:none}
   .ptabs button{font-size:10px;padding:6px 2px;min-width:0}
   .ptabs .leave{flex:1.6;min-width:72px}
 }
+
+/* 외형 선택 */
+#stylePick{z-index:70}#stylePick .card{max-height:90vh;overflow:auto;text-align:left}
+#spList{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.spc{display:flex;flex-direction:column;gap:3px;text-align:left;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#fff;padding:12px}
+.spc i{font-size:30px;font-style:normal}.spc b{font-size:16px}.spc small{color:var(--dim);font-size:12px;line-height:1.4}.spc em{font-style:normal;font-size:11px;color:var(--teal);font-family:var(--num)}
+.spc.on{border-color:var(--teal);background:rgba(34,211,211,.14)}
+@media (max-height:520px) and (pointer:coarse){#spList{grid-template-columns:repeat(3,1fr);gap:5px}.spc{padding:7px}.spc i{font-size:20px}.spc b{font-size:12px}.spc small{font-size:10px}.spc em{font-size:9px}}
+/* 시계 글자가 길어도 솔라레 버튼·크레딧과 겹치지 않게 */
+#clock{max-width:min(360px,34vw);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block}
+#banner{width:min(640px,56vw)}

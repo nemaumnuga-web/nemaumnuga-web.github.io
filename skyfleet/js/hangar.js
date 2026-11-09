@@ -1,7 +1,7 @@
 // 격납고: 항구마다 다른 3D 배경 · 정비 로봇팔 · 모듈 장착 애니메이션
 import { THREE, Q, renderer, rand, pick, canvasTex, Particles, TEX_SMOKE, TEX_SOFT, put, finish, box, cyl, HPI, addProto, COL, clamp, lerp, sfx } from './core.js';
-import { makeShipModel } from './ships.js';
-import { TIERS, MODULES } from './data.js';
+import { makeShipModel, styleModel } from './ships.js';
+import { TIERS, MODULES, save } from './data.js';
 
 export const hscene = new THREE.Scene();
 hscene.background = new THREE.Color(0x05090b);
@@ -190,7 +190,7 @@ function rebuildMarkers() {
 export function setHangarShip(cls, paint, mods = []) {
   if (ship) hscene.remove(ship.root);
   curTier = cls; curPaint = paint; curMods = (mods || []).slice();
-  ship = makeShipModel(cls, paint, 'player');
+  ship = makeShipModel(cls, paint, 'player'); styleModel(ship, cls, paint, save.style);
   ship.root.position.y = 9 + TIERS[cls].scale * 3; ship.root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   hscene.add(ship.root); rebuildMarkers();
 }

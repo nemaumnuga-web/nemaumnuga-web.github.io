@@ -2,7 +2,7 @@
 import { THREE, $, rand, pick, clamp, lerp, wrap, fmt, isTouch, SAFE, QUALITY, camera, render, frameYield, sleep, sfx, COL, engineSound, setMute, FXS } from './core.js';
 import { TIERS, MODS, modCost, ORES, RAR_COL, RANKS, rankOf, PAINTS, TIPS, CAPTAIN_NAMES, PIRATE_NAMES, WORLD, save, loadSave, persist, activeShip, ownsTier, buyTier, refillQuests, makeQuest, questProgress, priceOf, driftPrices, WEAPONS, MODULES, CHAPTERS, INTRO, ENDING, REGIONS, ownsLevel } from './data.js';
 import { scene, buildWorld, updateWorld, terrainH, groundAt, ports, ores, depleteOre, nearestPort, homePort, DAY, FIRE, SMOKE, WEATHER, islands, islandAt, WRECKS, surfaceBelow } from './world.js';
-import { Ship, blinkNav, makeShipModel, setShipNight } from './ships.js';
+import { Ship, blinkNav, makeShipModel, setShipNight, STYLES, STYLE_KEYS } from './ships.js';
 import { rememberDeath as solRemember, initSolare, say as solSay, event as solEvent, tickSolare, chatOpen, toggleChat, agentUpdate, agentPause, agentReset, agentOn, agentState, setPermUI, refreshSolUI, cfg as solCfg, setLLM, setModel, MODEL_NAMES, llmText, permName, permDesc, PERM_NAMES } from './solare.js';
 import { S, morphFx, explode, fireTurrets, fireMissile, updateBullets, updateMissiles, spawnDebris, updateDebris, dropCrate, updateCrates, mineBeam, shipFx, clearFx, dropFlares, incoming, updateFlares, shieldFx } from './fx.js';
 import { runAI } from './ai.js';
@@ -62,7 +62,8 @@ $('ldGo').onclick = () => {
   if (srCredits) { save.credits += srCredits; toast(`SKY RUN 보너스 <b>+${srCredits} CR</b>`); }
   save.skyrunBest = Math.max(save.skyrunBest || 0, best); persist();
   const go = () => { enterHangar(homePort()); setTimeout(() => solSay(save.story.ch === 0 ? '안녕하세요, 캡틴. 첫 임무는 출항이에요. 아래 「항구를 떠나기」를 눌러 주세요!' : `다시 오셨네요, 캡틴! ${CHAPTERS[save.story.ch] ? '현재 임무: ' + CHAPTERS[save.story.ch].nm : ''}`, 'happy', 2), 600); };
-  if (!save.story.intro) playIntro(go); else go();
+  const go2 = () => { go(); if (!save.style) setTimeout(() => openStylePicker(true), 400); };
+  if (!save.story.intro) playIntro(go2); else go2();
 };
 
 /* ================= 함선 생성 ================= */
@@ -70,6 +71,7 @@ function makePlayer() {
   const a = activeShip();
   if (player) scene.remove(player.mesh);
   player = new Ship({ name: '나', faction: 'player', tier: a.tier, paint: save.paint, lv: a.lv, isPlayer: true, weapon: a.weapon || 'cannon', mods: a.mods || [], elems: a.elems || [] });
+  player.look = player.baseLook = save.style || 'ship'; player.build(scene);
   scene.add(player.mesh); S.player = player;
   S.ships = S.ships.filter(s => !s.isPlayer); S.ships.unshift(player);
 }
@@ -243,7 +245,7 @@ function cycleLock() {
 function toggleForm() {
   if (mode !== 'fly' || !player.alive) return;
   if (!player.canMorph) { toast('변형 코어(모듈 탭)가 필요해요'); return; }
-  if (player.setForm(player.form === 'ship' ? 'tank' : 'ship')) toast(player.form === 'tank' ? '🛡 <b>전차 모드</b> — 피해 -35% · 포 피해 +35% · 지상 이동' : '🚀 <b>비행선 모드</b>');
+  if (isFounder() ? player.nextForm() : player.setForm(player.form === 'ship' ? 'tank' : 'base')) toast(player.form === 'tank' ? '🛡 <b>전차 모드</b> — 피해 -35% · 포 피해 +35% · 지상 이동' : `${STYLES[player.look].ic} <b>${STYLES[player.look].nm}</b>`);;
 }
 function dropCargo() {
   if (!player.cargoKg) { toast('투하할 화물이 없습니다'); return; }
@@ -556,6 +558,7 @@ function openTab(tab) {
     $('qReroll').onclick = () => { save.credits -= 50; save.quests = save.quests.filter(q => q.have > 0); refillQuests(); persist(); refreshPort(); openTab('quest'); };
   } else if (tab === 'yard') {
     T('조선소'); const r = rankOf(save.xp);
+    setTimeout(() => { const b = document.createElement('button'); b.className = 'btn'; b.style.margin = '0 0 8px'; b.textContent = `외형 바꾸기 · 지금: ${STYLES[save.style || 'ship'].nm}`; b.onclick = () => openStylePicker(false); $('ppB').prepend(b); }, 0);
     B.innerHTML = `<p style="color:var(--dim);font-size:13px">평판 등급과 이전 등급 함선 보유가 필요합니다. 등급마다 전투·화물·정찰 등 여러 갈래가 있고, 모든 분기는 다음 단계로 이어집니다.</p>` + [0, 1, 2, 3, 4].map(lvl => `<h4 class="ylv">T${lvl + 1}</h4>` + TIERS.filter(t => t.tier === lvl).map(t => {
       const own = ownsTier(t.id), act = a.tier === t.id, lockR = r < t.rank, lockP = lvl > 0 && !ownsLevel(lvl - 1);
       const btn = act ? `<button class="btn" disabled>탑승 중</button>` : own ? `<button class="btn ghost" data-use="${t.id}">탑승</button>` : `<button class="btn" data-buy="${t.id}" ${lockR || lockP || save.credits < t.cost ? 'disabled' : ''}>${lockR ? `🔒 ${RANKS[t.rank].nm}` : lockP ? `🔒 T${lvl} 필요` : `구매 ${fmt(t.cost)} C`}</button>`;
@@ -609,6 +612,15 @@ function openTab(tab) {
   }
 }
 $('leave').onclick = () => launch();
+/* ===== 외형 선택 ===== */
+function openStylePicker(first) {
+  const ov = $('stylePick'), fd = isFounder();
+  $('spList').innerHTML = STYLE_KEYS.map(k => `<button class="spc ${save.style === k ? 'on' : ''}" data-st="${k}"><i>${STYLES[k].ic}</i><b>${STYLES[k].nm}</b><small>${STYLES[k].ds}</small><em>속도 ×${STYLES[k].mul.speed} · 선회 ×${STYLES[k].mul.turn} · 화력 ×${STYLES[k].mul.dmg}</em></button>`).join('');
+  $('spNote').textContent = fd ? '👑 캡틴 특권: 비행 중 T(변형)를 누르면 모든 외형과 전차로 차례대로 변신해요.' : (first ? '처음 함선 외형을 고르세요. 격납고 조선소 탭에서 언제든 바꿀 수 있어요.' : '외형을 바꿔도 능력치·모듈은 그대로예요.');
+  ov.classList.add('on');
+  $('spList').querySelectorAll('[data-st]').forEach(b => b.onclick = () => { save.style = b.dataset.st; persist(); sfx('install'); ov.classList.remove('on'); setHangarShip(activeShip().tier, save.paint, activeShip().mods); toast(`${STYLES[save.style].ic} <b>${STYLES[save.style].nm}</b> 선택!`); });
+}
+$('spX').onclick = () => { if (!save.style) { save.style = 'ship'; persist(); } $('stylePick').classList.remove('on'); };
 $('toBridge').onclick = () => { setMode('bridge'); $('ppanel').hidden = true; enterBridge(); sfx('ui'); };
 $('brBack').onclick = () => { exitBridge(); setMode('hangar'); sfx('ui'); };
 $('brInteract').onpointerdown = e => { e.stopPropagation(); bridgeInteract(); };
@@ -624,7 +636,7 @@ bhooks.status = () => { const s = solSnap(), a = activeShip(); return `현재 �
 function launch() {
   const a = activeShip(), p = dockPort;
   if (player.tier !== a.tier || player.paint !== save.paint) { player.tier = a.tier; player.paint = save.paint; }
-  player.lv = a.lv; player.weapon = a.weapon || 'cannon'; player.mods = a.mods || []; player.elems = a.elems || []; player.form = 'ship'; player.formShown = 'ship'; player.hp = undefined; player.shield = 0; player.build(scene);
+  player.lv = a.lv; player.weapon = a.weapon || 'cannon'; player.mods = a.mods || []; player.elems = a.elems || []; player.form = 'ship'; player.look = player.baseLook = save.style || 'ship'; player.formShown = 'ship'; player.hp = undefined; player.shield = 0; player.build(scene);
   const yaw = Math.atan2(p.x, p.z);   // 바깥쪽 대신 맵 중앙을 향함
   player.spawnAt(p.x, p.deck + player.hover + 2, p.z, yaw);
   cam.yaw = yaw; cam.pitch = 0.3; cam.last = 0;
@@ -888,7 +900,7 @@ function autoForm(dt) {
   const tgtLow = AP.target ? AP.target.pos.y - groundAt(AP.target.pos.x, AP.target.pos.z) < 170 : true;
   const defending = AP.kind === 'outpost' && fighting;
   const want = (fighting && !low && (defending || (nearGround && tgtLow))) ? 'tank' : 'ship';
-  if (want !== player.form && player.setForm(want)) solSay(want === 'tank' ? '전차 모드로 전환할게요! 단단하게 버텨요.' : '비행선 모드로 돌아와요.', 'calm', 0);
+  if (want !== player.form && player.setForm(want === 'ship' ? 'base' : want)) solSay(want === 'tank' ? '전차 모드로 전환할게요! 단단하게 버텨요.' : '비행선 모드로 돌아와요.', 'calm', 0);
 }
 /* ================= 전초기지 연결 ================= */
 let nearBase = null;

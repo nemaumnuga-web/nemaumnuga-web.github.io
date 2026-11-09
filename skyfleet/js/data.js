@@ -247,6 +247,7 @@ export function activateFounder() {
   save.credits = Math.max(save.credits, 9999999); save.xp = Math.max(save.xp, 30000);
   for (const t of TIERS) if (!ownsTier(t.id)) save.ships.push(freshShip(t.id));
   save.modules = Object.keys(MODULES); save.weapons = Object.keys(WEAPONS); save.elements = Object.keys(ELEMENTS);
+  save.active = Math.max(0, save.ships.findIndex(sh => sh.tier === 8));   // 최고 등급(T5 아크라이트)로 탑승
   for (const sh of save.ships) { for (const k in MODS) sh.lv[k] = Math.max(sh.lv[k] || 0, 25); sh.elems = Object.keys(ELEMENTS); if (sh.mods.length < slotCount(sh.tier)) for (const id of save.modules) { if (sh.mods.length >= slotCount(sh.tier)) break; if (!sh.mods.includes(id)) sh.mods.push(id); } }
   persist();
 }
