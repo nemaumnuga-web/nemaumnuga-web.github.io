@@ -204,6 +204,58 @@ def save(font, path, flavor=None):
     print("  %-52s %6.2f MB" % (os.path.relpath(path), os.path.getsize(path) / 1e6), flush=True)
 
 
+def ks_hangul():
+    out = set()
+    for hi in range(0xB0, 0xC9):
+        for lo in range(0xA1, 0xFF):
+            try:
+                out.add(ord(bytes([hi, lo]).decode("euc_kr")))
+            except UnicodeDecodeError:
+                pass
+    return out
+
+
+def web_subsets(vf_path, outdir):
+    """Split the variable font into woff2 pieces + a css with unicode-range (loads only what a page uses)."""
+    from fontTools import subset
+    os.makedirs(outdir, exist_ok=True)
+    cm = TTFont(vf_path).getBestCmap()
+    hangul = {c for c in cm if 0xAC00 <= c <= 0xD7A3}
+    common = ks_hangul() & hangul
+    groups = (("symbols", set(cm) - hangul), ("hangul-common", common), ("hangul-rare", hangul - common))
+
+    def rng(cps):
+        cps = sorted(cps)
+        parts, i = [], 0
+        while i < len(cps):
+            j = i
+            while j + 1 < len(cps) and cps[j + 1] == cps[j] + 1:
+                j += 1
+            parts.append("U+%04X" % cps[i] if i == j else "U+%04X-%04X" % (cps[i], cps[j]))
+            i = j + 1
+        return ", ".join(parts)
+
+    css = ["/* Nemaum variable font, split by unicode-range. */"]
+    for name, cps in groups:
+        opts = subset.Options()
+        opts.layout_features = ["*"]
+        opts.notdef_outline = True
+        opts.name_IDs = ["*"]
+        opts.flavor = "woff2"
+        f = TTFont(vf_path)
+        ss = subset.Subsetter(opts)
+        ss.populate(unicodes=cps)
+        ss.subset(f)
+        f.flavor = "woff2"
+        p = os.path.join(outdir, "Nemaum-VF-%s.woff2" % name)
+        f.save(p)
+        print("  %-52s %6.2f MB" % (os.path.relpath(p), os.path.getsize(p) / 1e6), flush=True)
+        css.append("@font-face {\n  font-family: \"Nemaum VF\";\n  src: url(\"Nemaum-VF-%s.woff2\") format(\"woff2\");\n"
+                   "  font-weight: 100 900;\n  font-display: swap;\n  unicode-range: %s;\n}" % (name, rng(cps)))
+    with open(os.path.join(outdir, "nemaum.css"), "w") as fh:
+        fh.write("\n".join(css) + "\n")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sample", action="store_true", help="only every 40th Hangul syllable (fast)")
@@ -226,6 +278,8 @@ def main():
     os.makedirs(os.path.join(out, "variable"))
     save(vf, os.path.join(out, "variable", "Nemaum-VF.ttf"))
     save(TTFont(os.path.join(out, "variable", "Nemaum-VF.ttf")), os.path.join(out, "variable", "Nemaum-VF.woff2"), "woff2")
+    print("web subsets")
+    web_subsets(os.path.join(out, "variable", "Nemaum-VF.ttf"), os.path.join(out, "web"))
     if a.no_static:
         return
     print("static instances")

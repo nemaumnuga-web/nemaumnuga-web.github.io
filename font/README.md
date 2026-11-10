@@ -14,6 +14,7 @@
 | 폴더 | 내용 |
 |---|---|
 | `variable/Nemaum-VF.ttf`, `.woff2` | 가변 폰트. 굵기 `wght` 100–900, 크기별 모양 `opsz` 12–72 |
+| `web/nemaum.css` + `web/*.woff2` | 가변 폰트를 기호·상용 한글 2,350자·나머지 한글로 쪼갠 웹용 파일. `unicode-range`로 필요한 조각만 내려받습니다 |
 | `text/{ttf,otf,woff2,woff}/` | 본문용(작은 글씨에 맞춘 모양) Light / Regular / Bold |
 | `display/{ttf,otf,woff2,woff}/` | 제목용(큰 글씨에 맞춘 모양) Light / Regular / Bold |
 
@@ -34,13 +35,11 @@
 
 ### 웹 (CSS)
 
+```html
+<link rel="stylesheet" href="dist/web/nemaum.css">
+```
+
 ```css
-@font-face {
-  font-family: "Nemaum VF";
-  src: url("dist/variable/Nemaum-VF.woff2") format("woff2");
-  font-weight: 100 900;
-  font-display: swap;
-}
 body { font-family: "Nemaum VF", system-ui, sans-serif; font-optical-sizing: auto; }
 h1   { font-weight: 800; }                      /* 굵기 */
 .big { font-variation-settings: "opsz" 72; }    /* 제목용 모양 */
@@ -74,6 +73,8 @@ python3 font/build.py --sample   # 한글 40자당 1자만 넣은 빠른 시험 
 
 ## 알려진 한계 (v0.1)
 
+- 지원하지 않는 글자: 히라가나, 옛 한글 자모(ㅦ ㅿ 등), 일부 단위 문자(㎣ ㎥ 등), ㉿, 한자.
+  이런 글자는 기기 기본 글꼴로 표시됩니다. 직접 그리면 오히려 시스템 글꼴보다 어색해서 일부러 넣지 않았습니다.
 - 획 끝이 직각인 단순한 기하 서체입니다. 디자이너의 다듬기가 필요합니다.
 - 볼드에서 겹받침(예: 곬, 읊) 글자는 아직 획이 붙어 보입니다.
 - 결합 문자는 앞 글자 폭을 모르므로 위치가 대략적입니다 (GPOS 미지원).
@@ -83,4 +84,4 @@ python3 font/build.py --sample   # 한글 40자당 1자만 넣은 빠른 시험 
 ## 라이선스
 
 **초안이며 확인이 필요합니다.** 개인용 무료 / 상업·웹용 유료 모델을 가정하고 있지만,
-최종 라이선스 문구는 정해지지 않았습니다. 배포 전에 `LICENSE.txt`를 확정하세요.
+`LICENSE.txt`는 초안입니다. 가격과 문구를 확정한 뒤 배포하세요. 마케팅 계획서는 `MARKETING.md`에 있습니다.

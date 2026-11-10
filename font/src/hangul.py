@@ -110,12 +110,13 @@ def syllable(L, V, T, W, H, hw, gap):
     s = hw * 0.9
     out = []
     has_t = bool(T)
+    cl = T in _DOUBLE  # cluster final: give the bottom row more room
     if V in VERT:
         if has_t:
-            top0 = 0.44 * H + s
+            top0 = (0.52 if cl else 0.44) * H + s
             Lb = (0.0, top0, 0.50 * W - s, H)
             Vb = (0.60 * W + s, top0, W, H)
-            Tb = (0.02 * W, 0.0, 0.98 * W, 0.30 * H)
+            Tb = (0.0, 0.0, W, (0.40 if cl else 0.30) * H)
         else:
             Lb = (0.0, 0.0, 0.50 * W - s, H)
             Vb = (0.60 * W + s, 0.0, W, H)
@@ -124,9 +125,14 @@ def syllable(L, V, T, W, H, hw, gap):
         out += into_box(_VOW[V], Vb)
     elif V in HORZ:
         if has_t:
-            Lb = (0.07 * W, 0.62 * H + s, 0.93 * W, H)
-            Vb = (0.0, 0.31 * H + s * 0.5, W, 0.49 * H - s * 0.3)
-            Tb = (0.02 * W, 0.0, 0.98 * W, 0.22 * H)
+            if cl:
+                Lb = (0.07 * W, 0.72 * H + s, 0.93 * W, H)
+                Vb = (0.0, 0.46 * H + s * 0.5, W, 0.60 * H - s * 0.3)
+                Tb = (0.0, 0.0, W, 0.34 * H)
+            else:
+                Lb = (0.07 * W, 0.62 * H + s, 0.93 * W, H)
+                Vb = (0.0, 0.31 * H + s * 0.5, W, 0.49 * H - s * 0.3)
+                Tb = (0.02 * W, 0.0, 0.98 * W, 0.22 * H)
         else:
             Lb = (0.07 * W, 0.46 * H + s, 0.93 * W, H)
             Vb = (0.0, 0.0, W, 0.32 * H)
@@ -136,10 +142,16 @@ def syllable(L, V, T, W, H, hw, gap):
     else:  # mixed
         h, v = MIXED[V]
         if has_t:
-            Lb = (0.02 * W, 0.62 * H + s, 0.50 * W - s, H)
-            Hb = (0.0, 0.32 * H + s * 0.5, 0.60 * W - s, 0.50 * H - s * 0.3)
-            Vb = (0.66 * W + s, 0.30 * H + s, W, H)
-            Tb = (0.02 * W, 0.0, 0.98 * W, 0.22 * H)
+            if cl:
+                Lb = (0.02 * W, 0.72 * H + s, 0.50 * W - s, H)
+                Hb = (0.0, 0.46 * H + s * 0.5, 0.60 * W - s, 0.60 * H - s * 0.3)
+                Vb = (0.66 * W + s, 0.42 * H + s, W, H)
+                Tb = (0.0, 0.0, W, 0.34 * H)
+            else:
+                Lb = (0.02 * W, 0.62 * H + s, 0.50 * W - s, H)
+                Hb = (0.0, 0.32 * H + s * 0.5, 0.60 * W - s, 0.50 * H - s * 0.3)
+                Vb = (0.66 * W + s, 0.30 * H + s, W, H)
+                Tb = (0.02 * W, 0.0, 0.98 * W, 0.22 * H)
         else:
             Lb = (0.02 * W, 0.46 * H + s, 0.50 * W - s, H)
             Hb = (0.0, 0.0, 0.60 * W - s, 0.32 * H)
@@ -161,7 +173,7 @@ def syllable_cplx(L, V, T):
 def hw_mult(L, V, T):
     """Dense syllables get a slightly lighter stroke so counters stay open."""
     c = syllable_cplx(L, V, T)
-    return max(0.5, min(1.0, 1.0 - 0.062 * (c - 4.0)))
+    return max(0.5, min(1.0, 1.0 - 0.05 * (c - 4.0)))
 
 
 def split_syllable(cp):

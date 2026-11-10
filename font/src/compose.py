@@ -141,7 +141,7 @@ def accent_recipe(cp):
         return None
     b = parts[0]
     bst, bw = LATIN[b]
-    upper = 0x41 <= b <= 0x5A
+    upper = chr(b).isupper()
     if any(m in ABOVE for m in parts[1:]) and b in (0x69, 0x6A):
         bst = [s for s in bst if s[0] != "d"]  # drop the dot
     top = CAP if upper else (ASC if b in TALL else XH)

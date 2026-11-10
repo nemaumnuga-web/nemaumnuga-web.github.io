@@ -89,7 +89,9 @@ def collect():
     for ch, g in {**L, **Pn}.items():
         G[ord(ch)] = make_latin(g)
     # composed glyphs (lowest priority; hand-drawn ones below replace them)
-    ranges = (list(range(0xA0, 0x250)) + list(range(0x1E00, 0x1F00)) + list(range(0x2070, 0x20A0)) +
+    cm.LATIN.update(sb.greek_cyrillic())
+    cm.LATIN.update(sb.kaomoji())
+    ranges = (list(range(0x2100, 0x2150)) + list(range(0xFFE0, 0xFFE7)) + list(range(0xA0, 0x250)) + list(range(0x1E00, 0x1F00)) + list(range(0x2070, 0x20A0)) +
               list(range(0x2150, 0x2190)) + list(range(0x2460, 0x24EB)) + list(range(0x3200, 0x3400)) +
               list(range(0xFF01, 0xFF5F)))
     for cp in ranges:
