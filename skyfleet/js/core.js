@@ -89,7 +89,18 @@ export function resize() {
   if (composer) composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
 }
-addEventListener('resize', resize); if (window.visualViewport) visualViewport.addEventListener('resize', resize); resize();
+addEventListener('resize', resize); resize();
+/* iOS 사파리: 툴바·키보드가 움직이면 페이지가 밀린다 → 보이는 영역을 CSS 변수로 알려주고 스크롤을 0 으로 고정 */
+function syncVV() {
+  const vv = window.visualViewport, h = vv ? vv.height : innerHeight, t = vv ? vv.offsetTop : 0;
+  document.documentElement.style.setProperty('--vvh', h + 'px'); document.documentElement.style.setProperty('--vvt', t + 'px');
+  if (!(document.activeElement && document.activeElement.tagName === 'INPUT') && (window.scrollX || window.scrollY)) window.scrollTo(0, 0);
+}
+if (window.visualViewport) { visualViewport.addEventListener('resize', () => { syncVV(); resize(); }); visualViewport.addEventListener('scroll', syncVV); }
+addEventListener('orientationchange', () => setTimeout(() => { syncVV(); resize(); }, 300));
+addEventListener('scroll', () => { if (!(document.activeElement && document.activeElement.tagName === 'INPUT')) window.scrollTo(0, 0); }, { passive: true });
+document.addEventListener('focusout', () => setTimeout(() => window.scrollTo(0, 0), 50));
+syncVV();
 const _pScale = new THREE.Vector2();
 export const particleSystems = [];
 export function render(scene, cam, dt) {
@@ -278,6 +289,14 @@ export function sfx(kind, vol = 1) {
         ping(t, 500, 0.5, 'sine', 0.07 * v, 0.55, 1400); ping(t, 1200, 0.5, 'sine', 0.035 * v, 0.6, 1205); break;
       case 'siren':   // 습격 경보
         ping(t, 520, 0.5, 'square', 0.025 * v, 0.2, 700); ping(t + 0.55, 700, 0.5, 'square', 0.025 * v, 0.2, 520); break;
+      case 'ultCharge': // 궁극기 충전: 아래에서 솟구치는 합창 같은 드론
+        for (const [f, d] of [[110, 0], [165, 7], [220, -6], [330, 4]]) { const o = ac.createOscillator(), g2 = ac.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 0.5, t); o.frequency.exponentialRampToValueAtTime(f * 2, t + 1.1); o.detune.value = d * 3; g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.05 * v, t + 0.9); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.25); const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(400, t); lp.frequency.exponentialRampToValueAtTime(5000, t + 1.1); o.connect(lp); lp.connect(g2); sendOut(g2, 0.6); o.start(t); o.stop(t + 1.3); }
+        burst(t, 1.1, 'bandpass', 600, 1.2, 0.06 * v, 0.6, 6000); break;
+      case 'ult':      // 궁극기 폭발: 초저음 충격 + 금속 공명 + 긴 잔향 꼬리
+        ping(t, 60, 2.2, 'sine', 0.6 * v, 0.5, 22); ping(t, 120, 1.4, 'triangle', 0.25 * v, 0.6, 40);
+        burst(t, 2.6, 'lowpass', 1200, 0.5, 0.55 * v, 0.8, 90); burst(t, 0.35, 'highpass', 3000, 0.6, 0.16 * v, 0.6);
+        for (const f of [523, 659, 784, 1046]) ping(t + 0.05, f, 2.4, 'sine', 0.035 * v, 0.9);
+        break;
       case 'warp':    // 등장 연출
         ping(t, 160, 0.8, 'sawtooth', 0.04 * v, 0.4, 1600); break;
       default:

@@ -515,3 +515,27 @@ body.touch #brTouch{display:block}body.touch #brKeys{display:none}
 /* 시계 글자가 길어도 솔라레 버튼·크레딧과 겹치지 않게 */
 #clock{max-width:min(360px,34vw);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block}
 #banner{width:min(640px,56vw)}
+
+/* ===== 모바일 팝업: 실제 보이는 화면(visualViewport) 기준으로 가운데 고정 ===== */
+:root{--vvh:100vh;--vvt:0px}
+@media (max-height:520px) and (pointer:coarse), (max-width:700px) and (pointer:coarse){
+  #ppanel,#basePanel,#strategyPanel,#crewCard,#solChat{
+    position:fixed!important;left:50%!important;right:auto!important;bottom:auto!important;
+    top:calc(var(--vvt) + var(--vvh) / 2)!important;transform:translate(-50%,-50%)!important;
+    width:min(560px,calc(100vw - 24px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)))!important;
+    max-height:calc(var(--vvh) - 20px)!important;height:auto!important;overflow:auto;z-index:60!important}
+  #solChat{height:calc(var(--vvh) - 20px)!important}
+  .ov{top:var(--vvt);height:var(--vvh);bottom:auto}
+  .ov .card{max-height:calc(var(--vvh) - 24px);overflow:auto}
+  #toast{top:calc(var(--vvt) + 70px)!important}
+}
+html,body{height:100%;overscroll-behavior:none}
+
+/* 궁극기 */
+#ultBar{height:7px;margin-top:8px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
+#ultBar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff6a2a,#3aa8ff,#5fffc8,#c06bff,#8cff4a,#9ff0ff,#ffc84a);transition:width .2s}
+#ultBar.ready{box-shadow:0 0 10px #fff,0 0 18px #c06bff;animation:blink .7s steps(2) infinite}
+#tUlt{right:300px;bottom:330px;background:linear-gradient(135deg,rgba(255,106,42,.4),rgba(192,107,255,.4))}
+#tUlt.ready{box-shadow:0 0 18px #fff,0 0 30px #c06bff;border-color:#fff}
+@media (max-height:520px) and (pointer:coarse){#tUlt{right:calc(var(--sr) + 64px);bottom:calc(var(--sb) + 150px);width:48px;height:48px;font-size:11px}}
+#solQuick button.dn{color:#ffb347;border-color:rgba(255,179,71,.6);background:rgba(255,179,71,.1)}

@@ -8,8 +8,17 @@ const ELEM_C = Object.fromEntries(Object.entries(ELEMENTS).map(([k, e]) => [k, n
 export const S = { ships: [], units: [], player: null, crates: [], hooks: {}, shake: 0 };
 const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), prevP = new THREE.Vector3(), Z_NEG = new THREE.Vector3(0, 0, -1);
 
+/* 큰 폭발에는 충격파 링 · 섬광 구를 더해 입체감을 준다 */
+const SW = [], swGeo = new THREE.TorusGeometry(1, 0.08, 6, 64), swOrb = new THREE.SphereGeometry(1, 20, 12);
+function shock(pos, size) {
+  const mk = (geo, op) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 2.2, 0.8), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); m.position.copy(pos); scene.add(m); return m; };
+  const r = mk(swGeo, 0.9); r.rotation.x = Math.PI / 2 + rand(-0.3, 0.3); SW.push({ m: r, t: 0, life: 0.8, s: size * 3.2, ring: true });
+  const o = mk(swOrb, 0.7); SW.push({ m: o, t: 0, life: 0.35, s: size * 0.9 });
+}
+export function updateShock(dt) { for (let i = SW.length - 1; i >= 0; i--) { const w = SW[i]; w.t += dt; const k = w.t / w.life; w.m.scale.setScalar(1 + w.s * k); if (w.ring) w.m.scale.z = 6 * (1 - k) + 1; w.m.material.opacity = Math.max(0, (w.ring ? 0.9 : 0.7) * (1 - k)); if (k >= 1) { scene.remove(w.m); w.m.material.dispose(); SW.splice(i, 1); } } }
 export function explode(pos, size, kind = 'boom') {
   const n = Math.max(2, Math.round(size * 0.55 * Q.fx));
+  if (size >= 25 && camera.position.distanceToSquared(pos) < 4e6) shock(pos, size);
   FIRE.emit(pos.x, pos.y, pos.z, 0, 0, 0, 0.16, size * 1.0, size * 1.7, [4, 3, 2], [3, 1.4, 0.4], 0.9);
   for (let i = 0; i < n; i++) { const v = rv(size * 1.3); FIRE.emit(pos.x, pos.y, pos.z, v[0], v[1], v[2], rand(0.5, 1.1), size * rand(0.4, 0.7), size * rand(0.9, 1.4), COL.fireHot, COL.fireMid, 1, 3.2); }
   for (let i = 0; i < n * 0.7; i++) { const v = rv(size * 0.7); SMOKE.emit(pos.x + v[0] * 0.2, pos.y + v[1] * 0.2, pos.z + v[2] * 0.2, v[0], v[1] + size * 0.2, v[2], rand(2, 4.5), size * 0.5, size * rand(1.6, 2.4), COL.smokeD, COL.smokeL, 0.75, 1.4, -4); }

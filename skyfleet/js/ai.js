@@ -1,6 +1,6 @@
 // AI: 해적(약탈) · 캡틴(채굴·교역·자위)
 import { THREE, rand, clamp, wrap } from './core.js';
-import { WORLD } from './data.js';
+import { WORLD, WEAPONS } from './data.js';
 import { ores, ports, groundAt, nearestPort } from './world.js';
 import { S, fireTurrets, fireMissile, mineBeam } from './fx.js';
 
@@ -27,15 +27,34 @@ function findTarget(s, range) {
   if (s.faction === 'pirate') for (const o of S.units) { if (!o.alive || o.build > 0) continue; const d = o.pos.distanceTo(s.pos) * (o.def ? 1 : 1.3); if (d < bd) { bd = d; best = o; } }
   return best;
 }
+/* 전투 AI v2: 무기 사거리에 맞춘 선회, 피격 시 회피 기동, 체력 낮으면 이탈, 탄속 기반 리드 조준, 미사일 일제사격 */
 function combat(s, t, dt) {
-  const a = s.ai, dist = t.pos.distanceTo(s.pos);
-  a.orbit = (a.orbit ?? rand(0, 6)) + dt * 0.35 * (a.dir || 1);
-  const r = 230 + (a.seed || 0) * 120;
-  steer(s, t.pos.x + Math.cos(a.orbit) * r, t.pos.y + 30 + Math.sin(a.orbit * 0.7) * 25, t.pos.z + Math.sin(a.orbit) * r, dist > 500 ? 1 : 0.75, dt);
-  aimP.copy(t.pos).addScaledVector(t.vel, dist / 680);
+  const a = s.ai, dist = t.pos.distanceTo(s.pos), W = WEAPONS[s.weapon] || WEAPONS.cannon;
+  const rng = W.speed * (s.bulletSpd || 1) * W.life * 0.85, hpR = s.hp / s.maxHp;
+  a.hitT = Math.max(0, (a.hitT || 0) - dt); if (s.hp < (a.lastHp ?? s.hp) - 0.5) a.hitT = 1.6; a.lastHp = s.hp;
+  // 체력이 낮으면 물러나 방어막 회복 후 복귀
+  if (hpR < 0.28 || (s.shBroken > 0 && hpR < 0.55)) a.retreatT = 6;
+  if ((a.retreatT = (a.retreatT || 0) - dt) > 0) {
+    const ux = s.pos.x - t.pos.x, uz = s.pos.z - t.pos.z, l = Math.hypot(ux, uz) || 1;
+    steer(s, s.pos.x + ux / l * 600, t.pos.y + 140, s.pos.z + uz / l * 600, 1, dt); s.boosting = true;
+    aimP.copy(t.pos).addScaledVector(t.vel, dist / W.speed); s.aimTurrets(dt, aimP); if (dist < rng) fireTurrets(s, aimP, 0.04);
+    if (s.flareCd <= 0 && Math.random() < dt) S.hooks.flare && S.hooks.flare(s);
+    return;
+  }
+  a.orbit = (a.orbit ?? rand(0, 6)) + dt * (0.45 + (a.hitT > 0 ? 0.6 : 0)) * (a.dir || 1);
+  if (Math.random() < dt * 0.12) a.dir = -(a.dir || 1);                 // 불규칙하게 도는 방향 전환
+  const r = Math.max(160, Math.min(rng * 0.7, 520)) + (a.seed || 0) * 80;
+  const jink = a.hitT > 0 ? Math.sin(performance.now() / 180 + a.seed * 9) * 45 : 0;   // 맞으면 위아래로 흔든다
+  steer(s, t.pos.x + Math.cos(a.orbit) * r, t.pos.y + 30 + jink + Math.sin(a.orbit * 0.7) * 25, t.pos.z + Math.sin(a.orbit) * r, dist > r * 1.6 ? 1 : 0.85, dt);
+  s.boosting = dist > rng * 1.5 || a.hitT > 0.8;
+  // 2단 리드 조준 (목표의 속도 · 탄 비행시간)
+  let tt = dist / (W.speed * (s.bulletSpd || 1)); aimP.copy(t.pos).addScaledVector(t.vel, tt); tt = aimP.distanceTo(s.pos) / (W.speed * (s.bulletSpd || 1)); aimP.copy(t.pos).addScaledVector(t.vel, tt);
   s.aim = aimP; s.aimTurrets(dt, aimP);
-  if (dist < 640) fireTurrets(s, aimP, 0.035 + (1 - (a.skill || 0.8)) * 0.05);
-  if (dist > 180 && dist < 1100 && Math.random() < dt * 0.25) fireMissile(s, t);
+  if (dist < rng) fireTurrets(s, aimP, 0.018 + (1 - (a.skill || 0.9)) * 0.03);
+  if (dist > 160 && dist < 1200 && Math.random() < dt * 0.45) fireMissile(s, t);
+  // 일제사격: 25초마다 미사일 4발
+  a.salvo = (a.salvo ?? rand(8, 20)) - dt;
+  if (a.salvo <= 0 && dist < 1000 && s.lv.missile > 0) { a.salvo = rand(22, 30); for (let i = 0; i < 4; i++) { s.cdM = 0; fireMissile(s, t); } }
 }
 export function runAI(s, dt) {
   const a = s.ai; a.t -= dt; a.skill = a.skill || rand(0.6, 1); a.seed = a.seed ?? Math.random(); a.dir = a.dir || (Math.random() < 0.5 ? -1 : 1);

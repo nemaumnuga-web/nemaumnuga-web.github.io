@@ -152,6 +152,7 @@ export function classify(raw) {
   if (has(s, '자율', '알아서', '임무수행', '임무해', '임무진행', '대신해', '자동으로')) { if (has(s, '꺼', '끄', '멈')) return { k: 'cmd', id: 'agentOff' }; return { k: 'cmd', id: 'agentOn' }; }
   if (has(s, '판매', '팔아', '팔줘', '매각')) return { k: 'cmd', id: 'sell' };
   if (has(s, '장착', '모듈달', '모듈사', '모듈사줘')) return { k: 'cmd', id: 'equip' };
+  if (has(s, '궁극', '필살', '얼티')) return { k: 'cmd', id: 'ult' };
   if (has(s, '플레어', '미사일회피', '회피')) return { k: 'cmd', id: 'flare' };
   if (has(s, '포트', '귀환', '귀항', '집으로', '돌아가', '도킹')) return { k: 'cmd', id: 'port' };
   if (has(s, '보스', '고르곤', '기함') && has(s, '잡', '공격', '싸워', '치러', '가줘', '덤벼')) return { k: 'cmd', id: 'boss' };
@@ -211,6 +212,7 @@ function runCmd(id, c) {
     case 'outpost': return reply(x.gotoOutpost() || '비행 중일 때 기지로 안내할 수 있어요.');
     case 'wreck': return reply(x.gotoWreck() || '난파선을 찾지 못했어요.');
     case 'boss': { const r = x.fightBoss(); return reply(r || '지금은 고르곤 신호가 없어요.'); }
+    case 'ult': return reply(x.ult ? x.ult() : '지금은 쓸 수 없어요.');
     case 'flare': return reply(x.flare() ? '플레어 발사!' : '플레어는 아직 재장전 중이에요.');
     case 'sell': { if (x.mode() !== 'hangar') return reply('시장은 포트에 도킹한 뒤 쓸 수 있어요.'); return reply(x.sellAll()); }
     case 'equip': { if (x.mode() !== 'hangar') return reply('장착은 포트에서 할 수 있어요.'); return reply(x.equipBest()); }
