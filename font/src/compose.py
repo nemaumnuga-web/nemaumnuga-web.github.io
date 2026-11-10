@@ -152,7 +152,7 @@ def accent_recipe(cp):
         gap = 20.0
 
     def f(P):
-        sb = 45 - 20 * P.t
+        sb = 60 - 25 * P.t
         dx = sb + P.hw
         cxm = max(bw, 1) / 2.0 if bw > 0 else 0.0
         if b == 0x69 or b == 0x6A or b == 0x6C:
@@ -193,7 +193,7 @@ def special_latin(cp):
         extra = [PS([bar[0], bar[1]])]
 
     def f(P):
-        sb = 45 - 20 * P.t
+        sb = 60 - 25 * P.t
         dx = sb + P.hw
         st = xform(list(bst) + extra, lt.SX, lt.SY, dx, 0)
         return render(st, P.hw), bw * lt.SX + 2 * dx

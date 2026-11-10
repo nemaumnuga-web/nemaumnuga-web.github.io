@@ -86,7 +86,7 @@ def build_master(wght, wdth, opsz, path, recipes, names):
 def setup_common(fb, names, wght):
     fb.setupNameTable(names)
     fb.setupOS2(version=4, sTypoAscender=C.ASCENDER, sTypoDescender=C.DESCENDER, sTypoLineGap=C.LINEGAP,
-                usWinAscent=1000, usWinDescent=300, usWeightClass=int(wght),
+                usWinAscent=1100, usWinDescent=320, usWeightClass=int(wght),
                 sxHeight=int(lt.XH * lt.SY), sCapHeight=int(lt.CAP * lt.SY), achVendID="NEMA",
                 fsSelection=(1 << 6) | (1 << 7))
     fb.setupPost(keepGlyphNames=False)
@@ -209,7 +209,7 @@ def ttf_to_otf(ttf, path_psname):
     fb.setupNameTable(names)
     o = ttf["OS/2"]
     fb.setupOS2(version=4, sTypoAscender=C.ASCENDER, sTypoDescender=C.DESCENDER, sTypoLineGap=C.LINEGAP,
-                usWinAscent=1000, usWinDescent=300, usWeightClass=o.usWeightClass,
+                usWinAscent=1100, usWinDescent=320, usWeightClass=o.usWeightClass,
                 sxHeight=int(lt.XH * lt.SY), sCapHeight=int(lt.CAP * lt.SY), achVendID="NEMA", fsSelection=o.fsSelection)
     fb.setupPost(keepGlyphNames=False)
     fb.font["head"].macStyle = ttf["head"].macStyle
@@ -279,6 +279,7 @@ def web_subsets(vf_path, outdir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sample", action="store_true", help="only every 40th Hangul syllable (fast)")
+    ap.add_argument("--common", action="store_true", help="only the 2,350 common Hangul syllables (quick check)")
     ap.add_argument("--no-static", action="store_true")
     ap.add_argument("--out", default="dist")
     a = ap.parse_args()
@@ -292,6 +293,10 @@ def main():
     if a.sample:
         recipes = {cp: f for cp, f in recipes.items()
                    if isinstance(cp, str) or not (0xAC00 <= cp <= 0xD7A3) or (cp - 0xAC00) % 40 == 0}
+    if a.common:
+        keep = ks_hangul()
+        recipes = {cp: f for cp, f in recipes.items()
+                   if isinstance(cp, str) or not (0xAC00 <= cp <= 0xD7A3) or cp in keep}
     print("glyphs:", len(recipes) + 1)
     print("building masters")
     vf = build_variable(recipes, work)

@@ -21,12 +21,13 @@ for c in range(0xE0100, 0xE01F0):
 
 
 def hangul_box(P):
-    """Centre-line box of a syllable; the ink then fills about 0.95-1.0 em."""
+    """Centre-line box of a syllable.  The ink stays inside about 0.88 x 0.92 em so
+    neighbouring syllables (and lines) keep a clear gap even at heavy weights."""
     t = P.t
-    W = 930 - 40 * t - P.hw * 1.0
-    H = 990 - 40 * t - P.hw * 2.0
+    W = 840 - 40 * t - P.hw * 1.2
+    H = 920 - 40 * t - P.hw * 2.0
     x0 = (1000 - W) / 2.0
-    y0 = -112 + 30 * t + P.hw
+    y0 = -80 + 20 * t + P.hw
     return W, H, x0, y0
 
 
@@ -53,22 +54,33 @@ def make_jamo(ch):
 
 
 def make_latin(strokes_w, k=1.0):
+    """Proportional glyph: side bearings measured from the real stroke extents,
+    so every letter gets the same space on both sides."""
     strokes, w = strokes_w
+    b = bounds(strokes) if strokes else (0, 0, 0, 0)
+    minx, maxx = b[0], b[2]
+    if not strokes:
+        minx, maxx = 0.0, w
 
     def f(P):
-        sb = 45 - 20 * P.t
+        sb = 60 - 25 * P.t
         dx = sb + P.hw
-        st = xform(strokes, lt.SX, lt.SY, dx, 0)
-        return render(st, P.hw * k), w * lt.SX + 2 * dx
+        st = xform(strokes, lt.SX, lt.SY, dx - minx * lt.SX, 0)
+        return render(st, P.hw * k), (maxx - minx) * lt.SX + 2 * dx
     return f
+
+
+TAB_ADV = 560 * 1.3 + 150   # widest digit at the Latin scale + side bearings
 
 
 def make_tabular(strokes_w):
     strokes, w = strokes_w
+    b = bounds(strokes)
 
     def f(P):
-        dx = (640 - w * lt.SX) / 2.0
-        return render(xform(strokes, lt.SX, lt.SY, dx, 0), P.hw), 640
+        cw = (b[2] - b[0]) * lt.SX
+        dx = (TAB_ADV - cw) / 2.0 - b[0] * lt.SX
+        return render(xform(strokes, lt.SX, lt.SY, dx, 0), P.hw), TAB_ADV
     return f
 
 

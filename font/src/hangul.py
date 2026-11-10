@@ -152,7 +152,7 @@ def syllable(L, V, T, W, H, hw, gap):
     Every syllable shares the same columns (left edge, vowel stem) and rows
     (top line, bottom line), so text lines up in a grid.
     """
-    s = hw * 0.9
+    s = hw * 1.15 + 6.0       # spacing unit between neighbouring jamo (grows with weight)
     gx = 0.12 * W + 1.8 * s   # horizontal gap between initial and vowel
     out = []
     has_t = bool(T)

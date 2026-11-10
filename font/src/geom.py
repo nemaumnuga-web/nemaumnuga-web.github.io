@@ -119,6 +119,8 @@ def _turn_ext(pa, pb, pc, h):
     c = (v1[0] * v2[0] + v1[1] * v2[1]) / (l1 * l2)
     c = max(-1.0, min(1.0, c))
     phi = math.acos(c)  # turning angle
+    if phi > math.radians(100):
+        return 0.0  # sharp turn (N, V, W, ㅅ apex): no extension, so no spike pokes out
     return h * min(math.tan(phi / 2.0), MAX_MITER) if phi > 1e-3 else 0.0
 
 
