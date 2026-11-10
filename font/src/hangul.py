@@ -117,31 +117,63 @@ def _shrink(box, l=0.0, b=0.0, r=0.0, t=0.0):
 # columns shared by every syllable (fractions of the centre-line box width)
 COL_STEM = 0.86   # main vertical stem of every right-hand vowel sits on this column
 COL_TICK = 0.14   # length of the short ticks of ㅏ ㅑ ㅓ ㅕ ㅔ ㅖ
-COL_PAIR = 0.18   # distance between the two stems of ㅐ ㅒ ㅔ ㅖ
+COL_PAIR = 0.15   # distance between the two stems of ㅐ ㅒ ㅔ ㅖ
+COL_TICK2 = 0.11  # shorter left tick of ㅔ ㅖ so the initial keeps its width
 
 
 def vert_vowel(v, y0, y1, W):
     """Right-hand vowel drawn on the shared stem column.
 
-    Returns (strokes, x of its leftmost part) so the initial can be fitted
-    to the left of it with a constant gap.
+    Returns (strokes, x of its leftmost part, True if that leftmost part is a
+    short horizontal tick) so the initial can be fitted to the left of it.
     """
-    R, t, d = COL_STEM * W, COL_TICK * W, COL_PAIR * W
+    R, t, d, t2 = COL_STEM * W, COL_TICK * W, COL_PAIR * W, COL_TICK2 * W
     ym = lambda f: y0 + (y1 - y0) * f
     one = [0.5]
     two = [0.66, 0.34]
     st = [line((R, y0), (R, y1))]
     if v == "ㅣ":
-        return st, R
+        return st, R, False
     if v in "ㅏㅑ":
-        return st + [line((R, ym(f)), (R + t, ym(f))) for f in (one if v == "ㅏ" else two)], R
+        return st + [line((R, ym(f)), (R + t, ym(f))) for f in (one if v == "ㅏ" else two)], R, False
     if v in "ㅓㅕ":
-        return st + [line((R - t, ym(f)), (R, ym(f))) for f in (one if v == "ㅓ" else two)], R - t
+        return st + [line((R - t, ym(f)), (R, ym(f))) for f in (one if v == "ㅓ" else two)], R - t, True
     st.append(line((R - d, y0), (R - d, y1)))
     if v in "ㅐㅒ":
-        return st + [line((R - d, ym(f)), (R, ym(f))) for f in (one if v == "ㅐ" else two)], R - d
+        return st + [line((R - d, ym(f)), (R, ym(f))) for f in (one if v == "ㅐ" else two)], R - d, False
     # ㅔ ㅖ
-    return st + [line((R - d - t, ym(f)), (R - d, ym(f))) for f in (one if v == "ㅔ" else two)], R - d - t
+    return st + [line((R - d - t2, ym(f)), (R - d, ym(f))) for f in (one if v == "ㅔ" else two)], R - d - t2, True
+
+
+# optical fill: share of the available height (vowel on the right) or width (vowel below)
+# that a consonant really uses.  Closed and round shapes look bigger than open ones,
+# so they are drawn smaller and centred to keep the visual size of every syllable even.
+VFILL = {"ㄱ": 1.0, "ㅋ": 1.0, "ㄴ": 0.88, "ㄷ": 0.86, "ㄹ": 0.90, "ㅁ": 0.80, "ㅂ": 0.86,
+         "ㅅ": 0.94, "ㅇ": 0.64, "ㅈ": 0.94, "ㅊ": 0.97, "ㅌ": 0.90, "ㅍ": 0.82, "ㅎ": 0.86}
+HFILL = {"ㅇ": 0.72, "ㅎ": 0.80, "ㅁ": 0.88, "ㅍ": 0.92, "ㅂ": 0.92}
+
+
+def _base(c):
+    return _DOUBLE[c][0] if c in _DOUBLE else c
+
+
+def fit_v(c, box, strength=1.0):
+    """Shrink box vertically by the consonant's optical fill (top-weighted)."""
+    f = 1.0 - (1.0 - VFILL.get(_base(c), 1.0)) * strength
+    x0, y0, x1, y1 = box
+    h = y1 - y0
+    top = y1 - (1.0 - f) * h * 0.45
+    return (x0, top - f * h, x1, top)
+
+
+def fit_h(c, box):
+    """Shrink box horizontally (centred) for round / closed consonants."""
+    if c in _DOUBLE:
+        return box
+    f = HFILL.get(c, 1.0)
+    x0, y0, x1, y1 = box
+    m = (x1 - x0) * (1.0 - f) / 2.0
+    return (x0 + m, y0, x1 - m, y1)
 
 
 def syllable(L, V, T, W, H, hw, gap):
@@ -159,8 +191,9 @@ def syllable(L, V, T, W, H, hw, gap):
     cl = T in _DOUBLE  # cluster final: give the bottom row more room
     if V in VERT:
         y0 = (((0.52 if cl else 0.44) * H + s) if has_t else 0.0)
-        vst, left = vert_vowel(V, y0, H, W)
-        Lb = (0.0, y0, left - gx, H)
+        vst, left, tick = vert_vowel(V, y0, H, W)
+        g = (0.06 * W + 1.4 * s) if tick else gx   # a short tick needs less room than a stem
+        Lb = fit_v(L, (0.0, y0, left - g, H), 0.5 if has_t else 1.0)
         Tb = (0.0, 0.0, W, (0.40 if cl else 0.30) * H) if has_t else None
         out += consonant(L, Lb, hw, gap)
         out += vst
@@ -180,7 +213,7 @@ def syllable(L, V, T, W, H, hw, gap):
             # ㅡ sits on the bottom line like the bars of ㅗ ㅛ
             Vb = (0.0, -0.16 * H, W, 0.16 * H) if V == "ㅡ" else (0.0, 0.0, W, 0.32 * H)
             Tb = None
-        out += consonant(L, Lb, hw, gap)
+        out += consonant(L, fit_h(L, Lb), hw, gap)
         out += into_box(_VOW[V], Vb)
     else:  # mixed: horizontal part under the initial, vertical part on the stem column
         h, v = MIXED[V]
@@ -194,7 +227,7 @@ def syllable(L, V, T, W, H, hw, gap):
         else:
             ytop_l, hb, vy0 = 0.46 * H + s, (0.0, 0.32 * H), 0.0
             Tb = None
-        vst, left = vert_vowel(v, vy0, H, W)
+        vst, left, tick = vert_vowel(v, vy0, H, W)
         Lb = (0.02 * W, ytop_l, min(0.50 * W - s, left - gx), H)
         Hb = (0.0, hb[0], left - gx, hb[1])
         if h == "ㅡ" and not has_t:
@@ -207,7 +240,7 @@ def syllable(L, V, T, W, H, hw, gap):
         # past the initial on the left or the vowel stem / tick on the right
         b = bounds(out)
         Tb = (max(Tb[0], b[0]), Tb[1], min(Tb[2], b[2]), Tb[3])
-        out += consonant(T, Tb, hw, gap)
+        out += consonant(T, fit_h(T, Tb), hw, gap)
     return out
 
 
