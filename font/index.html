@@ -27,7 +27,7 @@
   .ctrl b { color: var(--fg); font-variant-numeric: tabular-nums; }
   #play { width: 100%; min-height: 150px; border: 0; outline: 0; resize: vertical; background: transparent; color: inherit;
           font: inherit; font-size: var(--size, 40px); font-weight: var(--wght, 400);
-          font-variation-settings: "opsz" var(--opsz, 12); font-optical-sizing: none; line-height: 1.5; }
+          font-variation-settings: "opsz" var(--opsz, 12), "wdth" var(--wdth, 100); font-optical-sizing: none; line-height: 1.5; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 0; }
   button { font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
            background: var(--card); color: var(--fg); cursor: pointer; }
@@ -51,6 +51,7 @@
     <div class="ctrl">
       <label>굵기 wght <b id="vw">400</b><input id="w" type="range" min="100" max="900" step="10" value="400"></label>
       <label>글자 크기별 모양 opsz <b id="vo">12</b><input id="o" type="range" min="12" max="72" step="1" value="12"></label>
+      <label>폭 wdth <b id="vd">100</b><input id="d" type="range" min="80" max="125" step="1" value="100"></label>
       <label>크기 <b id="vs">40</b>px<input id="s" type="range" min="10" max="140" step="1" value="40"></label>
     </div>
     <textarea id="play" spellcheck="false">가나다라마바사 안녕하세요, 네마음체입니다.
@@ -76,6 +77,13 @@ The quick brown fox jumps over the lazy dog 0123456789
     <p style="font-size:20px;font-optical-sizing:auto">20px · 한글은 작은 크기에서도 획이 뭉치지 않도록 설계했습니다.</p>
     <p style="font-size:44px;font-optical-sizing:auto">44px · 큰 제목은 더 날렵하게</p>
     <p style="font-size:84px;font-optical-sizing:auto;line-height:1.2">84px 제목</p>
+  </div>
+
+  <h2>고정폭 숫자 (tnum)</h2>
+  <div class="card" style="font-size:30px">
+    <div class="t">기본 (글자마다 폭이 다름)</div>1111111 <br>9999999 <br>
+    <div class="t" style="margin-top:8px">font-feature-settings: "tnum" (모든 숫자 폭 같음)</div>
+    <span style="font-feature-settings:'tnum'">1111111<br>9999999</span>
   </div>
 
   <h2>특수문자 · 이모티콘</h2>
@@ -116,6 +124,13 @@ The quick brown fox jumps over the lazy dog 0123456789
     <a href="dist/display/ttf/NemaumDisplay-Bold.ttf" download>Bold.ttf</a>
     <div class="t" style="margin-top:10px">웹용 (WOFF2 / WOFF)</div>
     <a href="dist/text/woff2/Nemaum-Regular.woff2" download>Regular.woff2</a>
+    <div class="t" style="margin-top:10px">폭 변형 (좁게 / 넓게)</div>
+    <a href="dist/narrow/ttf/NemaumNarrow-Regular.ttf" download>Narrow Regular.ttf</a>
+    <a href="dist/narrow/ttf/NemaumNarrow-Bold.ttf" download>Narrow Bold.ttf</a>
+    <a href="dist/wide/ttf/NemaumWide-Regular.ttf" download>Wide Regular.ttf</a>
+    <a href="dist/wide/ttf/NemaumWide-Bold.ttf" download>Wide Bold.ttf</a>
+    <div class="t" style="margin-top:10px">웹</div>
+    <a href="dist/text/woff2/Nemaum-Regular.woff2" download>Regular.woff2</a>
     <a href="dist/text/woff/Nemaum-Regular.woff" download>Regular.woff</a>
   </div>
 </div>
@@ -125,10 +140,11 @@ The quick brown fox jumps over the lazy dog 0123456789
   function apply() {
     play.style.setProperty("--wght", $("w").value);
     play.style.setProperty("--opsz", $("o").value);
+    play.style.setProperty("--wdth", $("d").value); $("vd").textContent = $("d").value;
     play.style.setProperty("--size", $("s").value + "px");
     $("vw").textContent = $("w").value; $("vo").textContent = $("o").value; $("vs").textContent = $("s").value;
   }
-  ["w", "o", "s"].forEach((id) => $(id).addEventListener("input", apply));
+  ["w", "o", "s", "d"].forEach((id) => $(id).addEventListener("input", apply));
   document.querySelectorAll("button[data-w]").forEach((b) => b.onclick = () => { $("w").value = b.dataset.w; apply(); });
   document.querySelectorAll("button[data-o]").forEach((b) => b.onclick = () => { $("o").value = b.dataset.o; apply(); });
   apply();

@@ -271,7 +271,7 @@ def web_subsets(vf_path, outdir):
         f.save(p)
         print("  %-52s %6.2f MB" % (os.path.relpath(p), os.path.getsize(p) / 1e6), flush=True)
         css.append("@font-face {\n  font-family: \"Nemaum VF\";\n  src: url(\"Nemaum-VF-%s.woff2\") format(\"woff2\");\n"
-                   "  font-weight: 100 900;\n  font-display: swap;\n  unicode-range: %s;\n}" % (name, rng(cps)))
+                   "  font-weight: 100 900;\n  font-stretch: 80%% 125%%;\n  font-display: swap;\n  unicode-range: %s;\n}" % (name, rng(cps)))
     with open(os.path.join(outdir, "nemaum.css"), "w") as fh:
         fh.write("\n".join(css) + "\n")
 
