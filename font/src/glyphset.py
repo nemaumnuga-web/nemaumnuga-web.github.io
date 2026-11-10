@@ -36,7 +36,7 @@ def make_syllable(cp):
 
     def f(P):
         W, H, x0, y0 = hangul_box(P)
-        e = P.hw * m
+        e = hg.stroke(P.hw, m)
         st = hg.syllable(L, V, T, W, H, e, 44)
         st = xform(st, 1, 1, x0, y0)
         return render(st, e), 1000

@@ -28,7 +28,7 @@ def kscale(strokes, f):
 def hangul_strokes(cp, P):
     """Hangul syllable strokes inside a 860x880 box starting at x=0, y=-70."""
     L, V, T = hg.split_syllable(cp)
-    st = hg.syllable(L, V, T, 860, 880, P.hw * hg.hw_mult(L, V, T), 44)
+    st = hg.syllable(L, V, T, 860, 880, hg.stroke(P.hw, hg.hw_mult(L, V, T)), 44)
     return xform(st, 1, 1, 0, -70), 860
 
 

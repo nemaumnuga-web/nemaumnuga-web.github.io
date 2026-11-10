@@ -35,6 +35,19 @@ _DOUBLE = {"ㄲ": "ㄱㄱ", "ㄸ": "ㄷㄷ", "ㅃ": "ㅂㅂ", "ㅆ": "ㅅㅅ", "
            "ㄳ": "ㄱㅅ", "ㄵ": "ㄴㅈ", "ㄶ": "ㄴㅎ", "ㄺ": "ㄹㄱ", "ㄻ": "ㄹㅁ", "ㄼ": "ㄹㅂ",
            "ㄽ": "ㄹㅅ", "ㄾ": "ㄹㅌ", "ㄿ": "ㄹㅍ", "ㅀ": "ㄹㅎ", "ㅄ": "ㅂㅅ"}
 
+# number of horizontal bars stacked in each consonant / horizontal vowel: used to share the
+# height of a syllable so that every bar gets the same spacing (a uniform rhythm)
+HBARS = {"ㄱ": 1, "ㄴ": 1, "ㄷ": 2, "ㄹ": 3, "ㅁ": 2, "ㅂ": 2, "ㅅ": 1, "ㅇ": 2, "ㅈ": 1.5,
+         "ㅊ": 2.5, "ㅋ": 2, "ㅌ": 3, "ㅍ": 2, "ㅎ": 3}
+VBARS = {"ㅗ": 1.5, "ㅛ": 1.5, "ㅜ": 1.5, "ㅠ": 1.5, "ㅡ": 0.6}
+
+
+def hbars(c):
+    if c in _DOUBLE:
+        return max(HBARS[x] for x in _DOUBLE[c])
+    return HBARS[c]
+
+
 CPLX = {"ㄱ": 1, "ㄴ": 1, "ㄷ": 1.6, "ㄹ": 2.6, "ㅁ": 2.0, "ㅂ": 2.6, "ㅅ": 1.6, "ㅇ": 1.4, "ㅈ": 2.2,
         "ㅊ": 3.0, "ㅋ": 2.0, "ㅌ": 2.6, "ㅍ": 3.0, "ㅎ": 3.0}
 
@@ -125,14 +138,15 @@ def syllable(L, V, T, W, H, hw, gap):
         out += into_box(_VOW[V], Vb)
     elif V in HORZ:
         if has_t:
-            if cl:
-                Lb = (0.07 * W, 0.72 * H + s, 0.93 * W, H)
-                Vb = (0.0, 0.46 * H + s * 0.5, W, 0.60 * H - s * 0.3)
-                Tb = (0.0, 0.0, W, 0.34 * H)
-            else:
-                Lb = (0.07 * W, 0.62 * H + s, 0.93 * W, H)
-                Vb = (0.0, 0.31 * H + s * 0.5, W, 0.49 * H - s * 0.3)
-                Tb = (0.02 * W, 0.0, 0.98 * W, 0.22 * H)
+            wl, wv, wt = hbars(L) + 0.6, VBARS[V], hbars(T)
+            g1 = 0.06 * H + 1.6 * s   # initial -> vowel
+            g2 = 0.09 * H + 1.8 * s   # vowel -> final (kept wider so the two never touch)
+            avail = H - g1 - g2
+            tot = wl + wv + wt
+            hT, hV = avail * wt / tot, avail * wv / tot
+            Tb = (0.02 * W, 0.0, 0.98 * W, hT)
+            Vb = (0.0, hT + g2, W, hT + g2 + hV)
+            Lb = (0.07 * W, hT + g2 + hV + g1, 0.93 * W, H)
         else:
             Lb = (0.07 * W, 0.46 * H + s, 0.93 * W, H)
             Vb = (0.0, 0.0, W, 0.32 * H)
@@ -173,7 +187,14 @@ def syllable_cplx(L, V, T):
 def hw_mult(L, V, T):
     """Dense syllables get a slightly lighter stroke so counters stay open."""
     c = syllable_cplx(L, V, T)
-    return max(0.5, min(1.0, 1.0 - 0.05 * (c - 4.0)))
+    return max(0.6, min(1.0, 1.0 - 0.05 * (c - 4.0)))
+
+
+def stroke(hw, m):
+    """Effective half-stroke: uniform at light/regular weights; only heavy weights
+    thin the dense syllables (so counters stay open)."""
+    r = max(0.0, min(1.0, (hw - 24.0) / 40.0))
+    return hw * (1.0 - (1.0 - m) * r)
 
 
 def split_syllable(cp):

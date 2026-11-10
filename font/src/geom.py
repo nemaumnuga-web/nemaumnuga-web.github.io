@@ -52,7 +52,7 @@ MAX_MITER = 1.0
 WSCALE = 1.0   # horizontal scale of centre-lines (wdth axis); stroke widths are unaffected
 
 
-def _rect(p0, p1, e0, e1, h):
+def _rect(p0, p1, e0, e1, h, cut0=False, cut1=False):
     dx, dy = p1[0] - p0[0], p1[1] - p0[1]
     L = math.hypot(dx, dy)
     if L < 1e-6:
@@ -61,8 +61,23 @@ def _rect(p0, p1, e0, e1, h):
     nx, ny = -uy, ux
     a = (p0[0] - ux * e0, p0[1] - uy * e0)
     b = (p1[0] + ux * e1, p1[1] + uy * e1)
-    return [(a[0] + nx * h, a[1] + ny * h), (b[0] + nx * h, b[1] + ny * h),
-            (b[0] - nx * h, b[1] - ny * h), (a[0] - nx * h, a[1] - ny * h)]
+    pts = [(a[0] + nx * h, a[1] + ny * h), (b[0] + nx * h, b[1] + ny * h),
+           (b[0] - nx * h, b[1] - ny * h), (a[0] - nx * h, a[1] - ny * h)]
+    diag = min(abs(ux), abs(uy)) > 0.08
+    if diag and (cut0 or cut1):
+        def flat(c, ref):
+            # slide the corner along the stroke until it is level with the stroke end:
+            # steep strokes are cut horizontally, shallow ones vertically
+            if abs(uy) >= abs(ux):
+                t = (ref[1] - c[1]) / uy
+            else:
+                t = (ref[0] - c[0]) / ux
+            return (c[0] + ux * t, c[1] + uy * t)
+        if cut0:
+            pts[0], pts[3] = flat(pts[0], a), flat(pts[3], a)
+        if cut1:
+            pts[1], pts[2] = flat(pts[1], b), flat(pts[2], b)
+    return pts
 
 
 def _turn_ext(pa, pb, pc, h):
@@ -107,16 +122,14 @@ def render(strokes, hw):
                 else:
                     e0 = h * cap if i == 0 else _turn_ext(q[i - 1], a, b, h)
                     e1 = h * cap if i == segs - 1 else _turn_ext(a, b, q[i + 2], h)
-                r = _rect(a, b, e0, e1, h)
+                r = _rect(a, b, e0, e1, h, (not closed) and i == 0 and cap == 0.0,
+                          (not closed) and i == segs - 1 and cap == 0.0)
                 if r:
                     out.append(r)
         elif t == "d":
             _, x, y, r, k = s
             R = hw * k * r
-            c = 0.4142135623730951 * R  # regular octagon with circumradius ~ R*1.082
-            R2 = R * 1.0
-            pts = [(x - c, y + R2), (x + c, y + R2), (x + R2, y + c), (x + R2, y - c),
-                   (x + c, y - R2), (x - c, y - R2), (x - R2, y - c), (x - R2, y + c)]
+            pts = [(x - R, y + R), (x + R, y + R), (x + R, y - R), (x - R, y - R)]  # square dot
             out.append(pts)
         elif t in ("f", "h"):
             pts = s[1]
