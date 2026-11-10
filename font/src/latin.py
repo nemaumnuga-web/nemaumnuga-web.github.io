@@ -3,13 +3,13 @@
 Every glyph returns (strokes, content_width); x starts at 0.  The builder adds
 side bearings.  CAP=730, XH=520, ASC=750, DESC=-190.
 """
-from geom import P, D, line, arc, ring
+from geom import P, D, line, sarc as arc, sring as ring
 
 CAP, XH, ASC, DESC = 730, 520, 750, -190
-SX, SY = 1.05, 1.2   # proportional glyphs are drawn at this scale (taller x-height, wider letters)
+SX, SY = 1.3, 1.2   # proportional glyphs are drawn at this scale (taller x-height, wider letters)
 
 
-def _o(cx, cy, rx, ry, n=28):
+def _o(cx, cy, rx, ry, n=32):
     return P(ring(cx, cy, rx, ry, n), True)
 
 

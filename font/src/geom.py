@@ -43,6 +43,35 @@ def ring(cx, cy, rx, ry, n=28, rot=90.0):
              cy + ry * math.sin(math.radians(rot + 360.0 * i / n))) for i in range(n)]
 
 
+# ------------------------------------------------- squarish curves (house style)
+ROUND_N = 3.4   # superellipse exponent: 2 = ellipse, larger = closer to a rounded rectangle
+
+
+def _se(t, n):
+    c, s = math.cos(t), math.sin(t)
+    return (math.copysign(abs(c) ** (2.0 / n), c), math.copysign(abs(s) ** (2.0 / n), s))
+
+
+def sarc(cx, cy, rx, ry, a0, a1, step=10.0, n=None):
+    """Like arc() but on a superellipse: the squarish bowls of the letters."""
+    n = n or ROUND_N
+    k = max(2, int(math.ceil(abs(a1 - a0) / step)))
+    out = []
+    for i in range(k + 1):
+        x, y = _se(math.radians(a0 + (a1 - a0) * i / k), n)
+        out.append((cx + rx * x, cy + ry * y))
+    return out
+
+
+def sring(cx, cy, rx, ry, n=32, rot=90.0, e=None):
+    e = e or ROUND_N
+    out = []
+    for i in range(n):
+        x, y = _se(math.radians(rot + 360.0 * i / n), e)
+        out.append((cx + rx * x, cy + ry * y))
+    return out
+
+
 def line(a, b, cap=0.0, k=1.0):
     return P([a, b], False, cap, k)
 

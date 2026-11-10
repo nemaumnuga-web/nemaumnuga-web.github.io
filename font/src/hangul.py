@@ -1,5 +1,5 @@
 """Procedural Hangul: jamo skeletons in the unit square + syllable layout."""
-from geom import P, D, line, arc, ring, into_box, xform, bounds
+from geom import P, D, line, arc, into_box, xform, bounds, sring as ring
 
 CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
 JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
@@ -16,7 +16,7 @@ def _c(name):
     S["ㅁ"] = [P([(0, 1), (1, 1), (1, 0), (0, 0)], True)]
     S["ㅂ"] = [P([(0, 1), (0, 0), (1, 0), (1, 1)]), line((0, .48), (1, .48))]
     S["ㅅ"] = [line((.5, 1), (0, 0)), line((.5, .62), (1, 0))]
-    S["ㅇ"] = [P(ring(.5, .5, .5, .5, 28), True)]
+    S["ㅇ"] = [P(ring(.5, .5, .5, .5, 32), True)]
     S["ㅈ"] = [line((0, 1), (1, 1)), line((.5, 1), (0, 0)), line((.5, .55), (1, 0))]
     S["ㅊ"] = [line((.34, 1), (.66, 1)), line((0, .74), (1, .74)),
               line((.5, .74), (0, 0)), line((.5, .4), (1, 0))]
@@ -24,7 +24,7 @@ def _c(name):
     S["ㅌ"] = [P([(1, 1), (0, 1), (0, 0), (1, 0)]), line((0, .5), (1, .5))]
     S["ㅍ"] = [line((0, 1), (1, 1)), line((0, 0), (1, 0)), line((.25, 1), (.25, 0)), line((.75, 1), (.75, 0))]
     S["ㅎ"] = [line((.3, 1), (.7, 1)), line((0, .76), (1, .76)),
-              P(ring(.5, .3, .3, .3, 24), True)]
+              P(ring(.5, .3, .3, .3, 28), True)]
     return S[name]
 
 
