@@ -49,6 +49,7 @@ def line(a, b, cap=0.0, k=1.0):
 
 # ---------------------------------------------------------------- render
 MAX_MITER = 1.0
+WSCALE = 1.0   # horizontal scale of centre-lines (wdth axis); stroke widths are unaffected
 
 
 def _rect(p0, p1, e0, e1, h):
@@ -80,6 +81,8 @@ def _turn_ext(pa, pb, pc, h):
 def render(strokes, hw):
     """-> list of contours (list of (x, y)), clockwise, overlaps allowed."""
     out = []
+    if WSCALE != 1.0:
+        strokes = xform(strokes, WSCALE, 1.0)
     for s in strokes:
         t = s[0]
         if t == "p":

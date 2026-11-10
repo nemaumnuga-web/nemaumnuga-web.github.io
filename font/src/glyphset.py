@@ -21,11 +21,12 @@ for c in range(0xE0100, 0xE01F0):
 
 
 def hangul_box(P):
+    """Centre-line box of a syllable; the ink then fills about 0.95-1.0 em."""
     t = P.t
-    W = 860 - 60 * t
-    H = 900 - 80 * t
+    W = 930 - 40 * t - P.hw * 1.0
+    H = 990 - 40 * t - P.hw * 2.0
     x0 = (1000 - W) / 2.0
-    y0 = -70 + 40 * t
+    y0 = -112 + 30 * t + P.hw
     return W, H, x0, y0
 
 
@@ -55,10 +56,19 @@ def make_latin(strokes_w, k=1.0):
     strokes, w = strokes_w
 
     def f(P):
-        sb = 55 - 25 * P.t
+        sb = 45 - 20 * P.t
         dx = sb + P.hw
-        st = xform(strokes, 1, 1, dx, 0)
-        return render(st, P.hw * k), w + 2 * dx
+        st = xform(strokes, lt.SX, lt.SY, dx, 0)
+        return render(st, P.hw * k), w * lt.SX + 2 * dx
+    return f
+
+
+def make_tabular(strokes_w):
+    strokes, w = strokes_w
+
+    def f(P):
+        dx = (640 - w * lt.SX) / 2.0
+        return render(xform(strokes, lt.SX, lt.SY, dx, 0), P.hw), 640
     return f
 
 
@@ -114,4 +124,6 @@ def collect():
     G.update(sa.misc())
     G.update(sb.all_recipes())
     G.update(sb.bridges())
+    for d in "0123456789":
+        G["uni%04X.tf" % ord(d)] = make_tabular(L[d])
     return G

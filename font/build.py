@@ -18,6 +18,8 @@ from fontTools.ttLib import TTFont, newTable
 
 import config as C
 import glyphset
+import geom
+import latin as lt
 from geom import render, P as PS
 
 STYLES = {100: "Thin", 300: "Light", 400: "Regular", 700: "Bold", 900: "Black"}
@@ -32,9 +34,11 @@ def notdef(P):
     return render(st, P.hw * 0.7), 560
 
 
-def build_master(wght, opsz, path, recipes, names):
+def build_master(wght, wdth, opsz, path, recipes, names):
     hw, t = C.hw_for(wght, opsz)
-    P = SimpleNamespace(hw=hw, t=t, wght=wght, opsz=opsz)
+    f = wdth / 100.0
+    geom.WSCALE = f
+    P = SimpleNamespace(hw=hw, t=t, wght=wght, opsz=opsz, wdth=wdth, f=f)
     order = [".notdef"]
     cmap = {}
     glyphs, metrics = {}, {}
@@ -56,13 +60,18 @@ def build_master(wght, opsz, path, recipes, names):
         metrics[name] = (int(round(adv)), min(xs) if xs else 0)
 
     c, a = notdef(P)
-    add(".notdef", c, a)
-    for cp in sorted(recipes):
+    add(".notdef", c, a * f)
+    for cp in sorted(k for k in recipes if isinstance(k, int)):
         n = gname(cp)
         order.append(n)
         cmap[cp] = n
         c, a = recipes[cp](P)
-        add(n, c, a)
+        add(n, c, a * f)
+    for n in sorted(k for k in recipes if isinstance(k, str)):  # alternates without a cmap entry
+        order.append(n)
+        c, a = recipes[n](P)
+        add(n, c, a * f)
+    geom.WSCALE = 1.0
 
     fb = FontBuilder(C.UPM, isTTF=True)
     fb.setupGlyphOrder(order)
@@ -78,7 +87,7 @@ def setup_common(fb, names, wght):
     fb.setupNameTable(names)
     fb.setupOS2(version=4, sTypoAscender=C.ASCENDER, sTypoDescender=C.DESCENDER, sTypoLineGap=C.LINEGAP,
                 usWinAscent=1000, usWinDescent=300, usWeightClass=int(wght),
-                sxHeight=520, sCapHeight=730, achVendID="NEMA",
+                sxHeight=int(lt.XH * lt.SY), sCapHeight=int(lt.CAP * lt.SY), achVendID="NEMA",
                 fsSelection=(1 << 6) | (1 << 7))
     fb.setupPost(keepGlyphNames=False)
     gasp = newTable("gasp")
@@ -98,32 +107,41 @@ def family_names(style, family=None):
 
 def build_variable(recipes, work):
     doc = DesignSpaceDocument()
-    for tag, name, rng in (("wght", "Weight", C.WGHT), ("opsz", "Optical Size", C.OPSZ)):
+    for tag, name, rng in (("wght", "Weight", C.WGHT), ("wdth", "Width", C.WDTH), ("opsz", "Optical Size", C.OPSZ)):
         ax = AxisDescriptor()
         ax.tag, ax.name = tag, name.lower().replace(" ", "")
         ax.minimum, ax.default, ax.maximum = rng
         doc.addAxis(ax)
-    masters = [(100, 12), (400, 12), (900, 12), (100, 72), (900, 72)]
-    for w, o in masters:
-        p = os.path.join(work, "master-%d-%d.ttf" % (w, o))
+    masters = [(w, d, o) for w in (100, 400, 900) for d in (80, 100, 125) for o in (12, 72)]  # full grid: the width/weight/size terms interact
+    for w, d, o in masters:
+        p = os.path.join(work, "master-%d-%d-%d.ttf" % (w, d, o))
         t0 = time.time()
-        build_master(w, o, p, recipes, family_names("Master %d %d" % (w, o)))
-        print("  master wght=%d opsz=%d  (%.1fs)" % (w, o, time.time() - t0), flush=True)
+        build_master(w, d, o, p, recipes, family_names("Master %d %d %d" % (w, d, o)))
+        print("  master wght=%d wdth=%d opsz=%d  (%.1fs)" % (w, d, o, time.time() - t0), flush=True)
         s = SourceDescriptor()
         s.path = p
-        s.location = {"weight": w, "opticalsize": o}
+        s.location = {"weight": w, "width": d, "opticalsize": o}
         s.familyName, s.styleName = C.FAMILY, "Master"
         doc.addSource(s)
     for w, name in STYLES.items():
         i = InstanceDescriptor()
         i.familyName, i.styleName = C.FAMILY, name
-        i.location = {"weight": w, "opticalsize": 12}
+        i.location = {"weight": w, "width": 100, "opticalsize": 12}
         doc.addInstance(i)
     dsp = os.path.join(work, "Nemaum.designspace")
     doc.write(dsp)
     t0 = time.time()
     vf, _, _ = varLib.build(dsp, master_finder=lambda s: s)
     print("  varLib merged (%.1fs)" % (time.time() - t0), flush=True)
+    # OpenType features: tabular figures
+    from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
+    order = vf.getGlyphOrder()
+    cmap_ = vf.getBestCmap()
+    tf_names = order[-10:]  # the ten uniXXXX.tf alternates are always the last glyphs
+    digits = "0123456789"
+    fea = ("languagesystem DFLT dflt;\nlanguagesystem latn dflt;\nlanguagesystem hang dflt;\n"
+           "feature tnum {\n" + "\n".join("  sub %s by %s;" % (cmap_[ord(d)], tf_names[i]) for i, d in enumerate(digits)) + "\n} tnum;\n")
+    addOpenTypeFeaturesFromString(vf, fea)
     # naming of the variable font
     nm = vf["name"]
     for nid, val in ((1, C.FAMILY), (2, "Regular"), (4, C.FAMILY + " Variable"), (6, C.FAMILY + "-VF"),
@@ -133,9 +151,9 @@ def build_variable(recipes, work):
     return vf
 
 
-def make_static(vf, wght, opsz, family):
+def make_static(vf, wght, opsz, family, wdth=100):
     style = STYLES.get(wght, str(wght))
-    f = instancer.instantiateVariableFont(vf, {"wght": wght, "opsz": opsz}, inplace=False,
+    f = instancer.instantiateVariableFont(vf, {"wght": wght, "wdth": wdth, "opsz": opsz}, inplace=False,
                                           overlap=instancer.OverlapMode.REMOVE)
     nm = f["name"]
     nm.names = [n for n in nm.names if n.nameID not in (16, 17, 25) and n.nameID < 256]
@@ -192,9 +210,11 @@ def ttf_to_otf(ttf, path_psname):
     o = ttf["OS/2"]
     fb.setupOS2(version=4, sTypoAscender=C.ASCENDER, sTypoDescender=C.DESCENDER, sTypoLineGap=C.LINEGAP,
                 usWinAscent=1000, usWinDescent=300, usWeightClass=o.usWeightClass,
-                sxHeight=520, sCapHeight=730, achVendID="NEMA", fsSelection=o.fsSelection)
+                sxHeight=int(lt.XH * lt.SY), sCapHeight=int(lt.CAP * lt.SY), achVendID="NEMA", fsSelection=o.fsSelection)
     fb.setupPost(keepGlyphNames=False)
     fb.font["head"].macStyle = ttf["head"].macStyle
+    if "GSUB" in ttf:
+        fb.font["GSUB"] = ttf["GSUB"]
     return fb.font
 
 
@@ -271,7 +291,7 @@ def main():
     recipes = glyphset.collect()
     if a.sample:
         recipes = {cp: f for cp, f in recipes.items()
-                   if not (0xAC00 <= cp <= 0xD7A3) or (cp - 0xAC00) % 40 == 0}
+                   if isinstance(cp, str) or not (0xAC00 <= cp <= 0xD7A3) or (cp - 0xAC00) % 40 == 0}
     print("glyphs:", len(recipes) + 1)
     print("building masters")
     vf = build_variable(recipes, work)
@@ -296,6 +316,17 @@ def main():
             for fl in ("woff2", "woff"):
                 save(TTFont(os.path.join(out, folder, "ttf", base + ".ttf")),
                      os.path.join(out, folder, fl, base + "." + fl), fl)
+    for fam, wd, folder in ((C.FAMILY + " Narrow", 80, "narrow"), (C.FAMILY + " Wide", 125, "wide")):
+        for sub in ("ttf", "otf", "woff2"):
+            os.makedirs(os.path.join(out, folder, sub), exist_ok=True)
+        for w in (400, 700):
+            st = make_static(vf, w, 12, fam, wd)
+            base = "%s-%s" % (fam.replace(" ", ""), STYLES[w])
+            save(st, os.path.join(out, folder, "ttf", base + ".ttf"))
+            ot = ttf_to_otf(st, st["name"].getDebugName(6))
+            save(ot, os.path.join(out, folder, "otf", base + ".otf"))
+            save(TTFont(os.path.join(out, folder, "ttf", base + ".ttf")),
+                 os.path.join(out, folder, "woff2", base + ".woff2"), "woff2")
     shutil.rmtree(work, ignore_errors=True)
 
 

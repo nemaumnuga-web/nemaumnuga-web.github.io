@@ -7,6 +7,7 @@ ASCENDER, DESCENDER, LINEGAP = 880, -120, 300
 # variable-axis ranges
 WGHT = (100, 400, 900)       # min, default, max
 OPSZ = (12, 12, 72)
+WDTH = (80, 100, 125)
 
 # half stroke width at the extremes
 HW_MIN, HW_MAX = 11.0, 58.0

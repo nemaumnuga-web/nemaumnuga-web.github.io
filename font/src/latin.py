@@ -6,6 +6,7 @@ side bearings.  CAP=730, XH=520, ASC=750, DESC=-190.
 from geom import P, D, line, arc, ring
 
 CAP, XH, ASC, DESC = 730, 520, 750, -190
+SX, SY = 1.05, 1.2   # proportional glyphs are drawn at this scale (taller x-height, wider letters)
 
 
 def _o(cx, cy, rx, ry, n=28):

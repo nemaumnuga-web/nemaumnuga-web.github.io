@@ -152,7 +152,7 @@ def accent_recipe(cp):
         gap = 20.0
 
     def f(P):
-        sb = 55 - 25 * P.t
+        sb = 45 - 20 * P.t
         dx = sb + P.hw
         cxm = max(bw, 1) / 2.0 if bw > 0 else 0.0
         if b == 0x69 or b == 0x6A or b == 0x6C:
@@ -165,8 +165,8 @@ def accent_recipe(cp):
                 y += 110 if m in (0x0308, 0x0307) else 150
             else:
                 st += below_strokes(m, cxm, P.hw)
-        st = xform(st, 1, 1, dx, 0)
-        return render(st, P.hw), bw + 2 * dx
+        st = xform(st, lt.SX, lt.SY, dx, 0)
+        return render(st, P.hw), bw * lt.SX + 2 * dx
     return f
 
 
@@ -193,10 +193,10 @@ def special_latin(cp):
         extra = [PS([bar[0], bar[1]])]
 
     def f(P):
-        sb = 55 - 25 * P.t
+        sb = 45 - 20 * P.t
         dx = sb + P.hw
-        st = xform(list(bst) + extra, 1, 1, dx, 0)
-        return render(st, P.hw), bw + 2 * dx
+        st = xform(list(bst) + extra, lt.SX, lt.SY, dx, 0)
+        return render(st, P.hw), bw * lt.SX + 2 * dx
     return f
 
 
@@ -241,7 +241,7 @@ def combining_recipe(m):
             st = [line((cx - 40, -80), (cx + 40, -120)), line((cx - 40, -120), (cx + 40, -80))]
         if st is None:
             return [], 0
-        return render(st, P.hw), 0
+        return render(xform(st, lt.SX, lt.SY), P.hw), 0
     return f
 
 
@@ -261,7 +261,7 @@ def decomp_recipe(cp):
     if tag == "<wide>" and len(cps) == 1 and cps[0] in LATIN:
         def f(P):
             st, w = LATIN[cps[0]]
-            st = xform(st, 1.0, 1.0, (1000 - w) / 2.0, 0)
+            st = xform(st, lt.SX, lt.SY, (1000 - w * lt.SX) / 2.0, 0)
             return render(st, P.hw), 1000
         return f
     if tag in ("<super>", "<sub>") and all(c in LATIN for c in cps):
@@ -271,8 +271,8 @@ def decomp_recipe(cp):
             r = text_strokes(cps, P, 0.58, 40, 0.72)
             st, w = r
             sb = 45
-            st = xform(st, 1, 1, sb + P.hw, 330 if up else -150)
-            return render(st, P.hw * 0.72), w + 2 * (sb + P.hw)
+            st = xform(st, lt.SX, lt.SY, sb + P.hw, 330 * lt.SY if up else -150)
+            return render(st, P.hw * 0.72), w * lt.SX + 2 * (sb + P.hw)
         return f
     if tag == "<fraction>" and len(cps) == 3:
         n, sl, d = cps
@@ -281,9 +281,9 @@ def decomp_recipe(cp):
                 a = text_strokes([n], P, 0.5, 0, 0.75)
                 b = text_strokes([d], P, 0.5, 0, 0.75)
                 wa, wb = a[1], b[1]
-                st = xform(a[0], 1, 1, 40, 300) + [line((20 + wa + 20, 20), (wa + 20 + 160, 600))] + \
-                    xform(b[0], 1, 1, wa + 20 + 130, 0)
-                return render(st, P.hw * 0.75), wa + wb + 400
+                st = xform(a[0], lt.SX, lt.SY, 40, 300 * lt.SY) + [line((20 + wa + 20, 20), (wa + 20 + 160, 600 * lt.SY))] + \
+                    xform(b[0], lt.SX, lt.SY, wa + 20 + 130, 0)
+                return render(st, P.hw * 0.75), (wa + wb) * lt.SX + 400
             return f
     if tag == "<circle>" and all(base(c, type("Q", (), {"hw": 30, "t": 0})) for c in cps):
         def f(P):
