@@ -24,10 +24,10 @@ def hangul_box(P):
     """Centre-line box of a syllable.  The ink stays inside about 0.88 x 0.92 em so
     neighbouring syllables (and lines) keep a clear gap even at heavy weights."""
     t = P.t
-    W = 840 - 40 * t - P.hw * 1.2
-    H = 920 - 40 * t - P.hw * 2.0
+    W = 935 - 40 * t - P.hw * 2.0
+    H = 960 - 40 * t - P.hw * 2.0
     x0 = (1000 - W) / 2.0
-    y0 = -80 + 20 * t + P.hw
+    y0 = -95 + 20 * t + P.hw
     return W, H, x0, y0
 
 
