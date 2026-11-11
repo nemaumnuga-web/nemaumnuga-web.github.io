@@ -78,6 +78,8 @@ def line(a, b, cap=0.0, k=1.0):
 
 # ---------------------------------------------------------------- render
 MAX_MITER = 1.0
+ROUND = False  # round style: every stroke is a capsule (round ends and joins)
+ROUND_K = 5    # points per half circle of a round end
 WSCALE = 1.0   # horizontal scale of centre-lines (wdth axis); stroke widths are unaffected
 
 
@@ -106,6 +108,23 @@ def _rect(p0, p1, e0, e1, h, cut0=False, cut1=False):
             pts[0], pts[3] = flat(pts[0], a), flat(pts[3], a)
         if cut1:
             pts[1], pts[2] = flat(pts[1], b), flat(pts[2], b)
+    return pts
+
+
+def _capsule(p0, p1, h):
+    """Segment with round ends; clockwise; fixed point count (interpolation-safe)."""
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    L = math.hypot(dx, dy)
+    if L < 1e-6:
+        return None
+    th = math.atan2(dx, -dy)  # angle of the left normal n = (-uy, ux)
+    pts = []
+    for k in range(ROUND_K + 1):   # around p1, from +n through +u to -n
+        a = th - math.pi * k / ROUND_K
+        pts.append((p1[0] + h * math.cos(a), p1[1] + h * math.sin(a)))
+    for k in range(ROUND_K + 1):   # around p0, from -n through -u to +n
+        a = th - math.pi - math.pi * k / ROUND_K
+        pts.append((p0[0] + h * math.cos(a), p0[1] + h * math.sin(a)))
     return pts
 
 
@@ -153,14 +172,21 @@ def render(strokes, hw):
                 else:
                     e0 = h * cap if i == 0 else _turn_ext(q[i - 1], a, b, h)
                     e1 = h * cap if i == segs - 1 else _turn_ext(a, b, q[i + 2], h)
-                r = _rect(a, b, e0, e1, h, (not closed) and i == 0 and cap == 0.0,
-                          (not closed) and i == segs - 1 and cap == 0.0)
+                if ROUND:
+                    r = _capsule(a, b, h)
+                else:
+                    r = _rect(a, b, e0, e1, h, (not closed) and i == 0 and cap == 0.0,
+                              (not closed) and i == segs - 1 and cap == 0.0)
                 if r:
                     out.append(r)
         elif t == "d":
             _, x, y, r, k = s
             R = hw * k * r
-            pts = [(x - R, y + R), (x + R, y + R), (x + R, y - R), (x - R, y - R)]  # square dot
+            if ROUND:
+                pts = [(x + R * math.cos(-2 * math.pi * i / 12 + math.pi / 2),
+                        y + R * math.sin(-2 * math.pi * i / 12 + math.pi / 2)) for i in range(12)]
+            else:
+                pts = [(x - R, y + R), (x + R, y + R), (x + R, y - R), (x - R, y - R)]  # square dot
             out.append(pts)
         elif t in ("f", "h"):
             pts = s[1]

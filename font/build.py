@@ -8,6 +8,16 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
+if "--round" in sys.argv:
+    # round family: capsule strokes, softer bowls (set before the glyph modules are imported)
+    import geom as _g
+    _g.ROUND = True
+    _g.ROUND_N = 2.6
+    _g.ROUND_K = 4
+    import config as _c
+    _c.FAMILY = "Nemaum Round"
+    _c.FAMILY_KO = "네마음체 둥근"
+
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.designspaceLib import (DesignSpaceDocument, AxisDescriptor,
@@ -107,12 +117,18 @@ def family_names(style, family=None):
 
 def build_variable(recipes, work):
     doc = DesignSpaceDocument()
-    for tag, name, rng in (("wght", "Weight", C.WGHT), ("wdth", "Width", C.WDTH), ("opsz", "Optical Size", C.OPSZ)):
+    round_ = C.FAMILY.endswith("Round")
+    axes = (("wght", "Weight", C.WGHT), ("wdth", "Width", C.WDTH), ("opsz", "Optical Size", C.OPSZ))
+    if round_:
+        axes = (axes[0], axes[2])  # round family: weight + optical size (keeps the file size reasonable)
+    for tag, name, rng in axes:
         ax = AxisDescriptor()
         ax.tag, ax.name = tag, name.lower().replace(" ", "")
         ax.minimum, ax.default, ax.maximum = rng
         doc.addAxis(ax)
     masters = [(w, d, o) for w in (100, 400, 900) for d in (80, 100, 125) for o in (12, 72)]  # full grid: the width/weight/size terms interact
+    if round_:
+        masters = [(w, 100, o) for w in (100, 400, 900) for o in (12, 72)]
     for w, d, o in masters:
         p = os.path.join(work, "master-%d-%d-%d.ttf" % (w, d, o))
         t0 = time.time()
@@ -120,13 +136,13 @@ def build_variable(recipes, work):
         print("  master wght=%d wdth=%d opsz=%d  (%.1fs)" % (w, d, o, time.time() - t0), flush=True)
         s = SourceDescriptor()
         s.path = p
-        s.location = {"weight": w, "width": d, "opticalsize": o}
+        s.location = {"weight": w, "opticalsize": o} if round_ else {"weight": w, "width": d, "opticalsize": o}
         s.familyName, s.styleName = C.FAMILY, "Master"
         doc.addSource(s)
     for w, name in STYLES.items():
         i = InstanceDescriptor()
         i.familyName, i.styleName = C.FAMILY, name
-        i.location = {"weight": w, "width": 100, "opticalsize": 12}
+        i.location = {"weight": w, "opticalsize": 12} if round_ else {"weight": w, "width": 100, "opticalsize": 12}
         doc.addInstance(i)
     dsp = os.path.join(work, "Nemaum.designspace")
     doc.write(dsp)
@@ -144,8 +160,9 @@ def build_variable(recipes, work):
     addOpenTypeFeaturesFromString(vf, fea)
     # naming of the variable font
     nm = vf["name"]
-    for nid, val in ((1, C.FAMILY), (2, "Regular"), (4, C.FAMILY + " Variable"), (6, C.FAMILY + "-VF"),
-                     (3, C.FAMILY + "-VF;" + C.VERSION), (5, "Version " + C.VERSION)):
+    psf = C.FAMILY.replace(" ", "")
+    for nid, val in ((1, C.FAMILY), (2, "Regular"), (4, C.FAMILY + " Variable"), (6, psf + "-VF"),
+                     (3, psf + "-VF;" + C.VERSION), (5, "Version " + C.VERSION)):
         nm.setName(val, nid, 3, 1, 0x409)
         nm.setName(val, nid, 1, 0, 0)
     return vf
@@ -153,7 +170,9 @@ def build_variable(recipes, work):
 
 def make_static(vf, wght, opsz, family, wdth=100):
     style = STYLES.get(wght, str(wght))
-    f = instancer.instantiateVariableFont(vf, {"wght": wght, "wdth": wdth, "opsz": opsz}, inplace=False,
+    loc = {"wght": wght, "wdth": wdth, "opsz": opsz}
+    loc = {k: v for k, v in loc.items() if k in [a.axisTag for a in vf["fvar"].axes]}
+    f = instancer.instantiateVariableFont(vf, loc, inplace=False,
                                           overlap=instancer.OverlapMode.REMOVE)
     nm = f["name"]
     nm.names = [n for n in nm.names if n.nameID not in (16, 17, 25) and n.nameID < 256]
@@ -267,12 +286,12 @@ def web_subsets(vf_path, outdir):
         ss.populate(unicodes=cps)
         ss.subset(f)
         f.flavor = "woff2"
-        p = os.path.join(outdir, "Nemaum-VF-%s.woff2" % name)
+        p = os.path.join(outdir, "%s-VF-%s.woff2" % (C.FAMILY.replace(" ", ""), name))
         f.save(p)
         print("  %-52s %6.2f MB" % (os.path.relpath(p), os.path.getsize(p) / 1e6), flush=True)
-        css.append("@font-face {\n  font-family: \"Nemaum VF\";\n  src: url(\"Nemaum-VF-%s.woff2\") format(\"woff2\");\n"
-                   "  font-weight: 100 900;\n  font-stretch: 80%% 125%%;\n  font-display: swap;\n  unicode-range: %s;\n}" % (name, rng(cps)))
-    with open(os.path.join(outdir, "nemaum.css"), "w") as fh:
+        css.append("@font-face {\n  font-family: \"%s VF\";\n  src: url(\"%s-VF-%s.woff2\") format(\"woff2\");\n"
+                   "  font-weight: 100 900;\n  font-stretch: 80%% 125%%;\n  font-display: swap;\n  unicode-range: %s;\n}" % (C.FAMILY, C.FAMILY.replace(" ", ""), name, rng(cps)))
+    with open(os.path.join(outdir, C.FAMILY.lower().replace(" ", "-") + ".css"), "w") as fh:
         fh.write("\n".join(css) + "\n")
 
 
@@ -281,6 +300,7 @@ def main():
     ap.add_argument("--sample", action="store_true", help="only every 40th Hangul syllable (fast)")
     ap.add_argument("--common", action="store_true", help="only the 2,350 common Hangul syllables (quick check)")
     ap.add_argument("--no-static", action="store_true")
+    ap.add_argument("--round", action="store_true", help="build the round-stroke family (Nemaum Round)")
     ap.add_argument("--out", default="dist")
     a = ap.parse_args()
     here = os.path.dirname(os.path.abspath(__file__))
@@ -289,6 +309,8 @@ def main():
     for d in (out, work):
         shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d)
+    global VF
+    VF = C.FAMILY.replace(" ", "") + "-VF"
     recipes = glyphset.collect()
     if a.sample:
         recipes = {cp: f for cp, f in recipes.items()
@@ -301,10 +323,10 @@ def main():
     print("building masters")
     vf = build_variable(recipes, work)
     os.makedirs(os.path.join(out, "variable"))
-    save(vf, os.path.join(out, "variable", "Nemaum-VF.ttf"))
-    save(TTFont(os.path.join(out, "variable", "Nemaum-VF.ttf")), os.path.join(out, "variable", "Nemaum-VF.woff2"), "woff2")
+    save(vf, os.path.join(out, "variable", VF + ".ttf"))
+    save(TTFont(os.path.join(out, "variable", VF + ".ttf")), os.path.join(out, "variable", VF + ".woff2"), "woff2")
     print("web subsets")
-    web_subsets(os.path.join(out, "variable", "Nemaum-VF.ttf"), os.path.join(out, "web"))
+    web_subsets(os.path.join(out, "variable", VF + ".ttf"), os.path.join(out, "web"))
     if a.no_static:
         return
     print("static instances")
@@ -321,7 +343,8 @@ def main():
             for fl in ("woff2", "woff"):
                 save(TTFont(os.path.join(out, folder, "ttf", base + ".ttf")),
                      os.path.join(out, folder, fl, base + "." + fl), fl)
-    for fam, wd, folder in ((C.FAMILY + " Narrow", 80, "narrow"), (C.FAMILY + " Wide", 125, "wide")):
+    widths = () if C.FAMILY.endswith("Round") else ((C.FAMILY + " Narrow", 80, "narrow"), (C.FAMILY + " Wide", 125, "wide"))
+    for fam, wd, folder in widths:
         for sub in ("ttf", "otf", "woff2"):
             os.makedirs(os.path.join(out, folder, sub), exist_ok=True)
         for w in (400, 700):
