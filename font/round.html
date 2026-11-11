@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="dist-round/web/nemaum-round.css">
+<link rel="stylesheet" href="dist-emoji/nemaum-emoji.css">
+<title>네마음체 둥근 · 시험장</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1d1b19; --mut: #6d675f; --line: #e3dfd7; --card: #ffffff; --acc: #2b59ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151413; --fg: #f1eee8; --mut: #a39d93; --line: #2d2a27; --card: #1c1a18; --acc: #86a2ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font-family: "Nemaum Round VF", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+         line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: clamp(30px, 7vw, 60px); line-height: 1.25; margin: 20px 0 8px; font-weight: 800; }
+  h2 { font-size: 19px; margin: 32px 0 10px; font-weight: 700; }
+  p.lead { color: var(--mut); margin: 0 0 16px; font-size: 15px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .ctrl { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 20px; margin-bottom: 12px; }
+  .ctrl label { display: block; font-size: 13px; color: var(--mut); }
+  .ctrl input[type=range] { width: 100%; accent-color: var(--acc); }
+  .ctrl b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  #play { width: 100%; min-height: 8.5em; border: 0; outline: 0; resize: vertical; background: transparent; color: inherit;
+          font: inherit; font-size: var(--size, 28px); font-weight: var(--wght, 400);
+          font-variation-settings: "opsz" var(--opsz, 12), "wdth" var(--wdth, 100); font-optical-sizing: none; line-height: 1.6; word-break: keep-all; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 0; }
+  button { font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+           background: var(--card); color: var(--fg); cursor: pointer; }
+  button:hover { border-color: var(--acc); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .w { font-size: 22px; margin: 0; line-height: 1.5; }
+  .t { font-size: 12px; color: var(--mut); margin-bottom: 4px; }
+  .kao { font-size: 24px; line-height: 2.0; word-break: keep-all; }
+  .cover { font-size: 18px; line-height: 1.9; }
+  @media (max-width: 520px) {
+    .wrap { padding: 16px 16px 60px; }
+    .kao { font-size: 20px; }
+    .cover { font-size: 16px; }
+    .card { padding: 14px; }
+  }
+  .sizes p { margin: 6px 0; }
+  .dl a { display: inline-block; margin: 4px 8px 4px 0; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line);
+          color: var(--acc); text-decoration: none; font-size: 14px; background: var(--card); }
+  small { color: var(--mut); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>네마음체 둥근<br>Nemaum Round</h1>
+  <p class="lead"><a href="index.html">← 네마음체(기본)</a> · 둥근 획 가변 폰트 시험장 · 굵기(wght) · 글자 크기별 모양(opsz) · 한글 11,172자 · 특수문자 이모티콘</p>
+
+  <div class="card">
+    <div class="ctrl">
+      <label>굵기 wght <b id="vw">400</b><input id="w" type="range" min="100" max="900" step="10" value="400"></label>
+      <label>글자 크기별 모양 opsz <b id="vo">12</b><input id="o" type="range" min="12" max="72" step="1" value="12"></label>
+      <label>크기 <b id="vs">28</b>px<input id="s" type="range" min="10" max="120" step="1" value="28"></label>
+    </div>
+    <textarea id="play" spellcheck="false">가나다라마바사 안녕하세요, 네마음체입니다.
+The quick brown fox jumps over the lazy dog 0123456789
+(╯°□°）╯︵ ┻━┻  ʕ•ᴥ•ʔ  ٩(◕‿◕｡)۶  (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧  ♡(ˊᗜˋ)  ಠ_ಠ  ¯\_(ツ)_/¯</textarea>
+    <div class="row">
+      <button data-w="200">얇은 200</button><button data-w="400">기본 400</button>
+      <button data-w="700">볼드 700</button><button data-w="900">매우 굵게 900</button>
+      <button data-o="12">본문용 opsz 12</button><button data-o="72">제목용 opsz 72</button>
+    </div>
+  </div>
+
+  <h2>본문 읽기</h2>
+  <div class="card" style="font-size:16px;line-height:1.75">
+    <p style="margin:0 0 10px">네마음체는 작은 화면에서도 편하게 읽히도록 글자 사이와 줄 사이를 넉넉하게 잡았습니다. 받침이 많은 글자도 자모가 뭉치지 않도록 획 간격을 고르게 맞추고, 모든 글자의 세로획과 바닥선을 같은 자리에 세워 문장이 한 줄로 가지런하게 보이도록 했습니다.</p>
+    <p style="margin:0;font-size:14px;color:var(--mut)">Nemaum keeps clear gaps between letters and lines so long Korean text stays readable on a phone. 0123456789</p>
+  </div>
+
+  <h2>굵기와 크기 비교</h2>
+  <div class="grid">
+    <div class="card"><div class="t">얇은 · Light 300</div><p class="w" style="font-weight:300">가독성 있는 글씨체 Aa 12</p></div>
+    <div class="card"><div class="t">기본 · Regular 400</div><p class="w" style="font-weight:400">가독성 있는 글씨체 Aa 12</p></div>
+    <div class="card"><div class="t">볼드 · Bold 700</div><p class="w" style="font-weight:700">가독성 있는 글씨체 Aa 12</p></div>
+  </div>
+  <div class="card sizes" style="margin-top:12px">
+    <div class="t">작은 글씨에서는 자동으로 획이 굵어지고 칸이 넓어집니다 (font-optical-sizing)</div>
+    <p style="font-size:11px;font-optical-sizing:auto">11px · 한글은 작은 크기에서도 획이 뭉치지 않도록 설계했습니다. 받침이 있는 글자 값 읊 닭 뷁 쀍 곬</p>
+    <p style="font-size:14px;font-optical-sizing:auto">14px · 한글은 작은 크기에서도 획이 뭉치지 않도록 설계했습니다. 받침이 있는 글자 값 읊 닭 뷁 쀍 곬</p>
+    <p style="font-size:20px;font-optical-sizing:auto">20px · 한글은 작은 크기에서도 획이 뭉치지 않도록 설계했습니다.</p>
+    <p style="font-size:36px;font-optical-sizing:auto;line-height:1.4">36px · 큰 제목은 더 날렵하게</p>
+    <p style="font-size:64px;font-optical-sizing:auto;line-height:1.3">64px 제목</p>
+  </div>
+
+  <h2>고정폭 숫자 (tnum)</h2>
+  <div class="card" style="font-size:24px">
+    <div class="t">기본 (글자마다 폭이 다름)</div>1111111 <br>9999999 <br>
+    <div class="t" style="margin-top:8px">font-feature-settings: "tnum" (모든 숫자 폭 같음)</div>
+    <span style="font-feature-settings:'tnum'">1111111<br>9999999</span>
+  </div>
+
+  <h2>색깔 이모지 (Nemaum Emoji)</h2>
+  <div class="card">
+    <div class="ctrl"><label>이모지 크기 <b id="ves">48</b>px<input id="es" type="range" min="12" max="200" step="1" value="48"></label></div>
+    <div id="emo" style="font-family:'Nemaum Emoji';font-size:48px;line-height:1.35;word-break:break-all">😀😃😄😁😆😅😂🤣😊😇🙂🙃😉😍🥰😘😋😛😜😎😐😑😶🙄😏😴😢😭😡😠😱😳🥺😮😲🥲😤<br>❤️🧡💛💚💙💜🖤🤍🤎💕💖💗💔<br>⭐🌟✨🔥🎉☀️☁️🌈💧💦🌸🍀✅❌❗❓💤🎵🌙</div>
+    <p><small>벡터 색상 폰트(COLR)라 크기를 키워도 깨지지 않습니다. 파일: <a href="dist-emoji/NemaumEmoji.ttf" download>NemaumEmoji.ttf</a> · <a href="dist-emoji/NemaumEmoji.woff2" download>woff2</a></small></p>
+  </div>
+
+  <h2>특수문자 · 이모티콘</h2>
+  <div class="card kao" id="kao">
+    (╯°□°）╯︵ ┻━┻ &nbsp; ┬─┬ノ( º _ ºノ) &nbsp; ʕ•ᴥ•ʔ &nbsp; (≧▽≦) &nbsp; ٩(◕‿◕｡)۶ &nbsp; (づ｡◕‿‿◕｡)づ &nbsp;
+    (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ &nbsp; ☜(ﾟヮﾟ☜) &nbsp; (╥﹏╥) &nbsp; (๑˃̵ᴗ˂̵)و &nbsp; ಥ_ಥ &nbsp; (◕ᴗ◕✿) &nbsp; ♡ ♥ ★ ☆ ♪ ♬ ※ ◎ ● ○ ◇ ◆ △ ▽ → ← ↑ ↓<br>
+    ┌─┬─┐ ╔═╦═╗ ╭──╮ ▀▄█▌▐░▒▓ ⠿⣿⡇⢸ ① ② ③ ㉠ ㉡ ㉮ ㈜ № ℃ ™ Ⅰ Ⅱ Ⅲ ½ ¼
+  </div>
+  <p><small>폰트에 없는 글자는 기기의 기본 글꼴로 자동 대체되어 표시됩니다 (아이폰·카카오톡 포함).</small></p>
+
+  <h2>글자 범위</h2>
+  <div class="card cover">
+    <div class="t">한글 완성형 (일부)</div>
+    값 읊 닭 뷁 쀍 곬 훑 꿔 뙤 쉥 깎 읽 없 힣 갉 댉 쓻 쥙 쾡 휧<br>
+    <div class="t" style="margin-top:12px">자모 · 옛 자모 없이 쓰는 줄임</div>
+    ㄱㄲㄳㄴㄵㄶㄷㄸㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅃㅄㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ<br>
+    <div class="t" style="margin-top:12px">영문 · 숫자 · 그리스 · 키릴</div>
+    ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 ΑΒΓΔΣΩ αβγδσω БГДЖЯ бвгджя<br>
+    <div class="t" style="margin-top:12px">악센트 · 가나</div>
+    ÀÉÎÕÜ àéîõü ñç ß ヽノツシソンミヘ
+  </div>
+
+  <h2>내려받기</h2>
+  <div class="card dl">
+    <div class="t">가변 폰트 (굵기·크기 한 파일)</div>
+    <a href="dist-round/variable/NemaumRound-VF.ttf" download>NemaumRound-VF.ttf</a>
+    <a href="dist-round/variable/NemaumRound-VF.woff2" download>NemaumRound-VF.woff2</a>
+    <div class="t" style="margin-top:10px">아이폰 iFont · 일반 설치용 (TTF / OTF) — 본문용</div>
+    <a href="dist-round/text/ttf/NemaumRound-Light.ttf" download>Light.ttf</a>
+    <a href="dist-round/text/ttf/NemaumRound-Regular.ttf" download>Regular.ttf</a>
+    <a href="dist-round/text/ttf/NemaumRound-Bold.ttf" download>Bold.ttf</a>
+    <a href="dist-round/text/otf/NemaumRound-Regular.otf" download>Regular.otf</a>
+    <div class="t" style="margin-top:10px">제목용 (Display)</div>
+    <a href="dist-round/display/ttf/NemaumRoundDisplay-Regular.ttf" download>Regular.ttf</a>
+    <a href="dist-round/display/ttf/NemaumRoundDisplay-Bold.ttf" download>Bold.ttf</a>
+</div>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  if (window.innerWidth < 520) { document.getElementById("s").value = 22; }
+  const play = $("play");
+  function apply() {
+    play.style.setProperty("--wght", $("w").value);
+    play.style.setProperty("--opsz", $("o").value);
+    play.style.setProperty("--size", $("s").value + "px");
+    $("vw").textContent = $("w").value; $("vo").textContent = $("o").value; $("vs").textContent = $("s").value;
+  }
+  ["w", "o", "s"].forEach((id) => $(id).addEventListener("input", apply));
+  document.querySelectorAll("button[data-w]").forEach((b) => b.onclick = () => { $("w").value = b.dataset.w; apply(); });
+  document.querySelectorAll("button[data-o]").forEach((b) => b.onclick = () => { $("o").value = b.dataset.o; apply(); });
+  document.getElementById("es").addEventListener("input", (e) => {
+    document.getElementById("emo").style.fontSize = e.target.value + "px";
+    document.getElementById("ves").textContent = e.target.value;
+  });
+  apply();
+</script>
+</body>
+</html>

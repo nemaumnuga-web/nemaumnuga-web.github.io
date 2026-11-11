@@ -1,0 +1,6 @@
+@font-face {
+  font-family: "Nemaum Emoji";
+  src: url("NemaumEmoji.woff2") format("woff2"),
+       url("NemaumEmoji.ttf") format("truetype");
+  font-display: swap;
+}
