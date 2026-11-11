@@ -3,10 +3,18 @@
 Every glyph returns (strokes, content_width); x starts at 0.  The builder adds
 side bearings.  CAP=730, XH=520, ASC=750, DESC=-190.
 """
-from geom import P, D, line, sarc as arc, sring as ring
+from geom import P, D, line, sarc, sring
+
+
+def arc(cx, cy, rx, ry, a0, a1, step=10.0):
+    return sarc(cx, cy, rx, ry, a0, a1, step, n=2.15)   # Latin bowls: nearly elliptic
+
+
+def ring(cx, cy, rx, ry, n=32):
+    return sring(cx, cy, rx, ry, n, e=2.15)
 
 CAP, XH, ASC, DESC = 730, 520, 750, -190
-SX, SY = 1.3, 1.2   # proportional glyphs are drawn at this scale (taller x-height, wider letters)
+SX, SY = 1.12, 1.2   # proportional glyphs are drawn at this scale (taller x-height, wider letters)
 
 
 def _o(cx, cy, rx, ry, n=32):

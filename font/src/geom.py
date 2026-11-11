@@ -44,7 +44,7 @@ def ring(cx, cy, rx, ry, n=28, rot=90.0):
 
 
 # ------------------------------------------------- squarish curves (house style)
-ROUND_N = 3.4   # superellipse exponent: 2 = ellipse, larger = closer to a rounded rectangle
+ROUND_N = 2.5   # superellipse exponent: 2 = ellipse, larger = closer to a rounded rectangle
 
 
 def _se(t, n):
