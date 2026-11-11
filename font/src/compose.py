@@ -147,9 +147,9 @@ def accent_recipe(cp):
     top = CAP if upper else (ASC if b in TALL else XH)
     if b in (0x69, 0x6A):
         top = XH
-    gap = 30.0
+    gap = 80.0 if upper else 70.0      # clear space between the letter and its accent
     if b in TALL and not upper:
-        gap = 20.0
+        gap = 55.0
 
     def f(P):
         sb = 60 - 25 * P.t
@@ -278,12 +278,14 @@ def decomp_recipe(cp):
         n, sl, d = cps
         if n in LATIN and d in LATIN:
             def f(P):
-                a = text_strokes([n], P, 0.5, 0, 0.75)
-                b = text_strokes([d], P, 0.5, 0, 0.75)
-                wa, wb = a[1], b[1]
-                st = xform(a[0], lt.SX, lt.SY, 40, 300 * lt.SY) + [line((20 + wa + 20, 20), (wa + 20 + 160, 600 * lt.SY))] + \
-                    xform(b[0], lt.SX, lt.SY, wa + 20 + 130, 0)
-                return render(st, P.hw * 0.75), (wa + wb) * lt.SX + 400
+                a, wa = text_strokes([n], P, 0.5, 0, 0.75)
+                b, wb = text_strokes([d], P, 0.5, 0, 0.75)
+                wa, wb = wa * lt.SX, wb * lt.SY and wb * lt.SX
+                # numerator up-left, denominator down-right, slash in between: never touching
+                st = (xform(a, lt.SX, lt.SY, 40, 330) +
+                      [line((40 + wa + 40, -10), (40 + wa + 200, 880))] +
+                      xform(b, lt.SX, lt.SY, 40 + wa + 240, 0))
+                return render(st, P.hw * 0.75), 40 + wa + 240 + wb + 60
             return f
     if tag == "<circle>" and all(base(c, type("Q", (), {"hw": 30, "t": 0})) for c in cps):
         def f(P):

@@ -325,6 +325,16 @@ def main():
     os.makedirs(os.path.join(out, "variable"))
     save(vf, os.path.join(out, "variable", VF + ".ttf"))
     save(TTFont(os.path.join(out, "variable", VF + ".ttf")), os.path.join(out, "variable", VF + ".woff2"), "woff2")
+    if not C.FAMILY.endswith("Round"):
+        import emoji
+        ed = os.path.join(here, "dist-emoji")
+        os.makedirs(ed, exist_ok=True)
+        n = emoji.build(os.path.join(ed, "NemaumEmoji.ttf"))
+        save(TTFont(os.path.join(ed, "NemaumEmoji.ttf")), os.path.join(ed, "NemaumEmoji.woff2"), "woff2")
+        with open(os.path.join(ed, "nemaum-emoji.css"), "w") as fh:
+            fh.write('@font-face {\n  font-family: "Nemaum Emoji";\n  src: url("NemaumEmoji.woff2") format("woff2"),\n'
+                     '       url("NemaumEmoji.ttf") format("truetype");\n  font-display: swap;\n}\n')
+        print("  colour emoji:", len(n))
     print("web subsets")
     web_subsets(os.path.join(out, "variable", VF + ".ttf"), os.path.join(out, "web"))
     if a.no_static:

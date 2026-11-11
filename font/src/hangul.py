@@ -18,12 +18,12 @@ def _c(name):
     S["ㅅ"] = [line((.5, 1), (0, 0)), line((.5, .62), (1, 0))]
     S["ㅇ"] = [P(ring(.5, .5, .5, .5, 32), True)]
     S["ㅈ"] = [line((0, 1), (1, 1)), line((.5, 1), (0, 0)), line((.5, .55), (1, 0))]
-    S["ㅊ"] = [line((.5, 1), (.5, .80)), line((0, .74), (1, .74)),
+    S["ㅊ"] = [line((.34, 1), (.66, 1)), line((0, .74), (1, .74)),
               line((.5, .74), (0, 0)), line((.5, .4), (1, 0))]
     S["ㅋ"] = [P([(0, 1), (1, 1), (1, 0)]), line((0, .5), (1, .5))]
     S["ㅌ"] = [P([(1, 1), (0, 1), (0, 0), (1, 0)]), line((0, .5), (1, .5))]
     S["ㅍ"] = [line((0, 1), (1, 1)), line((0, 0), (1, 0)), line((.25, 1), (.25, 0)), line((.75, 1), (.75, 0))]
-    S["ㅎ"] = [line((.5, 1), (.5, .82)), line((0, .76), (1, .76)),
+    S["ㅎ"] = [line((.3, 1), (.7, 1)), line((0, .76), (1, .76)),
               P(ring(.5, .3, .3, .3, 28), True)]
     return S[name]
 
@@ -118,16 +118,11 @@ def _shrink(box, l=0.0, b=0.0, r=0.0, t=0.0):
 # Every syllable fills the same ink frame (W x H).  All distances below are measured on
 # the *ink* (the filled outline), not on centre-lines, so the gap between any two jamo is
 # exactly one constant G and every syllable has the same outer edges.
-FINAL_H = 0.31    # final consonant row height, share of the frame height
-FINAL_W = 0.80    # final width under horizontal / mixed vowels (centred)
-TICK = 0.19       # ㅏ ㅓ ticks beyond the stem ink, share of the frame width (long, open ticks)
-TICK2 = 0.12      # left tick of ㅔ ㅖ
+FINAL_H = 0.37    # final consonant row height, share of the frame height
+TICK = 0.13       # ㅏ ㅓ ticks beyond the stem ink, share of the frame width
+TICK2 = 0.10      # left tick of ㅔ ㅖ
 PAIR = 0.10       # counter between the two stems of ㅐ ㅒ ㅔ ㅖ (at least ~1.1 G)
-VTICK = 0.15      # ㅗ ㅜ ticks, share of the frame height
-INIT_V = 0.84     # initial height beside a vertical vowel (the stem stays full height)
-INIT_V_T = 0.90   # same, when the syllable has a final (less room to give away)
-INIT_H = 0.80     # initial width above a horizontal vowel (the bar stays full width)
-STEM_COL = 0.88   # right ink edge of the main vowel stem, share of the frame width (ㅏ ticks reach past it)
+VTICK = 0.11      # ㅗ ㅜ ticks, share of the frame height
 HCONTRAST = None  # resolved from geom.HCON
 
 
@@ -136,22 +131,30 @@ def _hh(hw):
     return hw * geom.HCON  # half thickness of a horizontal stroke
 
 
-def fit_ink(make, box, hw):
-    """Draw make(centre_box) so that its *ink* exactly fills box."""
+def fit_ink(make, box, hw, iters=4, tol=0.25):
+    """Draw make(centre_box) so that its *ink* fills box, to within tol units.
+
+    The spill of the ink beyond the centre-lines depends on the stroke and on the
+    geometry (joins, diagonals, rings), so the centre box is corrected iteratively."""
     x0, y0, x1, y1 = box
-    st = make(box)
-    b = ink_bounds(st, hw)
-    if b is None:
-        return st
-    el, eb, er, et = x0 - b[0], y0 - b[1], b[2] - x1, b[3] - y1
-    cb = (x0 + el, y0 + eb, x1 - er, y1 - et)
-    if cb[2] - cb[0] < 1.0:
-        m = (x0 + x1) / 2.0
-        cb = (m - 0.5, cb[1], m + 0.5, cb[3])
-    if cb[3] - cb[1] < 1.0:
-        m = (y0 + y1) / 2.0
-        cb = (cb[0], m - 0.5, cb[2], m + 0.5)
-    return make(cb)
+    cb = box
+    st = make(cb)
+    for _ in range(iters):
+        b = ink_bounds(st, hw)
+        if b is None:
+            return st
+        d = (x0 - b[0], y0 - b[1], b[2] - x1, b[3] - y1)   # how far the ink is off the target
+        if max(abs(v) for v in d) <= tol:
+            break
+        cb = (cb[0] + d[0], cb[1] + d[1], cb[2] - d[2], cb[3] - d[3])
+        if cb[2] - cb[0] < 1.0:
+            m = (cb[0] + cb[2]) / 2.0
+            cb = (m - 0.5, cb[1], m + 0.5, cb[3])
+        if cb[3] - cb[1] < 1.0:
+            m = (cb[1] + cb[3]) / 2.0
+            cb = (cb[0], m - 0.5, cb[2], m + 0.5)
+        st = make(cb)
+    return st
 
 
 def cons_ink(name, box, hw, G):
@@ -165,94 +168,105 @@ def cons_ink(name, box, hw, G):
 
 
 def vvowel(v, W, y0, y1, hw, G):
-    """Right-hand vowel whose rightmost ink touches the frame edge W
-    (ㅏ ㅑ: the long tick touches it, the stem stands TICK further in).
-    Returns (strokes, x of its leftmost ink)."""
+    """Right-hand vowel with weight-independent outer edges.
+
+    The outer ink edges are fixed at their Regular positions (right edge = frame edge W,
+    left edge = where the Regular design puts it); a heavier stroke grows *inwards*
+    (into the tick or the counter between two stems), so the initial next to it keeps
+    its box.  Returns (strokes, x of the vowel's leftmost ink)."""
+    r = REF_HW
     ym = lambda f: y0 + (y1 - y0) * f
     fs = [0.5] if v in "ㅏㅓㅐㅔ" else [0.64, 0.36]
     tk, tk2 = TICK * W, TICK2 * W
     dk = max(PAIR * W, 1.1 * G)
     stem = lambda a: line((a + hw, y0), (a + hw, y1))      # a = left ink edge of the stem
     if v == "ㅣ":
-        a = W - 2 * hw
+        a = W - 2 * hw                                     # right edge = frame edge (columns line up)
         return [stem(a)], a
     if v in "ㅏㅑ":
-        a = W - tk - 2 * hw
+        a = W - tk - 2 * r                                 # stem's left edge fixed; grows into the tick
         return [stem(a)] + [line((a + hw, ym(f)), (W, ym(f))) for f in fs], a
     if v in "ㅓㅕ":
-        a = W - 2 * hw
-        return [stem(a)] + [line((a - tk, ym(f)), (a + hw, ym(f))) for f in fs], a - tk
-    a2 = W - 2 * hw
-    a1 = a2 - dk - 2 * hw
+        a = W - 2 * hw                                     # right edge = frame edge
+        left = W - 2 * r - tk                              # tick start fixed
+        return [stem(a)] + [line((left, ym(f)), (a + hw, ym(f))) for f in fs], left
+    a2 = W - 2 * hw                                        # right stem: right edge = frame edge
+    a1 = W - 4 * r - dk                                    # left stem: left edge fixed
+    minc = 0.6 * G                                         # keep a counter between the stems
+    if a2 - (a1 + 2 * hw) < minc:
+        a1 = a2 - minc - 2 * hw
     st = [stem(a1), stem(a2)]
     if v in "ㅐㅒ":
         return st + [line((a1 + hw, ym(f)), (a2 + hw, ym(f))) for f in fs], a1
-    return st + [line((a1 - tk2, ym(f)), (a1 + hw, ym(f))) for f in fs], a1 - tk2   # ㅔ ㅖ
+    left = min(a1, W - 4 * r - dk) - tk2                   # ㅔ ㅖ: left tick end fixed
+    return st + [line((left, ym(f)), (a1 + hw, ym(f))) for f in fs], left
+
+
+REF_HW = 38.0     # Regular half-stroke: element boxes are designed at this weight and
+                  # stay fixed at every other weight (only the stroke thickness changes)
 
 
 def hvowel_height(v, H, hw):
-    return 2 * _hh(hw) + (0.0 if v == "ㅡ" else VTICK * H)
+    """Height of the box of a horizontal vowel.  ㅗ ㅛ ㅜ ㅠ: fixed (the bar grows into the
+    tick).  ㅡ is a single bar, so its box is the bar itself."""
+    if v == "ㅡ":
+        return 2 * _hh(hw)
+    return 2 * _hh(REF_HW) + VTICK * H
 
 
 def hvowel(v, xa, xb, yb, H, hw):
-    """Horizontal vowel whose ink occupies x in [xa, xb], y in [yb, yb + height]."""
+    """Horizontal vowel whose ink fills x in [xa, xb], y in [yb, yb + height] exactly."""
     hh = _hh(hw)
     vh = hvowel_height(v, H, hw)
     xs = [(xa + xb) / 2.0] if v in "ㅗㅜ" else [xa + (xb - xa) * 0.3, xa + (xb - xa) * 0.7]
     if v == "ㅡ":
         return [line((xa, yb + hh), (xb, yb + hh))]
-    if v in "ㅗㅛ":   # bar at the bottom, ticks up
+    if v in "ㅗㅛ":   # bar on the bottom edge, ticks up to the top edge
         return [line((xa, yb + hh), (xb, yb + hh))] + [line((x, yb + hh), (x, yb + vh)) for x in xs]
-    # ㅜ ㅠ: bar at the top, ticks down
+    # ㅜ ㅠ: bar on the top edge, ticks down to the bottom edge
     return [line((xa, yb + vh - hh), (xb, yb + vh - hh))] + [line((x, yb + vh - hh), (x, yb)) for x in xs]
 
 
+def syllable_parts(L, V, T, W, H, hw, gap):
+    """Same as syllable() but returns [(role, strokes), ...] (role: L, V, T)."""
+    parts = []
+    _syllable(L, V, T, W, H, hw, gap, parts)
+    return parts
+
+
 def syllable(L, V, T, W, H, hw, gap):
+    out = []
+    for _, st in syllable_parts(L, V, T, W, H, hw, gap):
+        out += st
+    return out
+
+
+def _syllable(L, V, T, W, H, hw, gap, parts):
     """Strokes of one syllable.  (W, H) is the ink frame, gap the constant jamo gap G.
 
     The ink of every syllable fills the frame exactly; any two neighbouring jamo are
     separated by G; the final always takes FINAL_H of the height and the full width.
     """
     G = gap
-    out = []
     has_t = bool(T)
     FT = FINAL_H * H
     ybot = FT + G if has_t else 0.0
     if V in VERT:
         vst, left = vvowel(V, W, ybot, H, hw, G)
-        f = INIT_V_T if has_t else INIT_V
-        top = H - (H - ybot) * (1.0 - f) * 0.35          # sits a little below the top line
-        out += cons_ink(L, (0.0, top - (H - ybot) * f, left - G, top), hw, G)
-        out += vst
+        parts.append(("L", cons_ink(L, (0.0, ybot, left - G, H), hw, G)))
+        parts.append(("V", vst))
     elif V in HORZ:
         vh = hvowel_height(V, H, hw)
-        m = W * (1.0 - INIT_H) / 2.0
-        out += cons_ink(L, (m, ybot + vh + G, W - m, H), hw, G)
-        out += hvowel(V, 0.0, W, ybot, H, hw)
+        parts.append(("L", cons_ink(L, (0.0, ybot + vh + G, W, H), hw, G)))
+        parts.append(("V", hvowel(V, 0.0, W, ybot, H, hw)))
     else:  # mixed: vertical part on the right, horizontal part under the initial
         hpart, vpart = MIXED[V]
         vst, left = vvowel(vpart, W, ybot, H, hw, G)
         vh = hvowel_height(hpart, H, hw)
-        top = H - (H - ybot - vh - G) * (1.0 - INIT_V) * 0.35
-        inset = (left - G) * 0.08
-        out += cons_ink(L, (inset, ybot + vh + G, left - G - inset, top), hw, G)
-        out += hvowel(hpart, 0.0, left - G, ybot, H, hw)
-        out += vst
+        parts.append(("L", cons_ink(L, (0.0, ybot + vh + G, left - G, H), hw, G)))
+        parts.append(("V", hvowel(hpart, 0.0, left - G, ybot, H, hw) + vst))
     if has_t:
-        if V in VERT or V in MIXED:
-            v = V if V in VERT else MIXED[V][1]
-            # the final ends under the vowel stem; the long ticks of ㅏ ㅑ reach past it
-            right = W - (TICK * W if v in "ㅏㅑ" else 0.0)
-            if V in MIXED:
-                m = W * (1.0 - FINAL_W) / 2.0
-                tb = (m, 0.0, min(W - m, right), FT)
-            else:
-                tb = (0.03 * W, 0.0, right - 0.06 * W, FT)   # tucked in under the stem
-        else:
-            m = W * (1.0 - FINAL_W) / 2.0
-            tb = (m, 0.0, W - m, FT)
-        out += cons_ink(T, tb, hw, G)
-    return out
+        parts.append(("T", cons_ink(T, (0.0, 0.0, W, FT), hw, G)))
 
 
 def syllable_cplx(L, V, T):
@@ -267,10 +281,9 @@ def hw_mult(L, V, T):
 
 
 def stroke(hw, m):
-    """Effective half-stroke: uniform at light/regular weights; only heavy weights
-    thin the dense syllables (so counters stay open)."""
-    r = max(0.0, min(1.0, (hw - 24.0) / 40.0))
-    return hw * (1.0 - (1.0 - m) * r)
+    """Every syllable uses exactly the same stroke at a given weight (no per-syllable
+    thinning), so changing the weight never changes the design of a glyph."""
+    return hw
 
 
 def split_syllable(cp):

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="dist/web/nemaum.css">
+<link rel="stylesheet" href="dist-emoji/nemaum-emoji.css">
 <title>네마음체 Nemaum · 글씨체 시험장</title>
 <style>
   :root {
@@ -99,6 +100,13 @@ The quick brown fox jumps over the lazy dog 0123456789
     <span style="font-feature-settings:'tnum'">1111111<br>9999999</span>
   </div>
 
+  <h2>색깔 이모지 (Nemaum Emoji)</h2>
+  <div class="card">
+    <div class="ctrl"><label>이모지 크기 <b id="ves">48</b>px<input id="es" type="range" min="12" max="200" step="1" value="48"></label></div>
+    <div id="emo" style="font-family:'Nemaum Emoji';font-size:48px;line-height:1.35;word-break:break-all">😀😃😄😁😆😅😂🤣😊😇🙂🙃😉😍🥰😘😋😛😜😎😐😑😶🙄😏😴😢😭😡😠😱😳🥺😮😲🥲😤<br>❤️🧡💛💚💙💜🖤🤍🤎💕💖💗💔<br>⭐🌟✨🔥🎉☀️☁️🌈💧💦🌸🍀✅❌❗❓💤🎵🌙</div>
+    <p><small>벡터 색상 폰트(COLR)라 크기를 키워도 깨지지 않습니다. 파일: <a href="dist-emoji/NemaumEmoji.ttf" download>NemaumEmoji.ttf</a> · <a href="dist-emoji/NemaumEmoji.woff2" download>woff2</a></small></p>
+  </div>
+
   <h2>특수문자 · 이모티콘</h2>
   <div class="card kao" id="kao">
     (╯°□°）╯︵ ┻━┻ &nbsp; ┬─┬ノ( º _ ºノ) &nbsp; ʕ•ᴥ•ʔ &nbsp; (≧▽≦) &nbsp; ٩(◕‿◕｡)۶ &nbsp; (づ｡◕‿‿◕｡)づ &nbsp;
@@ -161,6 +169,10 @@ The quick brown fox jumps over the lazy dog 0123456789
   ["w", "o", "s", "d"].forEach((id) => $(id).addEventListener("input", apply));
   document.querySelectorAll("button[data-w]").forEach((b) => b.onclick = () => { $("w").value = b.dataset.w; apply(); });
   document.querySelectorAll("button[data-o]").forEach((b) => b.onclick = () => { $("o").value = b.dataset.o; apply(); });
+  document.getElementById("es").addEventListener("input", (e) => {
+    document.getElementById("emo").style.fontSize = e.target.value + "px";
+    document.getElementById("ves").textContent = e.target.value;
+  });
   apply();
 </script>
 </body>
