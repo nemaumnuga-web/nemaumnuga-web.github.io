@@ -80,6 +80,7 @@ def line(a, b, cap=0.0, k=1.0):
 MAX_MITER = 1.0
 ROUND = False  # round style: every stroke is a capsule (round ends and joins)
 ROUND_K = 5    # points per half circle of a round end
+HCON = 0.9     # horizontal strokes are this much thinner than vertical ones (optical contrast)
 WSCALE = 1.0   # horizontal scale of centre-lines (wdth axis); stroke widths are unaffected
 
 
@@ -164,18 +165,26 @@ def render(strokes, hw):
             if n < 2:
                 continue
             segs = n if closed else n - 1
+
+            def heff(i):
+                a, b = q[i % n], q[(i + 1) % n]
+                L = math.hypot(b[0] - a[0], b[1] - a[1])
+                uy = abs(b[1] - a[1]) / L if L > 1e-9 else 1.0
+                return h * (HCON + (1.0 - HCON) * uy)
             for i in range(segs):
                 a, b = q[i], q[(i + 1) % n]
+                hi = heff(i)
+                # a join is extended by the half-thickness of the *neighbouring* stroke
                 if closed:
-                    e0 = _turn_ext(q[(i - 1) % n], a, b, h)
-                    e1 = _turn_ext(a, b, q[(i + 2) % n], h)
+                    e0 = _turn_ext(q[(i - 1) % n], a, b, heff(i - 1))
+                    e1 = _turn_ext(a, b, q[(i + 2) % n], heff(i + 1))
                 else:
-                    e0 = h * cap if i == 0 else _turn_ext(q[i - 1], a, b, h)
-                    e1 = h * cap if i == segs - 1 else _turn_ext(a, b, q[i + 2], h)
+                    e0 = hi * cap if i == 0 else _turn_ext(q[i - 1], a, b, heff(i - 1))
+                    e1 = hi * cap if i == segs - 1 else _turn_ext(a, b, q[i + 2], heff(i + 1))
                 if ROUND:
-                    r = _capsule(a, b, h)
+                    r = _capsule(a, b, hi)
                 else:
-                    r = _rect(a, b, e0, e1, h, (not closed) and i == 0 and cap == 0.0,
+                    r = _rect(a, b, e0, e1, hi, (not closed) and i == 0 and cap == 0.0,
                               (not closed) and i == segs - 1 and cap == 0.0)
                 if r:
                     out.append(r)
@@ -236,3 +245,18 @@ def into_box(strokes, box):
     """Map strokes drawn in the unit square into box=(x0,y0,x1,y1)."""
     x0, y0, x1, y1 = box
     return xform(strokes, x1 - x0, y1 - y0, x0, y0)
+
+
+def ink_bounds(strokes, hw):
+    """Bounds of the filled outline (not the centre-lines), ignoring the wdth scale."""
+    global WSCALE
+    saved, WSCALE = WSCALE, 1.0
+    try:
+        cs = render(strokes, hw)
+    finally:
+        WSCALE = saved
+    xs = [x for c in cs for x, y in c]
+    ys = [y for c in cs for x, y in c]
+    if not xs:
+        return None
+    return (min(xs), min(ys), max(xs), max(ys))

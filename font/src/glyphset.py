@@ -21,14 +21,15 @@ for c in range(0xE0100, 0xE01F0):
 
 
 def hangul_box(P):
-    """Centre-line box of a syllable.  The ink stays inside about 0.88 x 0.92 em so
-    neighbouring syllables (and lines) keep a clear gap even at heavy weights."""
+    """Ink frame of every syllable: (W, H, x0, y0).  Text sizes keep a slightly wider
+    gap between syllables (0.085 em) than display sizes (0.06 em)."""
     t = P.t
-    W = 935 - 40 * t - P.hw * 2.0
-    H = 960 - 40 * t - P.hw * 2.0
-    x0 = (1000 - W) / 2.0
-    y0 = -95 + 20 * t + P.hw
-    return W, H, x0, y0
+    W = 915 + 25 * t
+    H = 940 + 10 * t
+    return W, H, (1000 - W) / 2.0, -100.0
+
+
+JAMO_GAP = 72.0   # the single gap between any two jamo, on the ink
 
 
 def make_syllable(cp):
@@ -38,7 +39,7 @@ def make_syllable(cp):
     def f(P):
         W, H, x0, y0 = hangul_box(P)
         e = hg.stroke(P.hw, m)
-        st = hg.syllable(L, V, T, W, H, e, 44)
+        st = hg.syllable(L, V, T, W, H, e, JAMO_GAP - 12 * P.t)
         st = xform(st, 1, 1, x0, y0)
         return render(st, e), 1000
     return f
