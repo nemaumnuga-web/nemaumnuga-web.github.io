@@ -306,7 +306,7 @@ function headers(){var h={"Content-Type":"application/json"};if(cfg.key)h["Autho
 function checkHealth(){
   var dot=$("dot");dot.className="status-dot";
   if(!cfg.api){return}
-  fetch(base()+"/health",{headers:headers()}).then(function(r){dot.className="status-dot "+(r.ok?"ok":"bad")}).catch(function(){dot.className="status-dot bad"});
+  fetch(base()+"/v1/models",{headers:headers()}).then(function(r){dot.className="status-dot "+(r.ok?"ok":"bad")}).catch(function(){dot.className="status-dot bad"});
 }
 function apiMessages(c){
   var arr=[];
