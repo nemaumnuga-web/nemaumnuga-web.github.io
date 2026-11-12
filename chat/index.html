@@ -79,6 +79,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .md table{border-collapse:collapse;font-size:14.5px;width:max-content;min-width:100%}
 .md th,.md td{border:1px solid var(--border);padding:7px 11px;vertical-align:top;text-align:left;line-height:1.45}
 .md th{background:var(--bg-user);font-weight:600}
+.status{font-size:14px;color:var(--muted);margin:0 0 8px}
+.srcs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.srcs a{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px 10px;text-decoration:none}
+.srcs b{font-weight:600;color:inherit}
 .cursor::after{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--text);margin-left:4px;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.25;transform:scale(.7)}}
 .actions{display:flex;gap:2px;margin-top:4px;margin-left:-8px}
@@ -218,6 +222,7 @@ body.voice .voicebar{display:flex}
           설정
         </button>
         <div class="ttl">도구</div>
+        <button class="opt" id="mWeb">웹 검색</button>
         <button class="opt" data-tool="sum">요약하기</button>
         <button class="opt" data-tool="en">영어로 번역</button>
         <button class="opt" data-tool="tbl">표로 정리</button>
@@ -283,6 +288,7 @@ var LS={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}c
 /* ---------- state ---------- */
 var cfg={
   api:LS.get("lfm.api",""),
+  web:LS.get("lfm.web","0")==="1",
   key:LS.get("lfm.key",""),
   sys:LS.get("lfm.sys","당신은 친절하고 정확한 AI 어시스턴트입니다. 사용자의 언어로 답하세요."),
   temp:LS.get("lfm.temp2",""),
@@ -307,7 +313,7 @@ var pendingImg=null, streaming=false, ctrl=null, filter="";
 })();
 
 function saveCfg(){
-  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);
+  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");
   LS.set("lfm.lang",cfg.lang);LS.set("lfm.voice",cfg.voice);LS.set("lfm.vmode",cfg.auto?"1":"0");LS.set("lfm.effort",cfg.effort);
 }
 function saveChats(){
@@ -399,7 +405,9 @@ function assistantInner(m,idx,last){
   }
   var body=m.err?'<span class="err">'+esc(m.err)+"</span>":(m.text?md(m.text):"");
   var act=!live?'<div class="actions"><button data-act="copy" data-i="'+idx+'" title="복사">'+ICON_COPY+'</button><button data-act="speak" data-i="'+idx+'" title="소리 내어 읽기">'+(player.idx===idx?ICON_STOP:ICON_SPEAK)+"</button>"+(last?'<button data-act="retry" title="다시 생성">'+ICON_RETRY+"</button>":"")+"</div>":"";
-  return th+'<div class="md'+((live&&m.text)?" cursor":"")+'">'+body+"</div>"+act;
+  var pre=m.status?'<div class="status">'+esc(m.status)+"</div>":"";
+  var srcs=(m.sources&&m.sources.length?'<div class="srcs">'+m.sources.map(function(s,i){return '<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(s.title)+'"><b>'+(i+1)+"</b> "+esc(s.title)+"</a>"}).join("")+"</div>":"")+(m.searchErr?'<div class="status">'+esc(m.searchErr)+"</div>":"");
+  return th+pre+'<div class="md'+((live&&m.text)?" cursor":"")+'">'+body+"</div>"+srcs+act;
 }
 function msgHTML(m,idx,last){
   if(m.role==="user"){
@@ -449,10 +457,11 @@ function checkHealth(){
 }
 var EFF={minimal:"Minimal",low:"Low",medium:"Medium",high:"High",xhigh:"Extra High",max:"Max"};
 function effLabel(){$("effLabel").textContent=(cfg.effort&&caps.levels.length)?(EFF[cfg.effort]||cfg.effort):(cfg.think?"":"추론 끔")}
-function apiMessages(c){
+function apiMessages(c,extra){
   var arr=[],sys=cfg.sys.trim();
   if(vc.on)sys+=(sys?" ":"")+"지금은 음성 대화 중입니다. 마크다운 없이 말하듯이 자연스럽게, 1~3문장으로 짧게 답하세요.";
   if(c.memory)sys+=(sys?"\n\n":"")+"지금까지 대화의 요약(이전 대화 내용):\n"+c.memory;
+  if(extra)sys+=(sys?"\n\n":"")+extra;
   if(sys)arr.push({role:"system",content:sys});
   liveMsgs(c).forEach(function(m){
     if(m.role==="assistant"){if(m.text)arr.push({role:"assistant",content:m.text});return}
@@ -463,6 +472,27 @@ function apiMessages(c){
     }else arr.push({role:"user",content:m.text||"(이미지)"});
   });
   return arr;
+}
+// 웹 검색: 서버의 /search(Bing 결과)로 검색하고, 결과를 시스템 메시지에 넣어 출처 번호로 답하게 한다
+function webSearch(c,a,paint){
+  var last=null;for(var i=c.msgs.length-1;i>=0;i--){if(c.msgs[i].role==="user"){last=c.msgs[i];break}}
+  var q=last&&last.text?last.text.trim():"";
+  if(!q)return Promise.resolve(null);
+  a.status="웹 검색 중…";paint();
+  return fetch(base()+"/search?q="+encodeURIComponent(q),{headers:headers(),signal:ctrl.signal})
+    .then(function(r){if(!r.ok)throw new Error("검색 서버 "+r.status);return r.json()})
+    .then(function(j){
+      a.status="";
+      a.sources=(j.results||[]).filter(function(s){return /^https?:\/\//.test(s.url)}).slice(0,5);
+      paint();
+      if(!a.sources.length)return null;
+      return "다음은 방금 웹에서 검색한 결과입니다. 이 정보를 근거로 답하고, 근거가 된 문장 뒤에 [번호]로 출처를 표시하세요. 검색 결과에 없는 내용은 추측하지 마세요.\n"+
+        a.sources.map(function(s,k){return "["+(k+1)+"] "+s.title+" ("+s.url+")\n"+s.snippet}).join("\n");
+    })
+    .catch(function(e){
+      if(e.name==="AbortError")throw e;
+      a.status="";a.searchErr="웹 검색에 실패해서 검색 없이 답합니다.";paint();return null;
+    });
 }
 function run(c){
   var a={role:"assistant",text:""};c.msgs.push(a);
@@ -500,8 +530,8 @@ function run(c){
     if(ok)maybeCompact(c);
   }
   if(!cfg.api){a.err="서버 주소가 설정되지 않았습니다. 왼쪽 아래 ⚙️ 설정에서 입력하세요.";return done()}
-  Promise.resolve().then(function(){
-    var body={model:isV&&!useVL?"lfm3-audio":"lfm3-vl",messages:apiMessages(c),stream:true};
+  Promise.resolve().then(function(){ return (!isV&&cfg.web)?webSearch(c,a,paint):null }).then(function(ctx){
+    var body={model:isV&&!useVL?"lfm3-audio":"lfm3-vl",messages:apiMessages(c,ctx),stream:true};
     if(isV){
       body.max_tokens=150;                                  // 음성 답변은 짧게(반복 루프 방지)
       if(useVL)body.chat_template_kwargs={enable_thinking:false};else body.repeat_penalty=1.1;
@@ -872,6 +902,9 @@ function closePops(){$("plusMenu").classList.remove("on");$("modelMenu").classLi
 $("plusBtn").addEventListener("click",function(e){e.stopPropagation();var on=$("plusMenu").classList.contains("on");closePops();if(!on)$("plusMenu").classList.add("on")});
 $("mAttach").addEventListener("click",function(){closePops();pickImage()});
 $("mSettings").addEventListener("click",function(){closePops();openSettings()});
+function setWebLabel(){$("mWeb").textContent="웹 검색: "+(cfg.web?"켜짐 ✓":"꺼짐")}
+$("mWeb").addEventListener("click",function(){cfg.web=!cfg.web;saveCfg();setWebLabel();closePops()});
+setWebLabel();
 document.querySelectorAll(".opt[data-tool]").forEach(function(b){b.addEventListener("click",function(){closePops();runTool(b.getAttribute("data-tool"))})});
 function runTool(t){
   if(t==="mem"){var c=cur();alert(c&&c.memory?c.memory:"이 채팅에는 아직 압축된 메모리가 없습니다.");return}
