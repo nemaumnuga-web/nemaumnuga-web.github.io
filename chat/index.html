@@ -114,6 +114,13 @@ textarea::placeholder{color:var(--muted)}
 .modal .btns .pri{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
 .hint{font-size:12px;color:var(--muted);margin-top:4px}
 
+.icon-btn.rec{background:#ef4444;color:#fff;animation:recp 1s infinite}
+.icon-btn.wait{opacity:.5;pointer-events:none}
+@keyframes recp{50%{opacity:.6}}
+.modal select{width:100%;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);color:var(--text);padding:9px 12px;font:inherit;font-size:14px}
+.modal label.chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin-top:16px}
+.modal label.chk input{width:auto}
+.toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:var(--accent);color:var(--accent-text);padding:8px 16px;border-radius:999px;font-size:14px;z-index:30;max-width:90vw}
 @media (max-width:760px){
   .side{position:fixed;inset:0 auto 0 0;z-index:15;width:280px;margin-left:-280px;box-shadow:0 0 40px rgba(0,0,0,.3)}
   .side.open{margin-left:0}
@@ -161,6 +168,9 @@ textarea::placeholder{color:var(--muted)}
           </button>
           <input type="file" id="file" accept="image/*" hidden>
           <textarea id="input" rows="1" placeholder="무엇이든 물어보세요"></textarea>
+          <button class="icon-btn" id="micBtn" title="음성 입력">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+          </button>
           <button class="send" id="sendBtn" disabled title="전송">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
           </button>
@@ -183,6 +193,11 @@ textarea::placeholder{color:var(--muted)}
     <textarea id="sSys" rows="3"></textarea>
     <label for="sTemp">Temperature (텍스트는 0 권장)</label>
     <input id="sTemp" type="number" min="0" max="2" step="0.1">
+    <label for="sLang">음성 언어 (인식·읽기)</label>
+    <select id="sLang"><option value="ko">한국어</option><option value="en">English</option><option value="ja">日本語</option><option value="zh">中文</option></select>
+    <label for="sVoice">읽어주는 목소리</label>
+    <select id="sVoice"><option value="female">여성</option><option value="male">남성</option></select>
+    <label class="chk"><input id="sVmode" type="checkbox"> 음성 대화 모드 (말하면 바로 전송, 답변 자동 읽기)</label>
     <div class="btns"><button id="sCancel">취소</button><button class="pri" id="sSave">저장</button></div>
   </div>
 </div>
@@ -198,7 +213,10 @@ var cfg={
   api:LS.get("lfm.api",""),
   key:LS.get("lfm.key",""),
   sys:LS.get("lfm.sys","당신은 친절하고 정확한 AI 어시스턴트입니다. 사용자의 언어로 답하세요."),
-  temp:parseFloat(LS.get("lfm.temp","0"))||0
+  temp:parseFloat(LS.get("lfm.temp","0"))||0,
+  lang:LS.get("lfm.lang","ko"),
+  voice:LS.get("lfm.voice","female"),
+  vmode:LS.get("lfm.vmode","0")==="1"
 };
 var chats=[];try{chats=JSON.parse(LS.get("lfm.chats","[]"))||[]}catch(e){chats=[]}
 var curId=LS.get("lfm.cur","");
@@ -212,7 +230,7 @@ var pendingImg=null, streaming=false, ctrl=null;
   if(ch){saveCfg();history.replaceState(null,"",location.pathname)}
 })();
 
-function saveCfg(){LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys",cfg.sys);LS.set("lfm.temp",String(cfg.temp))}
+function saveCfg(){LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys",cfg.sys);LS.set("lfm.temp",String(cfg.temp));LS.set("lfm.lang",cfg.lang);LS.set("lfm.voice",cfg.voice);LS.set("lfm.vmode",cfg.vmode?"1":"0")}
 function saveChats(){
   // 이미지가 localStorage를 꽉 채우지 않도록 오래된 대화부터 이미지 제거
   var s=JSON.stringify(chats);
@@ -262,6 +280,8 @@ function md(src){
 /* ---------- render ---------- */
 var ICON_COPY='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg>';
 var ICON_RETRY='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg>';
+var ICON_SPEAK='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>';
+var ICON_STOP='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 var SUGGEST=["이 이미지를 설명해줘","간단한 파이썬 코드 짜줘","한국 여행 일정 추천해줘","영어 문장을 자연스럽게 고쳐줘"];
 
 function renderList(){
@@ -277,7 +297,7 @@ function msgHTML(m,idx,last){
   }
   var body=m.err?'<span class="err">'+esc(m.err)+"</span>":(m.text?md(m.text):"");
   var live=(streaming&&last)?" cursor":"";
-  var act=(!streaming||!last)?'<div class="actions"><button data-act="copy" data-i="'+idx+'" title="복사">'+ICON_COPY+"</button>"+(last?'<button data-act="retry" title="다시 생성">'+ICON_RETRY+"</button>":"")+"</div>":"";
+  var act=(!streaming||!last)?'<div class="actions"><button data-act="copy" data-i="'+idx+'" title="복사">'+ICON_COPY+'</button><button data-act="speak" data-i="'+idx+'" title="소리내어 읽기">'+(player.idx===idx?ICON_STOP:ICON_SPEAK)+"</button>"+(last?'<button data-act="retry" title="다시 생성">'+ICON_RETRY+"</button>":"")+"</div>":"";
   return '<div class="msg assistant"><div class="avatar">L3</div><div style="flex:1;min-width:0"><div class="md'+live+'">'+body+"</div>"+act+"</div></div>";
 }
 function render(keepScroll){
@@ -330,7 +350,7 @@ function run(c){
     if(md_el){md_el.innerHTML=md(a.text);md_el.classList.add("cursor")}
     var s=$("scroll");if(s.scrollHeight-s.scrollTop-s.clientHeight<160)toBottom();
   }
-  function done(){streaming=false;ctrl=null;saveChats();render(true)}
+  function done(){streaming=false;ctrl=null;saveChats();render(true);if(cfg.vmode&&a.text&&!a.err)speak(c.msgs.length-1)}
   if(!cfg.api){a.err="서버 주소가 설정되지 않았습니다. 왼쪽 아래 ⚙️ 설정에서 입력하세요.";return done()}
   fetch(base()+"/v1/chat/completions",{
     method:"POST",headers:headers(),signal:ctrl.signal,
@@ -359,6 +379,7 @@ function run(c){
 }
 function send(text){
   if(streaming)return;
+  stopSpeak();
   var c=cur()||newChat();
   text=(text||"").trim();
   if(!text&&!pendingImg)return;
@@ -369,6 +390,128 @@ function send(text){
   pendingImg=null;$("preview").className="preview";$("preview").innerHTML="";
   $("input").value="";autosize();
   run(c);
+}
+
+/* ---------- voice (음성 입력: ASR / 음성 출력: TTS) ---------- */
+var LANGS={ko:"Korean",en:"English",ja:"Japanese",zh:"Chinese"};
+var rec=null, asrBusy=false;
+var player={audio:null,gen:0,idx:-1};
+
+function toast(msg){
+  var t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.remove()},3200);
+}
+function toWav(buf){
+  var d=buf.getChannelData(0),n=d.length,ab=new ArrayBuffer(44+n*2),v=new DataView(ab);
+  function w(o,str){for(var i=0;i<str.length;i++)v.setUint8(o+i,str.charCodeAt(i))}
+  w(0,"RIFF");v.setUint32(4,36+n*2,true);w(8,"WAVEfmt ");v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,16000,true);v.setUint32(28,32000,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,"data");v.setUint32(40,n*2,true);
+  for(var i=0;i<n;i++){var x=Math.max(-1,Math.min(1,d[i]));v.setInt16(44+i*2,x<0?x*0x8000:x*0x7fff,true)}
+  return ab;
+}
+function b64(ab){
+  var bytes=new Uint8Array(ab),bin="",CH=0x8000;
+  for(var i=0;i<bytes.length;i+=CH)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  return btoa(bin);
+}
+// 녹음 파일(webm/mp4 등) -> 16kHz 모노 WAV
+function toWav16k(blob){
+  return blob.arrayBuffer().then(function(ab){
+    var AC=window.AudioContext||window.webkitAudioContext,ctx=new AC();
+    return ctx.decodeAudioData(ab).then(function(buf){
+      ctx.close();
+      var oc=new OfflineAudioContext(1,Math.max(1,Math.ceil(buf.duration*16000)),16000),src=oc.createBufferSource();
+      src.buffer=buf;src.connect(oc.destination);src.start();
+      return oc.startRendering();
+    });
+  }).then(toWav);
+}
+function transcribe(wavAb){
+  return fetch(base()+"/v1/chat/completions",{
+    method:"POST",headers:headers(),
+    body:JSON.stringify({model:"lfm3-omni",temperature:0,max_tokens:400,messages:[
+      {role:"system",content:"Perform ASR in "+(LANGS[cfg.lang]||"Korean")+"."},
+      {role:"user",content:[{type:"input_audio",input_audio:{data:b64(wavAb),format:"wav"}}]}
+    ]})
+  }).then(function(r){
+    if(!r.ok)throw new Error("서버 오류 "+r.status+(r.status===401?" (API 키 확인)":""));
+    return r.json();
+  }).then(function(j){return ((j.choices&&j.choices[0]&&j.choices[0].message.content)||"").trim()});
+}
+function setMic(state){
+  var b=$("micBtn");b.className="icon-btn"+(state?" "+state:"");
+  $("input").placeholder=state==="rec"?"듣는 중… 마이크를 다시 누르면 끝납니다":state==="wait"?"음성을 인식하는 중…":"무엇이든 물어보세요";
+}
+function startRec(){
+  if(!cfg.api){toast("먼저 설정에서 서버 주소를 입력하세요");return}
+  if(!navigator.mediaDevices||!window.MediaRecorder){toast("이 브라우저는 녹음을 지원하지 않습니다");return}
+  stopSpeak();
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    var mr=new MediaRecorder(stream),chunks=[];
+    rec={mr:mr,stream:stream,t0:Date.now(),timer:setTimeout(stopRec,60000)};
+    mr.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data)};
+    mr.onstop=function(){
+      stream.getTracks().forEach(function(t){t.stop()});
+      clearTimeout(rec.timer);var dur=Date.now()-rec.t0;rec=null;
+      if(dur<600||!chunks.length){setMic("");toast("너무 짧아요. 다시 말해 주세요");return}
+      asrBusy=true;setMic("wait");
+      toWav16k(new Blob(chunks,{type:mr.mimeType})).then(transcribe).then(function(text){
+        if(!text){toast("음성을 인식하지 못했어요");return}
+        if(cfg.vmode){send(text)}
+        else{var i=$("input");i.value=(i.value?i.value+" ":"")+text;autosize();updateSend();i.focus()}
+      }).catch(function(e){toast("음성 인식 실패: "+e.message)}).then(function(){asrBusy=false;setMic("")});
+    };
+    mr.start();setMic("rec");
+  }).catch(function(){toast("마이크 권한이 필요합니다")});
+}
+function stopRec(){if(rec&&rec.mr&&rec.mr.state!=="inactive")rec.mr.stop()}
+$("micBtn").addEventListener("click",function(){
+  if(asrBusy||streaming)return;
+  if(rec)stopRec();else startRec();
+});
+
+function speechText(t){
+  return t.replace(/```[\s\S]*?```/g," ").replace(/`([^`]*)`/g,"$1").replace(/\[([^\]]+)\]\([^)]*\)/g,"$1")
+    .replace(/^\s*[-*]\s+/gm,"").replace(/^\s*\d+\.\s+/gm,"").replace(/[*#>_~]/g," ").replace(/\s+/g," ").trim();
+}
+function chunkText(t){
+  var parts=t.split(/(?<=[.!?。！？])\s+/),out=[],cur="";
+  parts.forEach(function(p){
+    while(p.length>180){out.push(p.slice(0,180));p=p.slice(180)}
+    if((cur+" "+p).length>120&&cur){out.push(cur);cur=p}else cur=cur?cur+" "+p:p;
+  });
+  if(cur)out.push(cur);
+  return out.filter(function(x){return x.trim()});
+}
+function fetchTTS(txt){
+  return fetch(base()+"/v1/audio/speech",{method:"POST",headers:headers(),body:JSON.stringify({model:"tts",input:txt,voice:cfg.voice,lang:cfg.lang,response_format:"wav"})})
+    .then(function(r){if(!r.ok)throw new Error("서버 오류 "+r.status);return r.blob()});
+}
+function refreshSpeak(){
+  var els=document.querySelectorAll('[data-act="speak"]');
+  for(var i=0;i<els.length;i++){var on=+els[i].getAttribute("data-i")===player.idx;els[i].innerHTML=on?ICON_STOP:ICON_SPEAK;els[i].title=on?"읽기 중지":"소리내어 읽기"}
+}
+function stopSpeak(){
+  player.gen++;
+  if(player.audio){try{player.audio.pause()}catch(e){}player.audio=null}
+  player.idx=-1;refreshSpeak();
+}
+function speak(idx){
+  var c=cur(),m=c&&c.msgs[idx];if(!m||!m.text)return;
+  var chunks=chunkText(speechText(m.text));if(!chunks.length)return;
+  stopSpeak();var gen=player.gen;player.idx=idx;refreshSpeak();
+  var next=fetchTTS(chunks[0]);
+  (function step(i){
+    if(gen!==player.gen)return;
+    if(i>=chunks.length){if(gen===player.gen){player.idx=-1;player.audio=null;refreshSpeak()}return}
+    next.then(function(blob){
+      if(gen!==player.gen)return;
+      var pre=i+1<chunks.length?fetchTTS(chunks[i+1]):null;
+      var url=URL.createObjectURL(blob),a=new Audio(url);player.audio=a;
+      a.onended=a.onerror=function(){URL.revokeObjectURL(url);next=pre;step(i+1)};
+      a.play().catch(function(){toast("소리 재생이 차단됐어요. 스피커 버튼을 눌러 주세요");if(gen===player.gen)stopSpeak()});
+    }).catch(function(e){if(gen===player.gen){toast("음성 출력 실패: "+e.message);stopSpeak()}});
+  })(0);
 }
 
 /* ---------- events ---------- */
@@ -395,6 +538,7 @@ $("msgs").addEventListener("click",function(e){
   var ac=e.target.closest("[data-act]");if(!ac)return;
   var c=cur();if(!c)return;
   if(ac.getAttribute("data-act")==="copy"){var m=c.msgs[+ac.getAttribute("data-i")];navigator.clipboard&&navigator.clipboard.writeText(m.text||"")}
+  else if(ac.getAttribute("data-act")==="speak"){var si=+ac.getAttribute("data-i");if(player.idx===si)stopSpeak();else speak(si)}
   else if(ac.getAttribute("data-act")==="retry"&&!streaming){c.msgs.pop();run(c)}
 });
 $("attachBtn").addEventListener("click",function(){$("file").click()});
@@ -431,7 +575,7 @@ $("themeBtn").addEventListener("click",function(){
 
 /* settings */
 function openSettings(){
-  $("sApi").value=cfg.api;$("sKey").value=cfg.key;$("sSys").value=cfg.sys;$("sTemp").value=cfg.temp;
+  $("sApi").value=cfg.api;$("sKey").value=cfg.key;$("sSys").value=cfg.sys;$("sTemp").value=cfg.temp;$("sLang").value=cfg.lang;$("sVoice").value=cfg.voice;$("sVmode").checked=cfg.vmode;
   $("modalBg").classList.add("on");closeMobile();
 }
 $("settingsBtn").addEventListener("click",openSettings);
@@ -439,7 +583,7 @@ $("sCancel").addEventListener("click",function(){$("modalBg").classList.remove("
 $("modalBg").addEventListener("click",function(e){if(e.target===this)this.classList.remove("on")});
 $("sSave").addEventListener("click",function(){
   cfg.api=$("sApi").value.trim();cfg.key=$("sKey").value.trim();cfg.sys=$("sSys").value;
-  cfg.temp=Math.max(0,Math.min(2,parseFloat($("sTemp").value)||0));
+  cfg.temp=Math.max(0,Math.min(2,parseFloat($("sTemp").value)||0));cfg.lang=$("sLang").value;cfg.voice=$("sVoice").value;cfg.vmode=$("sVmode").checked;
   saveCfg();$("modalBg").classList.remove("on");checkHealth();
 });
 
