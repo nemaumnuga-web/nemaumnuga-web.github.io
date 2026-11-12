@@ -90,6 +90,11 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .think.live summary{animation:pulse 1.4s infinite}
 .think .tr{white-space:pre-wrap;border-left:2px solid var(--border);padding:4px 0 4px 12px;margin-top:4px;line-height:1.5}
 
+.memnote{margin:6px 0 2px;font-size:13px;color:var(--muted);border-top:1px dashed var(--border);padding-top:8px}
+.memnote summary{cursor:pointer;list-style:none}
+.memnote summary::-webkit-details-marker{display:none}
+.memnote .tr{white-space:pre-wrap;margin-top:6px;line-height:1.5}
+
 /* composer */
 .composer-wrap{padding:0 16px calc(12px + env(safe-area-inset-bottom));position:relative}
 .composer{max-width:768px;margin:0 auto;background:var(--bg-input);border-radius:28px;padding:8px 10px 8px 10px;display:flex;flex-direction:column;gap:6px}
@@ -253,6 +258,8 @@ body.voice .voicebar{display:flex}
     <select id="sLang"><option value="ko">한국어</option><option value="en">English</option><option value="ja">日本語</option><option value="zh">中文</option></select>
     <label for="sVoice">읽어주는 목소리</label>
     <select id="sVoice"><option value="female">여성</option><option value="male">남성</option></select>
+    <label for="sVmodel">음성 대화 답변 모델</label>
+    <select id="sVmodel"><option value="audio">LFM3 Audio (기본, 빠름)</option><option value="vl">LFM3 VL (추론 끔, 더 정확)</option></select>
     <label class="chk"><input id="sAuto" type="checkbox"> 답변 자동으로 소리 내어 읽기</label>
     <div class="btns"><button id="sCancel">취소</button><button class="pri" id="sSave">저장</button></div>
   </div>
@@ -271,6 +278,7 @@ var cfg={
   sys:LS.get("lfm.sys","당신은 친절하고 정확한 AI 어시스턴트입니다. 사용자의 언어로 답하세요."),
   temp:LS.get("lfm.temp2",""),
   think:LS.get("lfm.think","1")==="1",
+  vmodel:LS.get("lfm.vmodel","audio"),
   lang:LS.get("lfm.lang","ko"),
   voice:LS.get("lfm.voice","female"),
   auto:LS.get("lfm.vmode","0")==="1",
@@ -290,7 +298,7 @@ var pendingImg=null, streaming=false, ctrl=null, filter="";
 })();
 
 function saveCfg(){
-  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");
+  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);
   LS.set("lfm.lang",cfg.lang);LS.set("lfm.voice",cfg.voice);LS.set("lfm.vmode",cfg.auto?"1":"0");LS.set("lfm.effort",cfg.effort);
 }
 function saveChats(){
@@ -380,7 +388,7 @@ function render(keepScroll){
     $("scroll").style.overflow="hidden";
   }else{
     $("scroll").style.overflow="auto";
-    box.innerHTML=c.msgs.map(function(m,i){return msgHTML(m,i,i===c.msgs.length-1)}).join("")+'<div style="height:24px"></div>';
+    box.innerHTML=c.msgs.map(function(m,i){return ((c.memStart||0)>0&&i===c.memStart?memNote(c):"")+msgHTML(m,i,i===c.msgs.length-1)}).join("")+'<div style="height:24px"></div>';
   }
   updateSend();
   if(!keepScroll)toBottom();
@@ -417,8 +425,9 @@ function effLabel(){$("effLabel").textContent=(cfg.effort&&caps.levels.length)?(
 function apiMessages(c){
   var arr=[],sys=cfg.sys.trim();
   if(vc.on)sys+=(sys?" ":"")+"지금은 음성 대화 중입니다. 마크다운 없이 말하듯이 자연스럽게, 1~3문장으로 짧게 답하세요.";
+  if(c.memory)sys+=(sys?"\n\n":"")+"지금까지 대화의 요약(이전 대화 내용):\n"+c.memory;
   if(sys)arr.push({role:"system",content:sys});
-  c.msgs.forEach(function(m){
+  liveMsgs(c).forEach(function(m){
     if(m.role==="assistant"){if(m.text)arr.push({role:"assistant",content:m.text});return}
     if(m.img&&!vc.on){
       var parts=[];if(m.text)parts.push({type:"text",text:m.text});
@@ -430,30 +439,52 @@ function apiMessages(c){
 }
 function run(c){
   var a={role:"assistant",text:""};c.msgs.push(a);
-  var isV=vc.on;                                   // 음성 대화 중이면 LFM3 Audio, 아니면 LFM3 VL
+  var isV=vc.on, useVL=isV&&cfg.vmodel==="vl";     // 음성 대화: Audio(기본) 또는 VL(추론 끔) / 평소: VL
   streaming=true;ctrl=new AbortController();render();
+  var spoken=0,started=false;
   function paint(){
     var els=document.querySelectorAll(".msg.assistant"),el=els[els.length-1];
     if(el){el.innerHTML=assistantInner(a,c.msgs.indexOf(a),true)}
     var s=$("scroll");if(s.scrollHeight-s.scrollTop-s.clientHeight<160)toBottom();
   }
+  // 문장이 완성되는 즉시 읽기 큐에 넣는다 → 답변이 끝나기 전에 첫 문장부터 말하기 시작
+  function flushSpeech(final){
+    if(!isV||!vc.on)return;
+    var seg=a.text.slice(spoken),cut=-1,m,re=/[.!?。！？]+["')\]]*\s/g;
+    while((m=re.exec(seg)))cut=m.index+m[0].length;
+    if(cut<0){
+      if(final)cut=seg.length;
+      else if(seg.length>=80){var sp=seg.lastIndexOf(" ");if(sp>0)cut=sp+1}
+    }
+    if(cut<=0)return;
+    var part=seg.slice(0,cut);
+    if(!final&&speechText(part).length<6)return;
+    spoken+=cut;
+    chunkText(speechText(part)).forEach(function(t){vqPush(t)});
+    if(!started){started=true;setVState("speaking")}
+  }
   function done(){
     streaming=false;ctrl=null;delete a._t0;saveChats();render(true);
     var idx=c.msgs.indexOf(a),ok=a.text&&!a.err&&idx>=0;
     if(vc.on){
-      if(ok){setVState("speaking");speak(idx,function(){if(vc.on)setVState("listening")})}
-      else setVState("listening");
+      if(ok){flushSpeech(true);vqFinish(function(){if(vc.on)setVState("listening")})}
+      else{vqReset();setVState("listening")}
     }else if(cfg.auto&&ok)speak(idx);
+    if(ok)maybeCompact(c);
   }
   if(!cfg.api){a.err="서버 주소가 설정되지 않았습니다. 왼쪽 아래 ⚙️ 설정에서 입력하세요.";return done()}
-  var body={model:isV?"lfm3-audio":"lfm3-vl",messages:apiMessages(c),stream:true};
-  if(isV){body.max_tokens=300}
-  else{
-    if(cfg.temp!=="")body.temperature=cfg.temp;
-    if(!cfg.think)body.chat_template_kwargs={enable_thinking:false};
-    if(cfg.effort&&caps.levels.indexOf(cfg.effort)>=0)body.reasoning_effort=cfg.effort;
-  }
-  fetch((isV?vbase():base())+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)}).then(function(r){
+  Promise.resolve().then(function(){
+    var body={model:isV&&!useVL?"lfm3-audio":"lfm3-vl",messages:apiMessages(c),stream:true};
+    if(isV){
+      body.max_tokens=150;                                  // 음성 답변은 짧게(반복 루프 방지)
+      if(useVL)body.chat_template_kwargs={enable_thinking:false};else body.repeat_penalty=1.1;
+    }else{
+      if(cfg.temp!=="")body.temperature=cfg.temp;
+      if(!cfg.think)body.chat_template_kwargs={enable_thinking:false};
+      if(cfg.effort&&caps.levels.indexOf(cfg.effort)>=0)body.reasoning_effort=cfg.effort;
+    }
+    return fetch((isV&&!useVL?vbase():base())+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)});
+  }).then(function(r){
     if(!r.ok)return r.text().then(function(t){throw new Error("서버 오류 "+r.status+(r.status===401?" (API 키를 확인하세요)":"")+" "+t.slice(0,200))});
     var rd=r.body.getReader(),dec=new TextDecoder(),buf="";
     function pump(){
@@ -469,7 +500,7 @@ function run(c){
             if(dl.reasoning_content){if(!a.reasoning){a.reasoning="";a._t0=Date.now()}a.reasoning+=dl.reasoning_content;paint()}
             if(dl.content){
               if(a._t0&&!a.thinkMs)a.thinkMs=Date.now()-a._t0;
-              a.text+=dl.content;paint();
+              a.text+=dl.content;paint();flushSpeech(false);
             }
           }catch(e){}
         });
@@ -501,6 +532,7 @@ function send(text){
 var LANGS={ko:"Korean",en:"English",ja:"Japanese",zh:"Chinese"};
 var asrBusy=false;
 var player={audio:null,gen:0,idx:-1};
+var vq={gen:0,items:[],playing:false,finished:false,onEnd:null};   // 음성 대화용 문장 단위 재생 큐
 var vc={on:false};
 
 function toast(msg){
@@ -596,6 +628,7 @@ function refreshSpeak(){
   for(var i=0;i<els.length;i++){var on=+els[i].getAttribute("data-i")===player.idx;els[i].innerHTML=on?ICON_STOP:ICON_SPEAK;els[i].title=on?"읽기 중지":"소리 내어 읽기"}
 }
 function stopSpeak(){
+  vqReset();
   player.gen++;
   if(player.audio){try{player.audio.pause()}catch(e){}player.audio=null}
   player.idx=-1;refreshSpeak();
@@ -617,6 +650,70 @@ function speak(idx,onEnd){
       a.play().catch(function(){toast("소리 재생이 차단됐어요. 스피커 버튼을 눌러 주세요");if(gen===player.gen){stopSpeak();if(onEnd)onEnd()}});
     }).catch(function(e){if(gen===player.gen){toast("음성 출력 실패: "+e.message);stopSpeak();if(onEnd)onEnd()}});
   })(0);
+}
+
+/* ---------- 음성 대화용 문장 단위 재생 큐 ---------- */
+function vqReset(){
+  vq.gen++;vq.items=[];vq.playing=false;vq.finished=false;vq.onEnd=null;
+  if(player.audio){try{player.audio.pause()}catch(e){}player.audio=null}
+}
+function vqPush(txt){
+  txt=speechText(txt);if(!txt)return;
+  vq.items.push({txt:txt,p:null});vqPlay();
+}
+function vqFinish(cb){vq.finished=true;vq.onEnd=cb;vqPlay()}
+function vqPlay(){
+  for(var k=0;k<Math.min(2,vq.items.length);k++)if(!vq.items[k].p)vq.items[k].p=fetchTTS(vq.items[k].txt);   // 다음 두 문장까지 미리 합성
+  if(vq.playing)return;
+  var it=vq.items[0];
+  if(!it){if(vq.finished&&vq.onEnd){var f=vq.onEnd;vq.onEnd=null;f()}return}
+  vq.playing=true;var gen=vq.gen;
+  function next(){if(gen!==vq.gen)return;vq.items.shift();vq.playing=false;vqPlay()}
+  it.p.then(function(blob){
+    if(gen!==vq.gen)return;
+    var url=URL.createObjectURL(blob),au=new Audio(url);player.audio=au;
+    au.onended=au.onerror=function(){URL.revokeObjectURL(url);next()};
+    au.play().catch(function(){toast("소리 재생이 차단됐어요");next()});
+  }).catch(function(e){if(gen===vq.gen){toast("음성 출력 실패: "+e.message);next()}});
+}
+
+/* ---------- 롤링 메모리 압축 (긴 대화에서 컨텍스트·KV 캐시·프리필 시간을 일정하게 유지) ----------
+   오래된 대화는 통째로 지우는 대신, 나중에 다시 물어볼 만한 "사실 문장"(코드·번호·날짜·시간·연락처·기억 요청·건강/선호 정보)만
+   규칙으로 뽑아 메모리에 덧붙이고 원문은 버린다. 모델을 쓰지 않으므로 즉시 끝나고, 2B 모델의 요약 실패(원문 베끼기)를 피한다. */
+var CP={trigger:3000,keep:6,maxLines:60};              // 라이브 대화가 약 3000토큰을 넘으면 최근 6개 메시지만 남기고 정리
+function estTok(s){return Math.ceil(s.length/1.5)}     // 한국어 기준 보수적 추정(실측 1.45자/토큰)
+function liveMsgs(c){return c.msgs.slice(c.memStart||0)}
+function liveTokens(c){var t=estTok(c.memory||"");liveMsgs(c).forEach(function(m){t+=estTok(m.text||"")+(m.img?400:0)});return t}
+function extractFacts(ms){
+  var out=[];
+  ms.forEach(function(m){
+    if(m.role!=="user"||!m.text)return;
+    m.text.split(/(?<=[.!?。])\s+|\n/).forEach(function(sn){
+      sn=sn.trim();if(!sn)return;
+      var sc=0;
+      if(/\d{3,}/.test(sn))sc+=2;                                                           // 3자리 이상 숫자(코드·번호·연도·전화)
+      if(/\d{1,2}\s*시|\d{1,2}월\s*\d{1,2}일|\d{4}-\d{2}-\d{2}|\d{1,2}:\d{2}/.test(sn))sc+=2; // 날짜·시간
+      if(/@|https?:\/\//.test(sn))sc+=2;                                                    // 메일·주소
+      if(/약속|마감|비밀번호|주소|예약|알레르기|못 먹|이름은|취미|좋아해|싫어해|password|address|appointment|deadline|allergic|my name is|favorite|hobby/i.test(sn))sc+=2;
+      if(/기억해|잊지|remember|don't forget/i.test(sn))sc+=1;                                // "꼭 기억해 줘"만으로는 보관하지 않음(숫자·사실과 함께일 때만)
+      if(sc>=2)out.push("- "+sn.slice(0,200));
+    });
+  });
+  return out;
+}
+function memNote(c){
+  return '<details class="memnote"><summary>⋯ 이전 대화 '+(c.memStart||0)+'개 메시지는 정리했어요 (기억할 사실만 남김)</summary><div class="tr">'+esc(c.memory||"(기억할 사실이 없었어요)")+"</div></details>";
+}
+function maybeCompact(c){
+  var live=liveMsgs(c);
+  if(liveTokens(c)<=CP.trigger||live.length<=CP.keep)return;
+  var from=c.memStart||0,cut=from+live.length-CP.keep;
+  var mem=c.memory?c.memory.split("\n"):[],seen={};
+  mem.forEach(function(l){seen[l.replace(/\s/g,"")]=1});
+  extractFacts(c.msgs.slice(from,cut)).forEach(function(l){var k=l.replace(/\s/g,"");if(!seen[k]){seen[k]=1;mem.push(l)}});
+  if(mem.length>CP.maxLines)mem=mem.slice(mem.length-CP.maxLines);   // 메모리도 상한을 둔다(가장 오래된 줄부터 버림)
+  c.memory=mem.join("\n");c.memStart=cut;
+  saveChats();if(cur()===c)render(true);
 }
 
 /* ---------- 음성 대화 (연속 대화: 듣기 → 인식 → 답변 → 읽기 → 다시 듣기) ---------- */
@@ -787,7 +884,7 @@ $("themeBtn").addEventListener("click",function(){
 /* settings */
 function openSettings(){
   $("sApi").value=cfg.api;$("sKey").value=cfg.key;$("sSys").value=cfg.sys;$("sTemp").value=cfg.temp;
-  $("sLang").value=cfg.lang;$("sVoice").value=cfg.voice;$("sAuto").checked=cfg.auto;
+  $("sLang").value=cfg.lang;$("sVoice").value=cfg.voice;$("sAuto").checked=cfg.auto;$("sVmodel").value=cfg.vmodel;
   $("modalBg").classList.add("on");closeMobile();
 }
 $("settingsBtn").addEventListener("click",openSettings);
@@ -796,7 +893,7 @@ $("modalBg").addEventListener("click",function(e){if(e.target===this)this.classL
 $("sSave").addEventListener("click",function(){
   cfg.api=$("sApi").value.trim();cfg.key=$("sKey").value.trim();cfg.sys=$("sSys").value;
   var tv=parseFloat($("sTemp").value);cfg.temp=isNaN(tv)?"":Math.max(0,Math.min(2,tv));
-  cfg.lang=$("sLang").value;cfg.voice=$("sVoice").value;cfg.auto=$("sAuto").checked;
+  cfg.lang=$("sLang").value;cfg.voice=$("sVoice").value;cfg.auto=$("sAuto").checked;cfg.vmodel=$("sVmodel").value;
   saveCfg();$("modalBg").classList.remove("on");checkHealth();
 });
 
