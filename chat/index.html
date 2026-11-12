@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LFM3 Omni 채팅</title>
+<style>
+:root{
+  --bg:#ffffff; --bg-side:#f9f9f9; --bg-hover:#ececec; --bg-user:#f4f4f4; --bg-input:#f4f4f4;
+  --text:#0d0d0d; --muted:#6b6b6b; --border:#e5e5e5; --accent:#0d0d0d; --accent-text:#fff;
+  --code-bg:#0d0d0d; --code-text:#f4f4f4; --danger:#d93025;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#212121; --bg-side:#171717; --bg-hover:#2a2a2a; --bg-user:#303030; --bg-input:#303030;
+    --text:#ececec; --muted:#a0a0a0; --border:#3a3a3a; --accent:#ececec; --accent-text:#0d0d0d;
+    --code-bg:#0d0d0d; --code-text:#f4f4f4;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#212121; --bg-side:#171717; --bg-hover:#2a2a2a; --bg-user:#303030; --bg-input:#303030;
+  --text:#ececec; --muted:#a0a0a0; --border:#3a3a3a; --accent:#ececec; --accent-text:#0d0d0d;
+  --code-bg:#0d0d0d; --code-text:#f4f4f4;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.app{display:flex;height:100dvh}
+
+/* sidebar */
+.side{width:260px;background:var(--bg-side);display:flex;flex-direction:column;padding:8px;flex-shrink:0;transition:margin .2s}
+.side.hidden{margin-left:-260px}
+.side-top{display:flex;gap:4px;margin-bottom:8px}
+.new-btn{flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-size:14px}
+.new-btn:hover,.icon-btn:hover,.chat-item:hover{background:var(--bg-hover)}
+.icon-btn{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;flex-shrink:0}
+.chat-list{flex:1;overflow:auto}
+.chat-label{font-size:12px;color:var(--muted);padding:12px 12px 4px}
+.chat-item{display:flex;align-items:center;gap:4px;border-radius:10px;padding:0 4px 0 12px;height:38px;font-size:14px}
+.chat-item.active{background:var(--bg-hover)}
+.chat-item .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;line-height:38px}
+.chat-item .del{opacity:0;width:28px;height:28px;border-radius:6px;color:var(--muted)}
+.chat-item:hover .del,.chat-item.active .del{opacity:1}
+.chat-item .del:hover{color:var(--danger)}
+.side-bottom{border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:2px}
+.side-bottom button{text-align:left;padding:10px 12px;border-radius:10px;font-size:14px}
+.side-bottom button:hover{background:var(--bg-hover)}
+
+/* main */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.top{display:flex;align-items:center;gap:4px;padding:8px 12px;height:52px}
+.model-name{font-size:18px;font-weight:600;padding:6px 10px;border-radius:10px}
+.model-name small{color:var(--muted);font-weight:400;font-size:13px;margin-left:6px}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px}
+.status-dot.ok{background:#22c55e}.status-dot.bad{background:var(--danger)}
+.scroll{flex:1;overflow:auto;scroll-behavior:smooth}
+.col{max-width:768px;margin:0 auto;padding:0 16px}
+.empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center;padding:16px}
+.empty h1{font-size:28px;font-weight:600;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:640px}
+.chip{border:1px solid var(--border);border-radius:16px;padding:8px 14px;font-size:14px;color:var(--muted)}
+.chip:hover{background:var(--bg-hover);color:var(--text)}
+
+.msg{padding:14px 0;display:flex;flex-direction:column}
+.msg.user{align-items:flex-end}
+.msg.user .bubble{background:var(--bg-user);border-radius:22px;padding:10px 18px;max-width:80%;white-space:pre-wrap;word-break:break-word}
+.msg.user img.att{max-width:240px;max-height:240px;border-radius:14px;margin-bottom:6px;display:block}
+.msg.assistant{flex-direction:row;gap:14px;align-items:flex-start}
+.avatar{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);display:grid;place-items:center;flex-shrink:0;font-size:13px;font-weight:700;margin-top:2px}
+.md{flex:1;min-width:0;word-break:break-word}
+.md p{margin:0 0 12px}.md p:last-child{margin-bottom:0}
+.md h1,.md h2,.md h3{margin:18px 0 8px;line-height:1.3}
+.md h1{font-size:1.5em}.md h2{font-size:1.25em}.md h3{font-size:1.1em}
+.md ul,.md ol{margin:0 0 12px;padding-left:24px}
+.md code{background:var(--bg-user);padding:2px 6px;border-radius:6px;font:0.88em ui-monospace,SFMono-Regular,Menlo,monospace}
+.md pre{background:var(--code-bg);color:var(--code-text);border-radius:12px;margin:0 0 12px;overflow:hidden}
+.md pre .ph{display:flex;justify-content:space-between;padding:6px 14px;font-size:12px;color:#aaa;background:#2a2a2a}
+.md pre .ph button{font-size:12px;color:#aaa}.md pre .ph button:hover{color:#fff}
+.md pre code{display:block;background:none;padding:14px;overflow:auto;color:inherit;font-size:13.5px;line-height:1.5}
+.md a{color:#2563eb}
+.md blockquote{margin:0 0 12px;padding-left:14px;border-left:3px solid var(--border);color:var(--muted)}
+.cursor::after{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--text);margin-left:4px;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25;transform:scale(.7)}}
+.actions{display:flex;gap:2px;margin-top:6px}
+.actions button{width:30px;height:30px;border-radius:8px;color:var(--muted);display:grid;place-items:center}
+.actions button:hover{background:var(--bg-hover);color:var(--text)}
+.err{color:var(--danger);font-size:14px}
+
+/* composer */
+.composer-wrap{padding:0 16px calc(12px + env(safe-area-inset-bottom))}
+.composer{max-width:768px;margin:0 auto;background:var(--bg-input);border-radius:28px;padding:8px 10px 8px 14px;display:flex;flex-direction:column;gap:6px}
+.preview{display:none;gap:8px;padding:6px 4px 0}
+.preview.on{display:flex}
+.preview .pv{position:relative}
+.preview img{width:64px;height:64px;object-fit:cover;border-radius:12px;display:block}
+.preview .x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--accent-text);font-size:12px;line-height:20px}
+.row{display:flex;align-items:flex-end;gap:6px}
+textarea{flex:1;resize:none;border:0;outline:0;background:none;color:var(--text);font:inherit;max-height:200px;padding:8px 4px;min-height:40px}
+textarea::placeholder{color:var(--muted)}
+.send{width:36px;height:36px;border-radius:50%;background:var(--accent);color:var(--accent-text);display:grid;place-items:center;flex-shrink:0;margin-bottom:2px}
+.send:disabled{opacity:.3;cursor:default}
+.foot{text-align:center;font-size:12px;color:var(--muted);padding-top:8px}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;place-items:center;z-index:20;padding:16px}
+.modal-bg.on{display:grid}
+.modal{background:var(--bg);border-radius:20px;padding:22px;width:100%;max-width:480px;max-height:90dvh;overflow:auto;border:1px solid var(--border)}
+.modal h2{margin:0 0 14px;font-size:18px}
+.modal label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+.modal input,.modal textarea{width:100%;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);color:var(--text);padding:9px 12px;font:inherit;font-size:14px;min-height:0}
+.modal .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.modal .btns button{padding:9px 18px;border-radius:999px;font-size:14px;border:1px solid var(--border)}
+.modal .btns .pri{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+
+@media (max-width:760px){
+  .side{position:fixed;inset:0 auto 0 0;z-index:15;width:280px;margin-left:-280px;box-shadow:0 0 40px rgba(0,0,0,.3)}
+  .side.open{margin-left:0}
+  .side.hidden{margin-left:-280px}
+  .scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:14}
+  .scrim.on{display:block}
+  .msg.user .bubble{max-width:90%}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="side-top">
+      <button class="new-btn" id="newBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4Z"/></svg>
+        새 채팅
+      </button>
+      <button class="icon-btn" id="closeSide" title="사이드바 닫기">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+      </button>
+    </div>
+    <div class="chat-list" id="chatList"></div>
+    <div class="side-bottom">
+      <button id="themeBtn">🌓 테마 전환</button>
+      <button id="settingsBtn">⚙️ 설정</button>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <section class="main">
+    <header class="top">
+      <button class="icon-btn" id="openSide" title="사이드바 열기">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+      </button>
+      <div class="model-name"><span class="status-dot" id="dot"></span>LFM3 Omni<small>2B · Q4_K_M</small></div>
+    </header>
+    <div class="scroll" id="scroll"><div class="col" id="msgs"></div></div>
+    <div class="composer-wrap">
+      <div class="composer">
+        <div class="preview" id="preview"></div>
+        <div class="row">
+          <button class="icon-btn" id="attachBtn" title="이미지 첨부">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <input type="file" id="file" accept="image/*" hidden>
+          <textarea id="input" rows="1" placeholder="무엇이든 물어보세요"></textarea>
+          <button class="send" id="sendBtn" disabled title="전송">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="foot">LFM3 Omni는 실수할 수 있습니다. 중요한 정보는 확인하세요.</div>
+    </div>
+  </section>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>설정</h2>
+    <label for="sApi">서버 주소 (OpenAI 호환 API)</label>
+    <input id="sApi" placeholder="https://lfm3-omni.xxxx.ts.net" autocomplete="off">
+    <div class="hint">뒤에 /v1 은 붙이지 않아도 됩니다.</div>
+    <label for="sKey">API 키</label>
+    <input id="sKey" type="password" placeholder="서버를 켤 때 정한 키" autocomplete="off">
+    <label for="sSys">시스템 프롬프트</label>
+    <textarea id="sSys" rows="3"></textarea>
+    <label for="sTemp">Temperature (텍스트는 0 권장)</label>
+    <input id="sTemp" type="number" min="0" max="2" step="0.1">
+    <div class="btns"><button id="sCancel">취소</button><button class="pri" id="sSave">저장</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var LS={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}},set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+/* ---------- state ---------- */
+var cfg={
+  api:LS.get("lfm.api",""),
+  key:LS.get("lfm.key",""),
+  sys:LS.get("lfm.sys","당신은 친절하고 정확한 AI 어시스턴트입니다. 사용자의 언어로 답하세요."),
+  temp:parseFloat(LS.get("lfm.temp","0"))||0
+};
+var chats=[];try{chats=JSON.parse(LS.get("lfm.chats","[]"))||[]}catch(e){chats=[]}
+var curId=LS.get("lfm.cur","");
+var pendingImg=null, streaming=false, ctrl=null;
+
+// ?api=...&key=... 로 처음 연결 (주소창에서 바로 지워짐)
+(function(){
+  var p=new URLSearchParams(location.search), ch=false;
+  if(p.get("api")){cfg.api=p.get("api");ch=true}
+  if(p.get("key")){cfg.key=p.get("key");ch=true}
+  if(ch){saveCfg();history.replaceState(null,"",location.pathname)}
+})();
+
+function saveCfg(){LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys",cfg.sys);LS.set("lfm.temp",String(cfg.temp))}
+function saveChats(){
+  // 이미지가 localStorage를 꽉 채우지 않도록 오래된 대화부터 이미지 제거
+  var s=JSON.stringify(chats);
+  while(s.length>4000000&&chats.length>1){chats.pop();s=JSON.stringify(chats)}
+  LS.set("lfm.chats",s);LS.set("lfm.cur",curId);
+}
+function cur(){for(var i=0;i<chats.length;i++)if(chats[i].id===curId)return chats[i];return null}
+function newChat(){
+  var c={id:"c"+Date.now().toString(36),title:"새 채팅",msgs:[],ts:Date.now()};
+  chats.unshift(c);curId=c.id;saveChats();render();return c;
+}
+
+/* ---------- markdown (자체 구현, HTML 이스케이프 우선) ---------- */
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function inline(s){
+  s=esc(s);
+  var codes=[];
+  s=s.replace(/`([^`\n]+)`/g,function(_,c){codes.push(c);return "\u0000"+(codes.length-1)+"\u0000"});
+  s=s.replace(/\*\*([^*\n]+)\*\*/g,"<strong>$1</strong>");
+  s=s.replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<em>$2</em>");
+  s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  s=s.replace(/\u0000(\d+)\u0000/g,function(_,i){return "<code>"+codes[+i]+"</code>"});
+  return s;
+}
+function md(src){
+  var out=[],lines=src.split("\n"),i=0,para=[];
+  function flush(){if(para.length){out.push("<p>"+inline(para.join("\n")).replace(/\n/g,"<br>")+"</p>");para=[]}}
+  while(i<lines.length){
+    var L=lines[i],m;
+    if((m=L.match(/^```(\w*)/))){
+      flush();var buf=[];i++;
+      while(i<lines.length&&!/^```/.test(lines[i])){buf.push(lines[i]);i++}
+      i++;
+      out.push('<pre><div class="ph"><span>'+esc(m[1]||"code")+'</span><button data-copy>복사</button></div><code>'+esc(buf.join("\n"))+"</code></pre>");
+      continue;
+    }
+    if((m=L.match(/^(#{1,3})\s+(.*)/))){flush();out.push("<h"+m[1].length+">"+inline(m[2])+"</h"+m[1].length+">");i++;continue}
+    if(/^\s*[-*]\s+/.test(L)){flush();var li=[];while(i<lines.length&&/^\s*[-*]\s+/.test(lines[i])){li.push("<li>"+inline(lines[i].replace(/^\s*[-*]\s+/,""))+"</li>");i++}out.push("<ul>"+li.join("")+"</ul>");continue}
+    if(/^\s*\d+\.\s+/.test(L)){flush();var ol=[];while(i<lines.length&&/^\s*\d+\.\s+/.test(lines[i])){ol.push("<li>"+inline(lines[i].replace(/^\s*\d+\.\s+/,""))+"</li>");i++}out.push("<ol>"+ol.join("")+"</ol>");continue}
+    if(/^>\s?/.test(L)){flush();var q=[];while(i<lines.length&&/^>\s?/.test(lines[i])){q.push(lines[i].replace(/^>\s?/,""));i++}out.push("<blockquote>"+inline(q.join("\n")).replace(/\n/g,"<br>")+"</blockquote>");continue}
+    if(L.trim()===""){flush();i++;continue}
+    para.push(L);i++;
+  }
+  flush();return out.join("");
+}
+
+/* ---------- render ---------- */
+var ICON_COPY='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg>';
+var ICON_RETRY='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg>';
+var SUGGEST=["이 이미지를 설명해줘","간단한 파이썬 코드 짜줘","한국 여행 일정 추천해줘","영어 문장을 자연스럽게 고쳐줘"];
+
+function renderList(){
+  var h='<div class="chat-label">대화</div>';
+  chats.forEach(function(c){
+    h+='<div class="chat-item'+(c.id===curId?" active":"")+'" data-id="'+c.id+'"><span class="t">'+esc(c.title)+'</span><button class="del" data-del="'+c.id+'" title="삭제">✕</button></div>';
+  });
+  $("chatList").innerHTML=h;
+}
+function msgHTML(m,idx,last){
+  if(m.role==="user"){
+    return '<div class="msg user">'+(m.img?'<img class="att" src="'+m.img+'" alt="">':"")+(m.text?'<div class="bubble">'+esc(m.text)+"</div>":"")+"</div>";
+  }
+  var body=m.err?'<span class="err">'+esc(m.err)+"</span>":(m.text?md(m.text):"");
+  var live=(streaming&&last)?" cursor":"";
+  var act=(!streaming||!last)?'<div class="actions"><button data-act="copy" data-i="'+idx+'" title="복사">'+ICON_COPY+"</button>"+(last?'<button data-act="retry" title="다시 생성">'+ICON_RETRY+"</button>":"")+"</div>":"";
+  return '<div class="msg assistant"><div class="avatar">L3</div><div style="flex:1;min-width:0"><div class="md'+live+'">'+body+"</div>"+act+"</div></div>";
+}
+function render(keepScroll){
+  renderList();
+  var c=cur(),box=$("msgs");
+  if(!c||!c.msgs.length){
+    box.innerHTML='<div class="empty"><h1>무엇을 도와드릴까요?</h1><div class="chips">'+SUGGEST.map(function(s){return '<button class="chip" data-s="'+esc(s)+'">'+esc(s)+"</button>"}).join("")+"</div></div>";
+    $("scroll").style.overflow="hidden";
+  }else{
+    $("scroll").style.overflow="auto";
+    box.innerHTML=c.msgs.map(function(m,i){return msgHTML(m,i,i===c.msgs.length-1)}).join("")+'<div style="height:24px"></div>';
+  }
+  updateSend();
+  if(!keepScroll)toBottom();
+}
+function toBottom(){var s=$("scroll");s.scrollTop=s.scrollHeight}
+function updateSend(){
+  var b=$("sendBtn");
+  if(streaming){b.disabled=false;b.title="중지";b.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>'}
+  else{b.title="전송";b.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';b.disabled=!($("input").value.trim()||pendingImg)}
+}
+
+/* ---------- API ---------- */
+function base(){var a=cfg.api.trim().replace(/\/+$/,"");return a.replace(/\/v1$/,"")}
+function headers(){var h={"Content-Type":"application/json"};if(cfg.key)h["Authorization"]="Bearer "+cfg.key;return h}
+function checkHealth(){
+  var dot=$("dot");dot.className="status-dot";
+  if(!cfg.api){return}
+  fetch(base()+"/health",{headers:headers()}).then(function(r){dot.className="status-dot "+(r.ok?"ok":"bad")}).catch(function(){dot.className="status-dot bad"});
+}
+function apiMessages(c){
+  var arr=[];
+  if(cfg.sys.trim())arr.push({role:"system",content:cfg.sys.trim()});
+  c.msgs.forEach(function(m){
+    if(m.role==="assistant"){if(m.text)arr.push({role:"assistant",content:m.text});return}
+    if(m.img){
+      var parts=[];if(m.text)parts.push({type:"text",text:m.text});
+      parts.push({type:"image_url",image_url:{url:m.img}});
+      arr.push({role:"user",content:parts});
+    }else arr.push({role:"user",content:m.text});
+  });
+  return arr;
+}
+function run(c){
+  var a={role:"assistant",text:""};c.msgs.push(a);
+  streaming=true;ctrl=new AbortController();render();
+  var md_el=null;
+  function paint(){
+    var els=document.querySelectorAll(".msg.assistant .md");md_el=els[els.length-1];
+    if(md_el){md_el.innerHTML=md(a.text);md_el.classList.add("cursor")}
+    var s=$("scroll");if(s.scrollHeight-s.scrollTop-s.clientHeight<160)toBottom();
+  }
+  function done(){streaming=false;ctrl=null;saveChats();render(true)}
+  if(!cfg.api){a.err="서버 주소가 설정되지 않았습니다. 왼쪽 아래 ⚙️ 설정에서 입력하세요.";return done()}
+  fetch(base()+"/v1/chat/completions",{
+    method:"POST",headers:headers(),signal:ctrl.signal,
+    body:JSON.stringify({model:"lfm3-omni",messages:apiMessages(c),stream:true,temperature:cfg.temp})
+  }).then(function(r){
+    if(!r.ok)return r.text().then(function(t){throw new Error("서버 오류 "+r.status+(r.status===401?" (API 키를 확인하세요)":"")+" "+t.slice(0,200))});
+    var rd=r.body.getReader(),dec=new TextDecoder(),buf="";
+    function pump(){
+      return rd.read().then(function(x){
+        if(x.done)return;
+        buf+=dec.decode(x.value,{stream:true});
+        var lines=buf.split("\n");buf=lines.pop();
+        lines.forEach(function(l){
+          l=l.trim();if(l.indexOf("data:")!==0)return;
+          var d=l.slice(5).trim();if(d==="[DONE]")return;
+          try{var j=JSON.parse(d),t=j.choices&&j.choices[0]&&j.choices[0].delta&&j.choices[0].delta.content;if(t){a.text+=t;paint()}}catch(e){}
+        });
+        return pump();
+      });
+    }
+    return pump();
+  }).catch(function(e){
+    if(e.name==="AbortError"){if(!a.text)c.msgs.pop()}
+    else a.err=(a.text?"\n\n":"")+"연결 실패: "+e.message;
+  }).then(done);
+}
+function send(text){
+  if(streaming)return;
+  var c=cur()||newChat();
+  text=(text||"").trim();
+  if(!text&&!pendingImg)return;
+  var m={role:"user",text:text};if(pendingImg)m.img=pendingImg;
+  c.msgs.push(m);
+  if(c.msgs.length===1)c.title=(text||"이미지").slice(0,32);
+  c.ts=Date.now();
+  pendingImg=null;$("preview").className="preview";$("preview").innerHTML="";
+  $("input").value="";autosize();
+  run(c);
+}
+
+/* ---------- events ---------- */
+function autosize(){var t=$("input");t.style.height="auto";t.style.height=Math.min(t.scrollHeight,200)+"px"}
+$("input").addEventListener("input",function(){autosize();updateSend()});
+$("input").addEventListener("keydown",function(e){
+  if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();send($("input").value)}
+});
+$("sendBtn").addEventListener("click",function(){
+  if(streaming){if(ctrl)ctrl.abort();return}
+  send($("input").value);
+});
+$("newBtn").addEventListener("click",function(){var c=cur();if(c&&!c.msgs.length){closeMobile();return}newChat();closeMobile();$("input").focus()});
+$("chatList").addEventListener("click",function(e){
+  var d=e.target.closest("[data-del]");
+  if(d){var id=d.getAttribute("data-del");chats=chats.filter(function(c){return c.id!==id});if(curId===id)curId=chats[0]?chats[0].id:"";saveChats();render();return}
+  var it=e.target.closest("[data-id]");
+  if(it&&!streaming){curId=it.getAttribute("data-id");saveChats();render();closeMobile()}
+});
+$("msgs").addEventListener("click",function(e){
+  var chip=e.target.closest("[data-s]");if(chip){send(chip.getAttribute("data-s"));return}
+  var cp=e.target.closest("[data-copy]");
+  if(cp){var code=cp.closest("pre").querySelector("code").textContent;navigator.clipboard&&navigator.clipboard.writeText(code);cp.textContent="복사됨";setTimeout(function(){cp.textContent="복사"},1200);return}
+  var ac=e.target.closest("[data-act]");if(!ac)return;
+  var c=cur();if(!c)return;
+  if(ac.getAttribute("data-act")==="copy"){var m=c.msgs[+ac.getAttribute("data-i")];navigator.clipboard&&navigator.clipboard.writeText(m.text||"")}
+  else if(ac.getAttribute("data-act")==="retry"&&!streaming){c.msgs.pop();run(c)}
+});
+$("attachBtn").addEventListener("click",function(){$("file").click()});
+$("file").addEventListener("change",function(){
+  var f=this.files[0];this.value="";if(!f)return;
+  var img=new Image(),url=URL.createObjectURL(f);
+  img.onload=function(){
+    // 속도를 위해 긴 변 1024px로 축소
+    var s=Math.min(1,1024/Math.max(img.width,img.height)),cv=document.createElement("canvas");
+    cv.width=Math.round(img.width*s);cv.height=Math.round(img.height*s);
+    cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+    pendingImg=cv.toDataURL("image/jpeg",0.85);URL.revokeObjectURL(url);
+    $("preview").className="preview on";
+    $("preview").innerHTML='<div class="pv"><img src="'+pendingImg+'" alt=""><button class="x" id="rmImg">✕</button></div>';
+    updateSend();
+  };
+  img.src=url;
+});
+$("preview").addEventListener("click",function(e){if(e.target.id==="rmImg"){pendingImg=null;this.className="preview";this.innerHTML="";updateSend()}});
+
+/* sidebar */
+var mobile=function(){return window.matchMedia("(max-width:760px)").matches};
+function closeMobile(){if(mobile()){$("side").classList.remove("open");$("side").classList.add("hidden");$("scrim").classList.remove("on")}}
+$("closeSide").addEventListener("click",function(){if(mobile())closeMobile();else $("side").classList.add("hidden")});
+$("openSide").addEventListener("click",function(){if(mobile()){$("side").classList.remove("hidden");$("side").classList.add("open");$("scrim").classList.add("on")}else $("side").classList.remove("hidden")});
+$("scrim").addEventListener("click",closeMobile);
+
+/* theme */
+(function(){var t=LS.get("lfm.theme","");if(t)document.documentElement.setAttribute("data-theme",t)})();
+$("themeBtn").addEventListener("click",function(){
+  var el=document.documentElement,isDark=el.getAttribute("data-theme")==="dark"||(!el.getAttribute("data-theme")&&matchMedia("(prefers-color-scheme: dark)").matches);
+  var n=isDark?"light":"dark";el.setAttribute("data-theme",n);LS.set("lfm.theme",n);
+});
+
+/* settings */
+function openSettings(){
+  $("sApi").value=cfg.api;$("sKey").value=cfg.key;$("sSys").value=cfg.sys;$("sTemp").value=cfg.temp;
+  $("modalBg").classList.add("on");closeMobile();
+}
+$("settingsBtn").addEventListener("click",openSettings);
+$("sCancel").addEventListener("click",function(){$("modalBg").classList.remove("on")});
+$("modalBg").addEventListener("click",function(e){if(e.target===this)this.classList.remove("on")});
+$("sSave").addEventListener("click",function(){
+  cfg.api=$("sApi").value.trim();cfg.key=$("sKey").value.trim();cfg.sys=$("sSys").value;
+  cfg.temp=Math.max(0,Math.min(2,parseFloat($("sTemp").value)||0));
+  saveCfg();$("modalBg").classList.remove("on");checkHealth();
+});
+
+/* init */
+if(!cur()){if(chats.length)curId=chats[0].id;else newChat()}
+if(mobile())$("side").classList.add("hidden");
+render();checkHealth();
+if(!cfg.api)setTimeout(openSettings,300);
+})();
+</script>
+</body>
+</html>
