@@ -485,7 +485,7 @@ function webSearch(c,a,paint){
       a.status="";
       a.sources=(j.results||[]).filter(function(s){return /^https?:\/\//.test(s.url)}).slice(0,5);
       paint();
-      if(!a.sources.length)return null;
+      if(!a.sources.length){a.searchErr="검색 결과가 없어서 검색 없이 답합니다.";paint();return null}
       return "다음은 방금 웹에서 검색한 결과입니다. 이 정보를 근거로 답하고, 근거가 된 문장 뒤에 [번호]로 출처를 표시하세요. 검색 결과에 없는 내용은 추측하지 마세요.\n"+
         a.sources.map(function(s,k){return "["+(k+1)+"] "+s.title+" ("+s.url+")\n"+s.snippet}).join("\n");
     })
