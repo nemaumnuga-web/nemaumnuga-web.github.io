@@ -75,6 +75,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .md pre code{display:block;background:none;padding:14px;overflow:auto;color:inherit;font-size:13.5px;line-height:1.5}
 .md a{color:#2563eb}
 .md blockquote{margin:0 0 12px;padding-left:14px;border-left:3px solid var(--border);color:var(--muted)}
+.md .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 12px;max-width:100%}
+.md table{border-collapse:collapse;font-size:14.5px;width:max-content;min-width:100%}
+.md th,.md td{border:1px solid var(--border);padding:7px 11px;vertical-align:top;text-align:left;line-height:1.45}
+.md th{background:var(--bg-user);font-weight:600}
 .cursor::after{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--text);margin-left:4px;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.25;transform:scale(.7)}}
 .actions{display:flex;gap:2px;margin-top:4px;margin-left:-8px}
@@ -213,6 +217,11 @@ body.voice .voicebar{display:flex}
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3h0a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5h0a1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8v0a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1Z"/></svg>
           설정
         </button>
+        <div class="ttl">도구</div>
+        <button class="opt" data-tool="sum">요약하기</button>
+        <button class="opt" data-tool="en">영어로 번역</button>
+        <button class="opt" data-tool="tbl">표로 정리</button>
+        <button class="opt" data-tool="mem">대화 메모리 보기</button>
       </div>
       <div class="composer" id="composer">
         <div class="preview" id="preview"></div>
@@ -337,6 +346,24 @@ function md(src){
       continue;
     }
     if((m=L.match(/^(#{1,3})\s+(.*)/))){flush();out.push("<h"+m[1].length+">"+inline(m[2])+"</h"+m[1].length+">");i++;continue}
+    if(L.indexOf("|")>=0&&i+1<lines.length&&/^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(lines[i+1])){
+      flush();
+      var cellsOf=function(s){
+        s=s.trim().replace(/\\\|/g,"\u0001");
+        if(s.charAt(0)==="|")s=s.slice(1);
+        if(s.slice(-1)==="|")s=s.slice(0,-1);
+        return s.split("|").map(function(x){return x.trim().replace(/\u0001/g,"|")});
+      };
+      var head=cellsOf(L),sep=cellsOf(lines[i+1]);
+      var al=sep.map(function(x){return /^:-+:$/.test(x)?"center":/^-+:$/.test(x)?"right":""});
+      var sty=function(j){return al[j]?' style="text-align:'+al[j]+'"':""};
+      i+=2;var rows=[];
+      while(i<lines.length&&lines[i].indexOf("|")>=0&&lines[i].trim()!==""){rows.push(cellsOf(lines[i]));i++}
+      var th=head.map(function(h,j){return "<th"+sty(j)+">"+inline(h)+"</th>"}).join("");
+      var tb=rows.map(function(r){return "<tr>"+head.map(function(_,j){return "<td"+sty(j)+">"+inline(r[j]||"")+"</td>"}).join("")+"</tr>"}).join("");
+      out.push('<div class="tw"><table><thead><tr>'+th+"</tr></thead><tbody>"+tb+"</tbody></table></div>");
+      continue;
+    }
     if(/^\s*[-*]\s+/.test(L)){flush();var li=[];while(i<lines.length&&/^\s*[-*]\s+/.test(lines[i])){li.push("<li>"+inline(lines[i].replace(/^\s*[-*]\s+/,""))+"</li>");i++}out.push("<ul>"+li.join("")+"</ul>");continue}
     if(/^\s*\d+\.\s+/.test(L)){flush();var ol=[];while(i<lines.length&&/^\s*\d+\.\s+/.test(lines[i])){ol.push("<li>"+inline(lines[i].replace(/^\s*\d+\.\s+/,""))+"</li>");i++}out.push("<ol>"+ol.join("")+"</ol>");continue}
     if(/^>\s?/.test(L)){flush();var q=[];while(i<lines.length&&/^>\s?/.test(lines[i])){q.push(lines[i].replace(/^>\s?/,""));i++}out.push("<blockquote>"+inline(q.join("\n")).replace(/\n/g,"<br>")+"</blockquote>");continue}
@@ -845,6 +872,12 @@ function closePops(){$("plusMenu").classList.remove("on");$("modelMenu").classLi
 $("plusBtn").addEventListener("click",function(e){e.stopPropagation();var on=$("plusMenu").classList.contains("on");closePops();if(!on)$("plusMenu").classList.add("on")});
 $("mAttach").addEventListener("click",function(){closePops();pickImage()});
 $("mSettings").addEventListener("click",function(){closePops();openSettings()});
+document.querySelectorAll(".opt[data-tool]").forEach(function(b){b.addEventListener("click",function(){closePops();runTool(b.getAttribute("data-tool"))})});
+function runTool(t){
+  if(t==="mem"){var c=cur();alert(c&&c.memory?c.memory:"이 채팅에는 아직 압축된 메모리가 없습니다.");return}
+  var pre={sum:"아래 내용을 세 문장 이내로 요약해 줘:\n",en:"아래 내용을 영어로 번역해 줘:\n",tbl:"아래 내용을 마크다운 표로 정리해 줘:\n"}[t]||"";
+  var inp=$("input");inp.value=pre+inp.value;inp.focus();inp.dispatchEvent(new Event("input"));
+}
 function buildModelMenu(){
   var h='<div class="ttl">채팅</div><div class="opt"><div class="grow">LFM3 VL 2B<small>텍스트 · 이미지 · 추론(Thinking)</small></div><span>✓</span></div>';
   h+='<div class="ttl">음성 대화 · 받아쓰기 · 읽기</div><div class="opt"><div class="grow">LFM3 Audio 2B<small>음성 인식과 음성 합성, 음성 대화 답변</small></div></div>';
