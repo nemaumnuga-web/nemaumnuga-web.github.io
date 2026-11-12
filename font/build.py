@@ -53,11 +53,14 @@ def build_master(wght, wdth, opsz, path, recipes, names):
     cmap = {}
     glyphs, metrics = {}, {}
 
+    gs = C.GLOBAL_SCALE
+
     def add(name, contours, adv):
         pen = TTGlyphPen(None)
         xs = []
+        adv = adv * gs
         for c in contours:
-            pts = [(int(round(x)), int(round(y))) for x, y in c]
+            pts = [(int(round(x * gs)), int(round(y * gs))) for x, y in c]
             pen.moveTo(pts[0])
             for p in pts[1:]:
                 pen.lineTo(p)
@@ -97,7 +100,7 @@ def setup_common(fb, names, wght):
     fb.setupNameTable(names)
     fb.setupOS2(version=4, sTypoAscender=C.ASCENDER, sTypoDescender=C.DESCENDER, sTypoLineGap=C.LINEGAP,
                 usWinAscent=1100, usWinDescent=320, usWeightClass=int(wght),
-                sxHeight=int(lt.XH * lt.SY), sCapHeight=int(lt.CAP * lt.SY), achVendID="NEMA",
+                sxHeight=int(lt.XH * lt.SY * C.GLOBAL_SCALE), sCapHeight=int(lt.CAP * lt.SY * C.GLOBAL_SCALE), achVendID="NEMA",
                 fsSelection=(1 << 6) | (1 << 7))
     fb.setupPost(keepGlyphNames=False)
     gasp = newTable("gasp")
@@ -229,7 +232,7 @@ def ttf_to_otf(ttf, path_psname):
     o = ttf["OS/2"]
     fb.setupOS2(version=4, sTypoAscender=C.ASCENDER, sTypoDescender=C.DESCENDER, sTypoLineGap=C.LINEGAP,
                 usWinAscent=1100, usWinDescent=320, usWeightClass=o.usWeightClass,
-                sxHeight=int(lt.XH * lt.SY), sCapHeight=int(lt.CAP * lt.SY), achVendID="NEMA", fsSelection=o.fsSelection)
+                sxHeight=int(lt.XH * lt.SY * C.GLOBAL_SCALE), sCapHeight=int(lt.CAP * lt.SY * C.GLOBAL_SCALE), achVendID="NEMA", fsSelection=o.fsSelection)
     fb.setupPost(keepGlyphNames=False)
     fb.font["head"].macStyle = ttf["head"].macStyle
     if "GSUB" in ttf:

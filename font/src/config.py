@@ -2,6 +2,7 @@ FAMILY = "Nemaum"            # working name (ASCII, used for file/PS names)
 FAMILY_KO = "네마음체"
 VERSION = "0.1.0"
 UPM = 1000
+GLOBAL_SCALE = 0.90   # every glyph (outline and advance) is drawn at this size within the em
 ASCENDER, DESCENDER, LINEGAP = 1100, -300, 0   # default line height 1.4 em
 
 # variable-axis ranges
