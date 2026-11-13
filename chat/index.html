@@ -79,6 +79,50 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .md table{border-collapse:collapse;font-size:14.5px;width:max-content;min-width:100%}
 .md th,.md td{border:1px solid var(--border);padding:7px 11px;vertical-align:top;text-align:left;line-height:1.45}
 .md th{background:var(--bg-user);font-weight:600}
+.md pre .ph .phb{display:flex;gap:14px}
+.modes{display:flex;flex-wrap:wrap;gap:6px;padding:4px 6px 0}
+.modes:empty{display:none}
+.mode{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:#2563eb;background:rgba(37,99,235,.1);border-radius:999px;padding:2px 4px 2px 12px}
+.mode button{width:20px;height:20px;border-radius:50%;font-size:11px;color:inherit}
+.mode button:hover{background:rgba(37,99,235,.18)}
+.steps .tr{font-size:13.5px}
+.cv-card{display:flex;align-items:center;gap:12px;width:100%;max-width:420px;text-align:left;border:1px solid var(--border);border-radius:14px;padding:10px 14px;margin:6px 0 10px;background:var(--bg-user)}
+.cv-card:hover{background:var(--bg-hover)}
+.cv-card .cv-ico{font-size:22px;line-height:1}
+.cv-card b{display:block;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px}
+.cv-card small{color:var(--muted);font-size:12.5px}
+/* Canvas */
+.canvas{display:none;width:min(48vw,680px);flex-shrink:0;flex-direction:column;border-left:1px solid var(--border);background:var(--bg);min-width:0}
+.canvas.on{display:flex}
+.cv-top{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border)}
+.cv-top input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--text);font:inherit;font-weight:600;font-size:15px;padding:6px 8px;border-radius:8px}
+.cv-top input:focus{background:var(--bg-hover)}
+.cv-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.cv-tabs{display:inline-flex;background:var(--bg-user);border-radius:10px;padding:2px}
+.cv-tab{padding:4px 12px;border-radius:8px;font-size:13px;color:var(--muted)}
+.cv-tab.on{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.cv-bar .sp{flex:1}
+.cv-bar .sm{font-size:13px;padding:4px 10px;border-radius:8px;color:var(--muted)}
+.cv-bar .sm:hover{background:var(--bg-hover);color:var(--text)}
+.cv-ver{font-size:12.5px;color:var(--muted);min-width:34px;text-align:center}
+.cv-body{flex:1;min-height:0;position:relative}
+.cv-body>*{position:absolute;inset:0;width:100%;height:100%}
+#cvFrame{border:0;background:#fff;display:none}
+#cvDoc{overflow:auto;padding:16px 20px;display:none}
+#cvCode{resize:none;border:0;outline:0;background:var(--bg);color:var(--text);font:13.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;padding:14px 16px;tab-size:2;white-space:pre;overflow:auto}
+.cv-err{display:none;align-items:center;gap:8px;padding:6px 12px;background:rgba(217,48,37,.1);color:var(--danger);font-size:13px}
+.cv-err span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cv-err button{border:1px solid currentColor;border-radius:999px;padding:2px 12px;font-size:12.5px}
+.cv-acts{display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px;border-top:1px solid var(--border)}
+.cv-acts button{font-size:12.5px;border:1px solid var(--border);border-radius:999px;padding:4px 12px;color:var(--muted)}
+.cv-acts button:hover{background:var(--bg-hover);color:var(--text)}
+/* 패치노트 */
+.patch{max-width:520px}
+.pv-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:14px 0 4px;font-size:15px}
+.pv-h:first-child{margin-top:0}
+.pv-h span{font-size:12px;color:var(--muted)}
+.pv-l{margin:0;padding-left:20px;font-size:14px;line-height:1.55}
+.pv-l li{margin:5px 0}
 .status{font-size:14px;color:var(--muted);margin:0 0 8px}
 .srcs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 .srcs a{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px 10px;text-decoration:none}
@@ -171,6 +215,7 @@ body.voice .voicebar{display:flex}
   .scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:14}
   .scrim.on{display:block}
   .msg.user .bubble{max-width:90%}
+  .canvas{position:fixed;inset:0;width:100%;z-index:16;border:0}
   .pop.down{min-width:0;right:12px}
 }
 </style>
@@ -223,12 +268,15 @@ body.voice .voicebar{display:flex}
         </button>
         <div class="ttl">도구</div>
         <button class="opt" id="mWeb">웹 검색</button>
+        <button class="opt" id="mDeep">딥 리서치</button>
+        <button class="opt" id="mCanvas">Canvas</button>
         <button class="opt" data-tool="sum">요약하기</button>
         <button class="opt" data-tool="en">영어로 번역</button>
         <button class="opt" data-tool="tbl">표로 정리</button>
         <button class="opt" data-tool="mem">대화 메모리 보기</button>
       </div>
       <div class="composer" id="composer">
+        <div class="modes" id="modes"></div>
         <div class="preview" id="preview"></div>
         <div class="row">
           <button class="icon-btn" id="plusBtn" title="추가">
@@ -254,6 +302,38 @@ body.voice .voicebar{display:flex}
       <div class="foot">LFM3는 실수할 수 있습니다. 중요한 정보는 확인하세요.</div>
     </div>
   </section>
+  <aside class="canvas" id="canvas">
+    <div class="cv-top">
+      <input id="cvTitle" placeholder="제목 없음" autocomplete="off">
+      <button class="icon-btn" id="cvClose" title="Canvas 닫기">✕</button>
+    </div>
+    <div class="cv-bar">
+      <div class="cv-tabs"><button class="cv-tab on" id="cvTabView">미리보기</button><button class="cv-tab" id="cvTabCode">코드</button></div>
+      <span class="sp"></span>
+      <button class="sm" id="cvPrev" title="이전 버전">◀</button><span class="cv-ver" id="cvVer">1/1</span><button class="sm" id="cvNext" title="다음 버전">▶</button>
+      <button class="sm" id="cvCopy">복사</button><button class="sm" id="cvDown">저장</button>
+    </div>
+    <div class="cv-err" id="cvErr"><span id="cvErrT"></span><button id="cvErrFix">고치기</button></div>
+    <div class="cv-body">
+      <iframe id="cvFrame" sandbox="allow-scripts allow-modals allow-forms allow-popups" title="Canvas 미리보기"></iframe>
+      <div id="cvDoc" class="md"></div>
+      <textarea id="cvCode" spellcheck="false"></textarea>
+    </div>
+    <div class="cv-acts" id="cvActs">
+      <button data-q="더 짧고 간결하게 고쳐 줘">더 짧게</button>
+      <button data-q="더 자세하게 늘려 줘">더 자세히</button>
+      <button data-q="전체적으로 더 보기 좋고 자연스럽게 다듬어 줘">다듬기</button>
+      <button data-q="오류나 어색한 부분이 있으면 고쳐 줘">오류 고치기</button>
+    </div>
+  </aside>
+</div>
+
+<div class="modal-bg" id="patchBg">
+  <div class="modal patch">
+    <h2 id="patchTitle">업데이트 소식</h2>
+    <div id="patchBody"></div>
+    <div class="btns"><button id="patchAll">이전 내용도 보기</button><button class="pri" id="patchOk">확인</button></div>
+  </div>
 </div>
 
 <div class="modal-bg" id="modalBg">
@@ -275,6 +355,7 @@ body.voice .voicebar{display:flex}
     <label for="sVmodel">음성 대화 답변 모델</label>
     <select id="sVmodel"><option value="audio">LFM3 Audio (기본, 빠름)</option><option value="vl">LFM3 VL (추론 끔, 더 정확)</option></select>
     <label class="chk"><input id="sAuto" type="checkbox"> 답변 자동으로 소리 내어 읽기</label>
+    <button class="row-btn" id="sPatch" style="margin-top:14px;border:1px solid var(--border);justify-content:center">📋 패치노트 보기</button>
     <div class="btns"><button id="sCancel">취소</button><button class="pri" id="sSave">저장</button></div>
   </div>
 </div>
@@ -284,6 +365,35 @@ body.voice .voicebar{display:flex}
 "use strict";
 var $=function(id){return document.getElementById(id)};
 var LS={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}},set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+/* ---------- 패치노트 ----------
+ * ★ 이 파일을 고칠 때마다 APP_VERSION 을 1 올리고 PATCHES 맨 앞에 바뀐 내용을 추가하세요.
+ *   그러면 사용자가 다음에 접속할 때 바뀐 부분이 팝업으로 뜹니다. 항목은 [제목, 설명] 쌍입니다. */
+var APP_VERSION=7;
+var PATCHES=[
+ {v:7,date:"2026-11-13",title:"링크 읽기 · 웹 검색 개선 · 딥 리서치 · Canvas",items:[
+  ["링크를 붙여 넣으면 읽어 줘요","주소를 보내면 서버가 그 페이지를 열어 내용을 바탕으로 답해요. 자동 접근을 막은 사이트는 막혔다고 솔직히 알려 줘요."],
+  ["웹 검색이 더 정확해졌어요","한국어·영어 검색어를 함께 쓰고, 위키백과·빙·네이버에서 찾은 위쪽 페이지의 본문을 직접 읽은 뒤 답해요. 이전 질문을 이어 묻는 경우도 알아들어요."],
+  ["딥 리서치","+ 메뉴에서 켜면 검색어를 여러 개 만들어 여러 페이지를 읽고, 페이지마다 노트를 정리한 뒤 보고서로 써 줘요. 몇 분 걸리고, 진행 과정을 펼쳐 볼 수 있어요."],
+  ["Canvas","+ 메뉴에서 켜면 웹페이지·문서·코드를 오른쪽 작업 공간에 만들어요. 직접 고치고, 미리 보고, 버전을 오가고, 모델에게 수정도 시킬 수 있어요. 코드 블록의 Canvas 버튼으로 기존 코드도 열 수 있어요."],
+  ["패치노트 팝업","업데이트 뒤 처음 접속하면 바뀐 내용을 이렇게 알려 드려요. 설정에서 다시 볼 수 있어요."]]},
+ {v:6,title:"영어 검색어 · 시스템 프롬프트",items:[
+  ["영어 검색어","한국어 질문을 영어 검색어로 바꿔 위키백과와 빙에서 먼저 찾아요."],
+  ["기본 시스템 프롬프트 개선","모델 정체성, 출처 [번호] 표시, 표 형식, 오늘 날짜를 기본으로 알려 줘요."]]},
+ {v:5,title:"표 · 도구 메뉴 · 웹 검색",items:[
+  ["표 렌더링","깨져 보이던 마크다운 표를 제대로 된 표로 그려요."],
+  ["도구 메뉴","+ 메뉴에 요약하기·영어로 번역·표로 정리·대화 메모리 보기를 넣었어요."],
+  ["웹 검색","켜 두면 검색 결과를 근거로 답하고 출처 칩을 보여 줘요."]]},
+ {v:4,title:"음성 대화 · 긴 대화",items:[
+  ["문장 단위로 바로 읽기","답변이 완성되는 문장부터 소리 내어 읽어서 기다리는 시간이 줄었어요."],
+  ["답변 모델 선택","음성 대화 답변을 LFM3 Audio 또는 LFM3 VL로 고를 수 있어요."],
+  ["긴 대화 메모리 압축","대화가 길어지면 이름·번호·날짜·약속 같은 사실을 따로 기억해 오래 이어 가요."]]},
+ {v:3,title:"음성 대화 · 추론",items:[
+  ["음성 대화 버튼","입력창의 파형 버튼으로 말로 대화해요."],
+  ["Thinking 표시","추론하는 모델은 생각한 시간을 접어서 보여 줘요."]]},
+ {v:2,title:"음성 입력·출력",items:[["받아쓰기와 읽어 주기","마이크로 말하면 글이 되고, 답변을 소리로 들을 수 있어요."]]},
+ {v:1,title:"첫 공개",items:[["ChatGPT 같은 채팅 화면","LFM3 VL 2B와 대화하는 웹 채팅이에요."]]}
+];
 
 /* ---------- state ---------- */
 var DEFAULT_SYS=[
@@ -298,6 +408,8 @@ var DEFAULT_SYS=[
 var cfg={
   api:LS.get("lfm.api",""),
   web:LS.get("lfm.web","0")==="1",
+  deep:LS.get("lfm.deep","0")==="1",
+  canvas:LS.get("lfm.canvas","0")==="1",
   key:LS.get("lfm.key",""),
   sys:LS.get("lfm.sys2",DEFAULT_SYS),
   temp:LS.get("lfm.temp2",""),
@@ -312,6 +424,7 @@ var caps={levels:[]};          // 서버가 알려주는 추론 강도 단계 (�
 var chats=[];try{chats=JSON.parse(LS.get("lfm.chats","[]"))||[]}catch(e){chats=[]}
 var curId=LS.get("lfm.cur","");
 var pendingImg=null, streaming=false, ctrl=null, filter="";
+var cvOpenFlag=false, cvTab="view", cvLast="", cvSaveT=0;   // Canvas 패널 상태
 
 // ?api=...&key=... 로 처음 연결 (주소창에서 바로 지워짐)
 (function(){
@@ -322,7 +435,7 @@ var pendingImg=null, streaming=false, ctrl=null, filter="";
 })();
 
 function saveCfg(){
-  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");
+  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");LS.set("lfm.deep",cfg.deep?"1":"0");LS.set("lfm.canvas",cfg.canvas?"1":"0");
   LS.set("lfm.lang",cfg.lang);LS.set("lfm.voice",cfg.voice);LS.set("lfm.vmode",cfg.auto?"1":"0");LS.set("lfm.effort",cfg.effort);
 }
 function saveChats(){
@@ -357,7 +470,7 @@ function md(src){
       flush();var buf=[];i++;
       while(i<lines.length&&!/^```/.test(lines[i])){buf.push(lines[i]);i++}
       i++;
-      out.push('<pre><div class="ph"><span>'+esc(m[1]||"code")+'</span><button data-copy>복사</button></div><code>'+esc(buf.join("\n"))+"</code></pre>");
+      out.push('<pre><div class="ph"><span>'+esc(m[1]||"code")+'</span><span class="phb">'+(buf.length>=6||/^(html|svg|markdown|md)$/i.test(m[1])||buf.join("").length>=200?'<button data-cv>Canvas</button>':"")+'<button data-copy>복사</button></span></div><code>'+esc(buf.join("\n"))+"</code></pre>");
       continue;
     }
     if((m=L.match(/^(#{1,3})\s+(.*)/))){flush();out.push("<h"+m[1].length+">"+inline(m[2])+"</h"+m[1].length+">");i++;continue}
@@ -412,11 +525,24 @@ function assistantInner(m,idx,last){
     var lbl=(live&&!m.text)?"생각하는 중…":(m.thinkMs?Math.max(1,Math.round(m.thinkMs/1000))+"초 동안 생각함":"생각한 내용");
     th='<details class="think'+((live&&!m.text)?" live":"")+'"'+((live&&!m.text)?" open":"")+"><summary>"+lbl+'</summary><div class="tr">'+esc(m.reasoning.trim())+"</div></details>";
   }
-  var body=m.err?'<span class="err">'+esc(m.err)+"</span>":(m.text?md(m.text):"");
+  var st="";
+  if(m.steps&&m.steps.length){
+    var run_=live&&!m.text;
+    st='<details class="think steps'+(run_?" live":"")+'"'+(run_?" open":"")+"><summary>"+(run_?"딥 리서치 진행 중…":"딥 리서치 과정 ("+m.steps.length+"단계)")+'</summary><div class="tr">'+m.steps.map(function(x){return (x.done?"✓ ":"… ")+esc(x.t)}).join("\n")+"</div></details>";
+  }
+  var shown=m.text,card="";
+  if(m.cv!==undefined&&m.text){
+    var cb=cvFind(m.text);
+    if(cb){
+      shown=m.text.slice(0,cb.start)+"\n\n[[CANVAS_CARD]]\n\n"+(cb.closed?m.text.slice(cb.end):"");
+      card='<button class="cv-card" data-act="opencv" data-v="'+m.cv+'"><span class="cv-ico">'+(cb.kind==="html"?"🖥️":cb.kind==="doc"?"📄":cb.kind==="svg"?"🎨":"💻")+'</span><span class="cv-meta"><b>'+esc(cvTitle(cb)||"Canvas")+"</b><small>"+(live&&!cb.closed?"Canvas에 작성하는 중…":"눌러서 Canvas에서 열기")+"</small></span></button>";
+    }
+  }
+  var body=m.err?'<span class="err">'+esc(m.err)+"</span>":(shown?md(shown).replace("<p>[[CANVAS_CARD]]</p>",card):"");
   var act=!live?'<div class="actions"><button data-act="copy" data-i="'+idx+'" title="복사">'+ICON_COPY+'</button><button data-act="speak" data-i="'+idx+'" title="소리 내어 읽기">'+(player.idx===idx?ICON_STOP:ICON_SPEAK)+"</button>"+(last?'<button data-act="retry" title="다시 생성">'+ICON_RETRY+"</button>":"")+"</div>":"";
   var pre=m.status?'<div class="status">'+esc(m.status)+"</div>":"";
   var srcs=(m.sources&&m.sources.length?'<div class="srcs">'+m.sources.map(function(s,i){return '<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(s.title)+'"><b>'+(i+1)+"</b> "+esc(s.title)+"</a>"}).join("")+"</div>":"")+(m.searchErr?'<div class="status">'+esc(m.searchErr)+"</div>":"");
-  return th+pre+'<div class="md'+((live&&m.text)?" cursor":"")+'">'+body+"</div>"+srcs+act;
+  return st+th+pre+'<div class="md'+((live&&m.text)?" cursor":"")+'">'+body+"</div>"+srcs+act;
 }
 function msgHTML(m,idx,last){
   if(m.role==="user"){
@@ -436,6 +562,7 @@ function render(keepScroll){
   }
   updateSend();
   if(!keepScroll)toBottom();
+  cvRender();
 }
 function toBottom(){var s=$("scroll");s.scrollTop=s.scrollHeight}
 // ChatGPT처럼: 입력이 비어 있으면 음성 대화(파형) 버튼, 입력이 있으면 전송 화살표
@@ -472,9 +599,14 @@ function apiMessages(c,extra){
   if(vc.on)sys+=(sys?" ":"")+"지금은 음성 대화 중입니다. 마크다운 없이 말하듯이 자연스럽게, 1~3문장으로 짧게 답하세요.";
   if(c.memory)sys+=(sys?"\n\n":"")+"지금까지 대화의 요약(이전 대화 내용):\n"+c.memory;
   if(extra)sys+=(sys?"\n\n":"")+extra;
+  var cvOn=cfg.canvas&&!vc.on;
+  if(cvOn){
+    sys+="\n\n[Canvas 모드] 사용자가 웹페이지·앱·게임·문서·글·코드 같은 '결과물'을 요청하면 대화 답변은 한두 문장으로 짧게 하고, 결과물 전체를 코드 블록 하나에 담으세요. 웹페이지·앱·게임은 ```html 블록(HTML, CSS, JS를 한 파일에), 글·문서는 ```markdown 블록, 그 밖의 코드는 해당 언어 블록을 쓰세요. Canvas에 이미 내용이 있고 수정을 요청하면, 고친 전체 내용을 같은 형식의 블록으로 다시 쓰세요. 일부만 쓰거나 '생략'이라고 쓰지 마세요.";
+    if(c.canvas&&c.canvas.versions.length)sys+="\n\n현재 Canvas 내용(수정 요청이면 이것을 기준으로 고치세요):\n```"+(c.canvas.lang||"")+"\n"+c.canvas.versions[c.canvas.v]+"\n```";
+  }
   if(sys)arr.push({role:"system",content:sys});
   liveMsgs(c).forEach(function(m){
-    if(m.role==="assistant"){if(m.text)arr.push({role:"assistant",content:m.text});return}
+    if(m.role==="assistant"){if(m.text)arr.push({role:"assistant",content:(cvOn&&m.cv!==undefined)?cvStrip(m.text):m.text});return}
     if(m.img&&!vc.on){
       var parts=[];if(m.text)parts.push({type:"text",text:m.text});
       parts.push({type:"image_url",image_url:{url:m.img}});
@@ -483,49 +615,304 @@ function apiMessages(c,extra){
   });
   return arr;
 }
-// 웹 검색: 서버의 /search(Bing 결과)로 검색하고, 결과를 시스템 메시지에 넣어 출처 번호로 답하게 한다
-// 한국어 질문 → 영어 웹 검색어 한 줄(모델이 만든다). 형식이 어긋나면 빈 문자열(한국어 검색만 함).
-function translateQuery(q){
-  var shots=[["아이폰 16 가격 알려줘","iPhone 16 price"],["서울 맛집 추천","best restaurants in Seoul"],
-             ["제미나이가 뭐야","Google Gemini AI"],["클로드 최신 모델","latest Claude model"]];
-  var msgs=[{role:"system",content:"Task: rewrite the user's text as a short English web search query (2-8 words). Output only the query."}];
-  shots.forEach(function(x){msgs.push({role:"user",content:"Question: "+x[0]});msgs.push({role:"assistant",content:x[1]})});
-  msgs.push({role:"user",content:"Question: "+q});
-  var body={model:"lfm3-vl",max_tokens:30,temperature:0,chat_template_kwargs:{enable_thinking:false},messages:msgs};
-  return fetch(base()+"/v1/chat/completions",{method:"POST",headers:headers(),body:JSON.stringify(body)})
+// ---------- 웹 검색 · 링크 읽기 · 딥 리서치 ----------
+var URL_RE=/https?:\/\/[^\s<>"'`)\]]+/g;
+function lastUser(c,back){var n=0;for(var i=c.msgs.length-1;i>=0;i--)if(c.msgs[i].role==="user"&&n++===(back||0))return c.msgs[i];return null}
+function jget(path,params){
+  var qs=Object.keys(params).filter(function(k){return params[k]!==""&&params[k]!=null}).map(function(k){return k+"="+encodeURIComponent(params[k])}).join("&");
+  return fetch(base()+path+"?"+qs,{headers:headers(),signal:ctrl.signal}).then(function(r){if(!r.ok)throw new Error("검색 서버 "+r.status);return r.json()});
+}
+// 모델에게 짧은 작업을 시키고 결과를 한 번에 받는다(스트리밍 없음, 생각 끔)
+function llm(messages,max){
+  var body={model:"lfm3-vl",max_tokens:max||80,temperature:0,repeat_penalty:1.1,chat_template_kwargs:{enable_thinking:false},messages:messages};
+  return fetch(base()+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)})
     .then(function(r){return r.ok?r.json():null})
-    .then(function(j){
-      var t=(j&&j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:"")||"";
-      t=t.split("</think>").pop().split("\n")[0].replace(/["'`]/g,"").trim().replace(/[?.!]+$/,"").trim();
-      var words=t.split(/\s+/).length;
-      if(!t||/[가-힣]/.test(t)||/[.!?]/.test(t)||words<2||words>8)return "";
-      return t;
-    })
-    .catch(function(){return ""});
+    .then(function(j){var t=(j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||"";return t.split("</think>").pop().trim()});
 }
-function webSearch(c,a,paint){
-  var last=null;for(var i=c.msgs.length-1;i>=0;i--){if(c.msgs[i].role==="user"){last=c.msgs[i];break}}
-  var q=last&&last.text?last.text.trim():"";
-  if(!q)return Promise.resolve(null);
-  a.status="웹 검색 중…";paint();
-  var en=/[가-힣]/.test(q)?translateQuery(q):Promise.resolve("");
-  return en.then(function(e){
-    return fetch(base()+"/search?q="+encodeURIComponent(q)+(e?"&en="+encodeURIComponent(e):""),{headers:headers(),signal:ctrl.signal});
-  })
-    .then(function(r){if(!r.ok)throw new Error("검색 서버 "+r.status);return r.json()})
-    .then(function(j){
-      a.status="";
-      a.sources=(j.results||[]).filter(function(s){return /^https?:\/\//.test(s.url)}).slice(0,5);
-      paint();
-      if(!a.sources.length){a.searchErr="검색 결과가 없어서 검색 없이 답합니다.";paint();return null}
-      return "다음은 방금 웹에서 검색한 결과입니다. 이 정보를 근거로 답하고, 근거가 된 문장 뒤에 [번호]로 출처를 표시하세요. 검색 결과에 없는 내용은 추측하지 마세요.\n"+
-        a.sources.map(function(s,k){return "["+(k+1)+"] "+s.title+" ("+s.url+")\n"+s.snippet}).join("\n");
-    })
-    .catch(function(e){
-      if(e.name==="AbortError")throw e;
-      a.status="";a.searchErr="웹 검색에 실패해서 검색 없이 답합니다.";paint();return null;
+function okQuery(t){
+  t=(t||"").split("\n")[0].replace(/["'`*]/g,"").trim().replace(/[?.!]+$/,"").trim();
+  var w=t.split(/\s+/).length;
+  return (!t||/[가-힣]/.test(t)||/[.!?]/.test(t)||w<2||w>10)?"":t;
+}
+var QSHOTS=[["아이폰 16 가격 알려줘","iPhone 16 price"],["서울 맛집 추천","best restaurants in Seoul"],["제미나이가 뭐야","Google Gemini AI"],["클로드 최신 모델","latest Claude model"]];
+// 한국어 질문 → 영어 웹 검색어 한 줄. 형식이 어긋나면 빈 문자열(한국어 검색만 함).
+function makeQuery(q){
+  var msgs=[{role:"system",content:"Task: rewrite the user's text as a short English web search query (2-8 words). Output only the query."}];
+  QSHOTS.forEach(function(x){msgs.push({role:"user",content:"Question: "+x[0]});msgs.push({role:"assistant",content:x[1]})});
+  msgs.push({role:"user",content:"Question: "+q});
+  return llm(msgs,30).then(okQuery).catch(function(e){if(e.name==="AbortError")throw e;return ""});
+}
+// "그건 얼마야?"처럼 짧은 후속 질문이면 이전 질문을 앞에 붙여 검색한다
+function withContext(c,q){
+  var prev=lastUser(c,1);
+  return (q.length<16&&prev&&prev.text)?prev.text.replace(URL_RE,"").trim().slice(0,80)+" "+q:q;
+}
+function srcBlock(list,cap){
+  var total=0,out=[];
+  list.forEach(function(r,i){
+    var body=r.content||r.snippet||"";if(!body)return;
+    var t="["+(i+1)+"] "+r.title+" ("+r.url+")\n"+body.slice(0,cap);
+    if(total+t.length>8000)return;total+=t.length;out.push(t);
+  });
+  return out.join("\n\n");
+}
+function cleanSrcs(arr){return (arr||[]).filter(function(s){return /^https?:\/\//.test(s.url)})}
+
+// 링크가 들어 있으면 그 페이지를 서버가 열어서 읽는다
+function readLinks(c,a,paint,urls,q){
+  a.status="링크 읽는 중…";paint();
+  return Promise.all(urls.map(function(u){
+    return jget("/fetch",{url:u,q:q,max:4500}).catch(function(e){if(e.name==="AbortError")throw e;return {url:u,ok:false,error:"검색 서버에 연결하지 못했습니다"}});
+  })).then(function(res){
+    a.status="";a.sources=res.map(function(r,i){return {title:r.title||urls[i],url:/^https?:\/\//.test(r.url)?r.url:urls[i]}});
+    var parts=res.map(function(r,i){
+      if(!r.ok)return "[링크 "+(i+1)+"] "+urls[i]+"\n읽기 실패: "+r.error;
+      if(r.empty)return "[링크 "+(i+1)+"] "+r.title+" ("+r.url+")\n(제목만 확인됨. 본문은 비어 있음: 로그인·스크립트가 필요하거나 접근이 제한된 페이지일 수 있음)";
+      return "[링크 "+(i+1)+"] "+r.title+" ("+r.url+")\n"+r.text;
     });
+    var failed=res.some(function(r){return !r.ok||r.empty});
+    if(failed)a.searchErr="일부 링크는 내용을 읽지 못했어요 (사이트가 막았거나 로그인이 필요할 수 있어요).";
+    paint();
+    return "사용자가 보낸 링크의 내용입니다. 이 내용을 근거로 답하세요. 읽지 못한 링크는 읽지 못했다고 솔직히 말하고 내용을 추측하지 마세요. 제목만 알면 제목에서 알 수 있는 것만 말하세요.\n\n"+parts.join("\n\n");
+  });
 }
+
+// 일반 웹 검색: 영어·한국어 검색어 → 여러 소스 → 위쪽 페이지 본문 발췌
+function webSearch(c,a,paint,q){
+  var qctx=withContext(c,q);
+  a.status="검색어 만드는 중…";paint();
+  var en=/[가-힣]/.test(qctx)?makeQuery(qctx):Promise.resolve(okQuery(qctx));
+  return en.then(function(e){
+    a.status="웹 검색 중…";paint();
+    return jget("/search",{q:qctx,en:e,read:3});
+  }).then(function(j){
+    a.status="";a.sources=cleanSrcs(j.results).slice(0,6);paint();
+    if(!a.sources.length){a.searchErr="검색 결과가 없어서 검색 없이 답합니다.";paint();return null}
+    return "다음은 방금 웹에서 검색한 결과입니다(본문을 읽은 것은 내용이 길게 나옵니다). 이 정보를 근거로 답하고, 근거가 된 문장 뒤에 [번호]로 출처를 표시하세요. 검색 결과에 답이 없으면 없다고 말하고 추측하지 마세요.\n\n"+srcBlock(a.sources,1500);
+  }).catch(function(e){
+    if(e.name==="AbortError")throw e;
+    a.status="";a.searchErr="웹 검색에 실패해서 검색 없이 답합니다.";paint();return null;
+  });
+}
+
+function pmap(items,n,fn){
+  var i=0,res=[];
+  function worker(){if(i>=items.length)return Promise.resolve();var k=i++;return fn(items[k],k).then(function(r){res[k]=r}).then(worker)}
+  var ws=[];for(var w=0;w<Math.min(n,items.length);w++)ws.push(worker());
+  return Promise.all(ws).then(function(){return res});
+}
+var PLAN_SHOTS=[["전기차 배터리 오래 쓰는 법","how to extend EV battery lifespan\nEV battery degradation causes\nbest charging habits electric vehicle battery"]];
+// 딥 리서치: 검색어 여러 개 → 검색·본문 읽기 → 페이지별 노트 → (이후 run 이 보고서를 스트리밍)
+function deepResearch(c,a,paint,q){
+  a.steps=[];
+  function step(t){a.steps.push({t:t,done:false});paint()}
+  function end(t){var s=a.steps[a.steps.length-1];if(s){s.done=true;if(t)s.t=t}paint()}
+  var qctx=withContext(c,q);
+  step("조사 계획 세우는 중");
+  var plan=[{role:"system",content:"Write 3 different short English web search queries (2-8 words each) that together help answer the user's question. One query per line, no numbering, no explanation."}];
+  PLAN_SHOTS.forEach(function(x){plan.push({role:"user",content:"Question: "+x[0]});plan.push({role:"assistant",content:x[1]})});
+  plan.push({role:"user",content:"Question: "+qctx});
+  return llm(plan,70).then(function(t){
+    var qs=t.split("\n").map(function(l){return okQuery(l.replace(/^[-*\d.)\s]+/,""))}).filter(function(x,i,arr){return x&&arr.indexOf(x)===i}).slice(0,3);
+    return qs.length?qs:makeQuery(qctx).then(function(e){return e?[e]:[]});
+  }).then(function(qs){
+    end("조사 계획: "+(qs.length?qs.join(" / "):qctx));
+    var jobs=qs.length?qs:[""];
+    step("검색하고 페이지 읽는 중 (0/"+jobs.length+")");
+    var n=0;
+    return Promise.all(jobs.map(function(en,i){
+      return jget("/search",{q:i===0?qctx:en,en:en,read:3}).then(function(j){n++;a.steps[a.steps.length-1].t="검색하고 페이지 읽는 중 ("+n+"/"+jobs.length+")";paint();return j.results||[]}).catch(function(e){if(e.name==="AbortError")throw e;return []});
+    }));
+  }).then(function(lists){
+    var seen={},all=[];
+    lists.forEach(function(l){cleanSrcs(l).forEach(function(r){var k=r.url.replace(/^https?:\/\/(www\.)?/,"").replace(/\/+$/,"");if(!seen[k]){seen[k]=1;all.push(r)}})});
+    var read=all.filter(function(r){return r.content&&r.content.length>150}).slice(0,8);
+    end("검색 완료: 페이지 "+all.length+"개 중 "+read.length+"개 본문을 읽었어요");
+    a.sources=all.slice(0,10);paint();
+    if(!read.length)return null;
+    step("노트 정리 중 (0/"+read.length+")");
+    var done=0;
+    return pmap(read,2,function(r){
+      return llm([{role:"system",content:"You extract facts from a web page for a research question."},
+        {role:"user",content:"질문: "+qctx+"\n\n페이지 본문:\n"+r.content.slice(0,1500)+"\n\n위 본문에서 질문에 답하는 데 도움이 되는 사실만 한국어 불릿 2~4개로 쓰세요. 본문에 없는 내용은 쓰지 마세요. 관련 내용이 없으면 '없음'이라고만 쓰세요."}],220)
+        .then(function(t){done++;a.steps[a.steps.length-1].t="노트 정리 중 ("+done+"/"+read.length+")";paint();return {r:r,t:t}})
+        .catch(function(e){if(e.name==="AbortError")throw e;return {r:r,t:""}});
+    }).then(function(notes){
+      end("노트 정리 완료");
+      var idx=function(r){return a.sources.indexOf(r)+1};
+      var good=notes.filter(function(x){return x&&x.t&&!/^없음/.test(x.t.trim())});
+      if(!good.length){a.searchErr="읽은 페이지에서 질문과 관련된 내용을 찾지 못했어요.";paint();return null}
+      step("보고서 작성 중");
+      a.deep=true;
+      return "아래는 딥 리서치 조사 노트입니다. 이 노트만 근거로 질문에 대한 보고서를 한국어로 쓰세요. 형식: 먼저 한두 문장 요약 → '## 핵심 내용'(불릿, 문장 끝에 [번호]) → '## 자세히'(소제목별 설명, 근거 뒤에 [번호]) → '## 한계와 불확실한 점'. 노트에 없는 내용은 쓰지 말고, 출처끼리 내용이 다르면 그 사실을 밝히세요.\n\n"+
+        good.map(function(x){return "["+idx(x.r)+"] "+x.r.title+" ("+x.r.url+")\n"+x.t}).join("\n\n");
+    });
+  }).catch(function(e){
+    if(e.name==="AbortError")throw e;
+    a.searchErr="딥 리서치 중 오류가 나서 일반 답변으로 대신해요: "+e.message;paint();return null;
+  });
+}
+
+// 대화 앞에 붙일 참고 자료를 모은다: 링크 읽기 > 딥 리서치 > 웹 검색
+function gather(c,a,paint,isV){
+  if(isV)return Promise.resolve(null);
+  var u=lastUser(c),text=u&&u.text?u.text.trim():"";
+  if(!text)return Promise.resolve(null);
+  var urls=(text.match(URL_RE)||[]).slice(0,2),q=text.replace(URL_RE,"").replace(/\s+/g," ").trim();
+  if(urls.length)return readLinks(c,a,paint,urls,q);
+  if(cfg.deep)return deepResearch(c,a,paint,q);
+  if(cfg.web)return webSearch(c,a,paint,q);
+  return Promise.resolve(null);
+}
+
+// ---------- Canvas ----------
+var CV_KIND={html:"html",htm:"html",svg:"svg",markdown:"doc",md:"doc"};
+function cvKind(lang,code){
+  lang=(lang||"").toLowerCase();
+  if(CV_KIND[lang])return CV_KIND[lang];
+  if(/^\s*<!doctype html|^\s*<html/i.test(code))return "html";
+  return "code";
+}
+function cvTitle(b){
+  var m;
+  if(b.kind==="html"&&(m=b.code.match(/<title[^>]*>([^<]{1,60})<\/title>/i)))return m[1].trim();
+  if(b.kind==="doc"&&(m=b.code.match(/^\s*#{1,3}\s+(.{1,60})/m)))return m[1].trim();
+  return b.kind==="code"?(b.lang||"코드"):"";
+}
+// 답변 글에서 Canvas로 보낼 코드 블록(가장 긴 것)을 찾는다. 아직 닫히지 않은 블록(스트리밍 중)도 포함한다.
+function cvFind(text){
+  var re=/```([\w+-]*)[^\n]*\n([\s\S]*?)(```|$)/g,m,best=null;
+  while((m=re.exec(text||""))){
+    var code=m[2].replace(/\n$/,"");
+    if(code.trim().length<20&&m[3])continue;
+    var lang=(m[1]||"").toLowerCase();
+    if(!best||code.length>best.code.length)best={lang:lang,code:code,kind:cvKind(lang,code),start:m.index,end:m.index+m[0].length,closed:m[3]==="```"};
+    if(m[3]!=="```")break;
+  }
+  return best;
+}
+function cvStrip(text){var b=cvFind(text);return b&&b.closed?text.slice(0,b.start)+"[Canvas에 작성한 내용]"+text.slice(b.end):text}
+function cvPush(c,b,title){
+  var cv=c.canvas;
+  if(!cv)cv=c.canvas={title:"",kind:b.kind,lang:b.lang,versions:[],v:0};
+  cv.kind=b.kind;cv.lang=b.lang;cv.title=title||cvTitle(b)||cv.title;
+  cv.versions.push(b.code);cv.v=cv.versions.length-1;
+  return cv;
+}
+// 모델 답변에서 코드 블록을 찾아 Canvas 에 반영(스트리밍 중에는 같은 버전을 계속 갱신)
+function cvSync(c,a,final){
+  if(!cfg.canvas)return;
+  var b=cvFind(a.text);if(!b)return;
+  if(a.cv===undefined){var was=!c.canvas;cvPush(c,b);a.cv=c.canvas.v;cvTab="code"}
+  else{var cv=c.canvas;cv.versions[a.cv]=b.code;cv.kind=b.kind;cv.lang=b.lang;cv.title=cvTitle(b)||cv.title}
+  c.canvas.v=a.cv;
+  cvOpenFlag=true;
+  if(final&&c.canvas.kind!=="code")cvTab="view";
+  cvRender(!final);
+}
+function cvRender(streaming_){
+  var c=cur(),cv=c&&c.canvas,box=$("canvas");
+  if(!cv||!cvOpenFlag){box.classList.remove("on");return}
+  box.classList.add("on");
+  var code=cv.versions[cv.v]||"",canView=cv.kind!=="code";
+  if(!canView)cvTab="code";
+  if($("cvTitle")!==document.activeElement)$("cvTitle").value=cv.title||"";
+  $("cvVer").textContent=(cv.v+1)+"/"+cv.versions.length;
+  $("cvPrev").disabled=cv.v<=0;$("cvNext").disabled=cv.v>=cv.versions.length-1;
+  $("cvTabView").style.display=canView?"":"none";
+  $("cvTabView").className="cv-tab"+(cvTab==="view"?" on":"");
+  $("cvTabCode").className="cv-tab"+(cvTab==="code"?" on":"");
+  var ta=$("cvCode");
+  ta.style.display=cvTab==="code"?"block":"none";
+  if(ta!==document.activeElement||streaming_)ta.value=code;
+  if(streaming_&&cvTab==="code")ta.scrollTop=ta.scrollHeight;
+  var showView=cvTab==="view"&&canView;
+  $("cvFrame").style.display=showView&&cv.kind!=="doc"?"block":"none";
+  $("cvDoc").style.display=showView&&cv.kind==="doc"?"block":"none";
+  if(showView){
+    var key=cv.kind+"\n"+code;
+    if(key!==cvLast){
+      cvLast=key;
+      if(cv.kind==="doc")$("cvDoc").innerHTML=md(code);
+      else{$("cvErr").style.display="none";$("cvFrame").srcdoc=cv.kind==="svg"?'<!doctype html><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#fff">'+code+"</body>":cvWrap(code)}
+    }
+  }
+}
+// 미리보기 안에서 스크립트 오류가 나면 부모 창에 알려서 "고치기" 버튼을 보여 준다
+var CV_ERR_JS='<script>addEventListener("error",function(e){parent.postMessage({lfmCvErr:(e.message||"오류")+(e.lineno?" (줄 "+e.lineno+")":"")},"*")})<\/script>';
+function cvWrap(code){
+  if(/<head[^>]*>/i.test(code))return code.replace(/<head[^>]*>/i,function(m){return m+CV_ERR_JS});
+  if(/<html[^>]*>/i.test(code))return code.replace(/<html[^>]*>/i,function(m){return m+CV_ERR_JS});
+  return CV_ERR_JS+code;
+}
+var cvErrMsg="";
+window.addEventListener("message",function(e){
+  if(!e.data||!e.data.lfmCvErr||e.source!==$("cvFrame").contentWindow)return;
+  cvErrMsg=String(e.data.lfmCvErr).slice(0,200);
+  $("cvErrT").textContent="미리보기 오류: "+cvErrMsg;$("cvErr").style.display="flex";
+});
+function cvExt(cv){
+  if(cv.kind==="html")return "html";if(cv.kind==="svg")return "svg";if(cv.kind==="doc")return "md";
+  return {python:"py",py:"py",javascript:"js",js:"js",typescript:"ts",ts:"ts",css:"css",json:"json",bash:"sh",sh:"sh",java:"java",c:"c",cpp:"cpp",go:"go",rust:"rs",sql:"sql",yaml:"yml"}[cv.lang]||"txt";
+}
+function cvSave(){clearTimeout(cvSaveT);cvSaveT=setTimeout(saveChats,500)}
+$("cvClose").addEventListener("click",function(){cvOpenFlag=false;cvRender()});
+$("cvTabView").addEventListener("click",function(){cvTab="view";cvLast="";cvRender()});
+$("cvTabCode").addEventListener("click",function(){cvTab="code";cvRender()});
+$("cvCode").addEventListener("input",function(){var c=cur();if(!c||!c.canvas)return;c.canvas.versions[c.canvas.v]=this.value;cvLast="";cvSave()});
+$("cvTitle").addEventListener("input",function(){var c=cur();if(!c||!c.canvas)return;c.canvas.title=this.value;cvSave()});
+$("cvPrev").addEventListener("click",function(){var c=cur();if(c&&c.canvas&&c.canvas.v>0){c.canvas.v--;cvLast="";cvRender()}});
+$("cvNext").addEventListener("click",function(){var c=cur();if(c&&c.canvas&&c.canvas.v<c.canvas.versions.length-1){c.canvas.v++;cvLast="";cvRender()}});
+$("cvCopy").addEventListener("click",function(){var c=cur();if(!c||!c.canvas)return;navigator.clipboard&&navigator.clipboard.writeText(c.canvas.versions[c.canvas.v]);toast("복사했어요")});
+$("cvDown").addEventListener("click",function(){
+  var c=cur();if(!c||!c.canvas)return;var cv=c.canvas;
+  var blob=new Blob([cv.versions[cv.v]],{type:"text/plain;charset=utf-8"}),u=URL.createObjectURL(blob),a=document.createElement("a");
+  var nm=(cv.title||"").replace(/[^A-Za-z0-9가-힣._-]+/g,"_").replace(/^_+|_+$/g,"").slice(0,40);   // 파일 이름은 안전한 글자만
+  a.href=u;a.download=(nm||"canvas")+"."+cvExt(cv);
+  document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},1000);
+});
+$("cvErrFix").addEventListener("click",function(){
+  if(streaming)return;
+  if(!cfg.canvas){cfg.canvas=true;saveCfg();setToolLabels()}
+  send("미리보기에서 오류가 났어요: "+cvErrMsg+"\n이 오류를 고쳐서 전체 코드를 다시 써 줘.");
+});
+$("cvActs").addEventListener("click",function(e){
+  var b=e.target.closest("[data-q]");if(!b||streaming)return;
+  if(!cfg.canvas){cfg.canvas=true;saveCfg();setToolLabels()}
+  send(b.getAttribute("data-q"));
+});
+
+// ---------- 도구 켜기/끄기 ----------
+function renderModes(){
+  var h="";
+  [["web","웹 검색"],["deep","딥 리서치"],["canvas","Canvas"]].forEach(function(x){if(cfg[x[0]])h+='<span class="mode">'+x[1]+'<button data-mode="'+x[0]+'" title="끄기">✕</button></span>'});
+  $("modes").innerHTML=h;
+}
+function setToolLabels(){
+  $("mWeb").textContent="웹 검색: "+(cfg.web?"켜짐 ✓":"꺼짐");
+  $("mDeep").textContent="딥 리서치: "+(cfg.deep?"켜짐 ✓":"꺼짐");
+  $("mCanvas").textContent="Canvas: "+(cfg.canvas?"켜짐 ✓":"꺼짐");
+  renderModes();
+}
+function toggleTool(k){cfg[k]=!cfg[k];saveCfg();setToolLabels();closePops()}
+
+// ---------- 패치노트 ----------
+function showPatches(all){
+  var seen=parseInt(LS.get("lfm.seen","0"),10)||0;
+  var list=PATCHES.filter(function(p){return all||p.v>seen});
+  if(!all&&!seen)list=PATCHES.slice(0,3);
+  if(!list.length)return;
+  var h="";
+  list.forEach(function(p){
+    h+='<div class="pv-h"><b>v'+p.v+" · "+esc(p.title)+"</b>"+(p.date?"<span>"+esc(p.date)+"</span>":"")+'</div><ul class="pv-l">'+p.items.map(function(i){return "<li><b>"+esc(i[0])+"</b> "+esc(i[1])+"</li>"}).join("")+"</ul>";
+  });
+  $("patchBody").innerHTML=h;
+  $("patchTitle").textContent=all?"패치노트":"업데이트 소식";
+  $("patchAll").style.display=all?"none":"";
+  $("patchBg").classList.add("on");
+}
+function closePatches(){LS.set("lfm.seen",String(APP_VERSION));$("patchBg").classList.remove("on")}
+
 function run(c){
   var a={role:"assistant",text:""};c.msgs.push(a);
   var isV=vc.on, useVL=isV&&cfg.vmodel==="vl";     // 음성 대화: Audio(기본) 또는 VL(추론 끔) / 평소: VL
@@ -534,6 +921,7 @@ function run(c){
   function paint(){
     var els=document.querySelectorAll(".msg.assistant"),el=els[els.length-1];
     if(el){el.innerHTML=assistantInner(a,c.msgs.indexOf(a),true)}
+    if(a.text&&cfg.canvas&&!isV)cvSync(c,a,false);
     var s=$("scroll");if(s.scrollHeight-s.scrollTop-s.clientHeight<160)toBottom();
   }
   // 문장이 완성되는 즉시 읽기 큐에 넣는다 → 답변이 끝나기 전에 첫 문장부터 말하기 시작
@@ -553,7 +941,7 @@ function run(c){
     if(!started){started=true;setVState("speaking")}
   }
   function done(){
-    streaming=false;ctrl=null;delete a._t0;saveChats();render(true);
+    streaming=false;ctrl=null;delete a._t0;delete a.status;if(a.text&&cfg.canvas&&!isV)cvSync(c,a,true);saveChats();render(true);
     var idx=c.msgs.indexOf(a),ok=a.text&&!a.err&&idx>=0;
     if(vc.on){
       if(ok){flushSpeech(true);vqFinish(function(){if(vc.on)setVState("listening")})}
@@ -562,7 +950,8 @@ function run(c){
     if(ok)maybeCompact(c);
   }
   if(!cfg.api){a.err="서버 주소가 설정되지 않았습니다. 왼쪽 아래 ⚙️ 설정에서 입력하세요.";return done()}
-  Promise.resolve().then(function(){ return (!isV&&cfg.web)?webSearch(c,a,paint):null }).then(function(ctx){
+  Promise.resolve().then(function(){ return gather(c,a,paint,isV) }).then(function(ctx){
+    a.status="";
     var body={model:isV&&!useVL?"lfm3-audio":"lfm3-vl",messages:apiMessages(c,ctx),stream:true};
     if(isV){
       body.max_tokens=150;                                  // 음성 답변은 짧게(반복 루프 방지)
@@ -571,6 +960,7 @@ function run(c){
       if(cfg.temp!=="")body.temperature=cfg.temp;
       if(!cfg.think)body.chat_template_kwargs={enable_thinking:false};
       if(cfg.effort&&caps.levels.indexOf(cfg.effort)>=0)body.reasoning_effort=cfg.effort;
+      if(a.deep)body.max_tokens=1600;                       // 딥 리서치 보고서는 길게
     }
     return fetch((isV&&!useVL?vbase():base())+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)});
   }).then(function(r){
@@ -901,6 +1291,12 @@ $("chatList").addEventListener("click",function(e){
   if(it&&!streaming){curId=it.getAttribute("data-id");saveChats();render();closeMobile()}
 });
 $("msgs").addEventListener("click",function(e){
+  var cb=e.target.closest("[data-cv]");
+  if(cb){
+    var pre=cb.closest("pre"),code=pre.querySelector("code").textContent,lang=pre.querySelector(".ph span").textContent.toLowerCase(),c0=cur();
+    if(c0){var bl={lang:lang==="code"?"":lang,code:code,kind:cvKind(lang,code)};cvPush(c0,bl);cvOpenFlag=true;cvTab=bl.kind==="code"?"code":"view";cvLast="";saveChats();cvRender()}
+    return;
+  }
   var cp=e.target.closest("[data-copy]");
   if(cp){var code=cp.closest("pre").querySelector("code").textContent;navigator.clipboard&&navigator.clipboard.writeText(code);cp.textContent="복사됨";setTimeout(function(){cp.textContent="복사"},1200);return}
   var ac=e.target.closest("[data-act]");if(!ac)return;
@@ -909,6 +1305,7 @@ $("msgs").addEventListener("click",function(e){
   if(act==="copy"){var m=c.msgs[+ac.getAttribute("data-i")];navigator.clipboard&&navigator.clipboard.writeText(m.text||"")}
   else if(act==="speak"){var si=+ac.getAttribute("data-i");if(player.idx===si)stopSpeak();else speak(si)}
   else if(act==="retry"&&!streaming){c.msgs.pop();run(c)}
+  else if(act==="opencv"){var cvv=+ac.getAttribute("data-v");if(c.canvas&&c.canvas.versions[cvv]!==undefined){c.canvas.v=cvv;cvOpenFlag=true;cvTab=c.canvas.kind==="code"?"code":"view";cvLast="";cvRender()}}
 });
 
 /* 첨부 */
@@ -934,9 +1331,11 @@ function closePops(){$("plusMenu").classList.remove("on");$("modelMenu").classLi
 $("plusBtn").addEventListener("click",function(e){e.stopPropagation();var on=$("plusMenu").classList.contains("on");closePops();if(!on)$("plusMenu").classList.add("on")});
 $("mAttach").addEventListener("click",function(){closePops();pickImage()});
 $("mSettings").addEventListener("click",function(){closePops();openSettings()});
-function setWebLabel(){$("mWeb").textContent="웹 검색: "+(cfg.web?"켜짐 ✓":"꺼짐")}
-$("mWeb").addEventListener("click",function(){cfg.web=!cfg.web;saveCfg();setWebLabel();closePops()});
-setWebLabel();
+$("mWeb").addEventListener("click",function(){toggleTool("web")});
+$("mDeep").addEventListener("click",function(){toggleTool("deep")});
+$("mCanvas").addEventListener("click",function(){toggleTool("canvas")});
+$("modes").addEventListener("click",function(e){var b=e.target.closest("[data-mode]");if(b)toggleTool(b.getAttribute("data-mode"))});
+setToolLabels();
 document.querySelectorAll(".opt[data-tool]").forEach(function(b){b.addEventListener("click",function(){closePops();runTool(b.getAttribute("data-tool"))})});
 function runTool(t){
   if(t==="mem"){var c=cur();alert(c&&c.memory?c.memory:"이 채팅에는 아직 압축된 메모리가 없습니다.");return}
@@ -995,11 +1394,18 @@ $("sSave").addEventListener("click",function(){
   saveCfg();$("modalBg").classList.remove("on");checkHealth();
 });
 
+/* 패치노트 */
+$("patchOk").addEventListener("click",closePatches);
+$("patchBg").addEventListener("click",function(e){if(e.target===this)closePatches()});
+$("patchAll").addEventListener("click",function(){showPatches(true)});
+$("sPatch").addEventListener("click",function(){$("modalBg").classList.remove("on");showPatches(true)});
+
 /* init */
 if(!cur()){if(chats.length)curId=chats[0].id;else newChat()}
 if(mobile())$("side").classList.add("hidden");
 render();checkHealth();
 if(!cfg.api)setTimeout(openSettings,300);
+else setTimeout(function(){showPatches(false)},600);
 })();
 </script>
 </body>
