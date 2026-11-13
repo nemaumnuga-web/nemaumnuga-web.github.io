@@ -1,0 +1,17 @@
+#!/usr/bin/bash
+# Installs the default apps listed in /usr/share/nuri/flatpaks.txt, once.
+set -euo pipefail
+
+LIST=/usr/share/nuri/flatpaks.txt
+DONE=/var/lib/nuri/flatpak-setup.done
+
+flatpak remote-add --system --if-not-exists flathub \
+    https://dl.flathub.org/repo/flathub.flatpakrepo
+
+mapfile -t apps < <(grep -Ev '^\s*(#|$)' "$LIST")
+if (( ${#apps[@]} )); then
+    flatpak install --system --noninteractive --assumeyes flathub "${apps[@]}"
+fi
+
+mkdir -p "$(dirname "$DONE")"
+touch "$DONE"

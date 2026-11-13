@@ -1,0 +1,14 @@
+# Installed from Flathub on first boot. One app ID per line.
+
+# Windows apps and games
+com.usebottles.bottles
+com.valvesoftware.Steam
+
+# Office files (docx/xlsx/pptx)
+org.libreoffice.LibreOffice
+
+# File transfer with Windows, macOS, Android, iOS
+org.localsend.localsend_app
+
+# Browser
+org.mozilla.firefox

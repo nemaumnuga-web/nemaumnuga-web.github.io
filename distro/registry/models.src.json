@@ -1,0 +1,107 @@
+{
+  "_doc": "Hand-curated model list. Run `make registry` to pin each entry to an exact file, commit and SHA-256 (writes system_files/usr/share/nuri/models.json). min_ram_gb = total system RAM needed (OS + desktop + model). recommend = per-language rank (1 = first). commercial: yes | no | unverified (only 'yes'/'no' after reading the LICENSE file). trust: official | trusted-quant | repackaged.",
+  "version": 1,
+  "models": [
+    {
+      "id": "qwen3.5-4b", "name": "Qwen3.5 4B", "params_b": 4.2, "min_ram_gb": 8,
+      "repo": "unsloth/Qwen3.5-4B-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "en", "zh", "ja", "ko"], "recommend": {"en": 1, "zh": 1, "ja": 1},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/Qwen/Qwen3.5-4B",
+      "commercial": "unverified", "trust": "trusted-quant"
+    },
+    {
+      "id": "gemma-4-e2b", "name": "Gemma 4 E2B", "params_b": 4.6, "min_ram_gb": 8,
+      "repo": "unsloth/gemma-4-E2B-it-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "en", "ko", "ja", "zh"], "recommend": {"en": 2, "ja": 2},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/google/gemma-4-E2B-it",
+      "commercial": "unverified", "trust": "trusted-quant"
+    },
+    {
+      "id": "ministral-3-3b", "name": "Ministral 3 3B", "params_b": 3.4, "min_ram_gb": 8,
+      "repo": "bartowski/mistralai_Ministral-3-3B-Instruct-2512-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "fr", "de", "es", "it", "en"], "recommend": {"fr": 1, "de": 1, "es": 1, "it": 1},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512",
+      "commercial": "unverified", "trust": "trusted-quant"
+    },
+    {
+      "id": "exaone-4.0-1.2b", "name": "EXAONE 4.0 1.2B", "params_b": 1.3, "min_ram_gb": 8,
+      "repo": "LGAI-EXAONE/EXAONE-4.0-1.2B-GGUF", "quant": ["Q4_K_M", "Q4_0", "Q8_0"],
+      "langs": ["ko", "en"], "recommend": {"ko": 1},
+      "license": "exaone-1.2-nc", "license_url": "https://huggingface.co/LGAI-EXAONE/EXAONE-4.0-1.2B",
+      "commercial": "no", "trust": "official",
+      "notes": "Research/education use only under the EXAONE NC license."
+    },
+    {
+      "id": "kanana-2-1.3b", "name": "Kanana-2 1.3B Instruct", "params_b": 1.3, "min_ram_gb": 8,
+      "repo": "winwinplatform/Kanana-2-1.3b-instruct-GGUF", "quant": ["Q4_K_M", "Q8_0", "Q4_0"],
+      "langs": ["ko", "en"], "recommend": {"ko": 2},
+      "license": "kanana-open", "license_url": "https://huggingface.co/kakaocorp/kanana-2-1.3b-instruct/blob/main/LICENSE",
+      "commercial": "unverified", "trust": "repackaged",
+      "notes": "Kakao publishes no official GGUF; this is a third-party conversion. Requires 'Powered by Kanana' attribution."
+    },
+    {
+      "id": "qwen3.5-9b", "name": "Qwen3.5 9B", "params_b": 9.0, "min_ram_gb": 12,
+      "repo": "unsloth/Qwen3.5-9B-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "en", "zh", "ja", "ko"], "recommend": {"en": 1, "zh": 1, "ja": 1, "ko": 3},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/Qwen/Qwen3.5-9B",
+      "commercial": "unverified", "trust": "trusted-quant"
+    },
+    {
+      "id": "gemma-4-e4b", "name": "Gemma 4 E4B", "params_b": 7.5, "min_ram_gb": 12,
+      "repo": "unsloth/gemma-4-E4B-it-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "en", "ko", "ja", "zh"], "recommend": {"en": 2, "ja": 2, "ko": 4},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/google/gemma-4-E4B-it",
+      "commercial": "unverified", "trust": "trusted-quant"
+    },
+    {
+      "id": "ministral-3-8b", "name": "Ministral 3 8B", "params_b": 8.5, "min_ram_gb": 12,
+      "repo": "bartowski/mistralai_Ministral-3-8B-Instruct-2512-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "fr", "de", "es", "it", "en"], "recommend": {"fr": 1, "de": 1, "es": 1, "it": 1},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512",
+      "commercial": "unverified", "trust": "trusted-quant"
+    },
+    {
+      "id": "gemma-4-12b", "name": "Gemma 4 12B (QAT)", "params_b": 12.0, "min_ram_gb": 16,
+      "repo": "google/gemma-4-12B-it-qat-q4_0-gguf", "quant": ["Q4_0", "q4_0"],
+      "langs": ["*", "en", "ko", "ja", "zh"], "recommend": {"en": 1, "ja": 1},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf",
+      "commercial": "unverified", "trust": "official"
+    },
+    {
+      "id": "ministral-3-14b", "name": "Ministral 3 14B", "params_b": 13.5, "min_ram_gb": 16,
+      "repo": "mistralai/Ministral-3-14B-Instruct-2512-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "fr", "de", "es", "it", "en"], "recommend": {"fr": 1, "de": 1, "es": 1, "it": 1},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF",
+      "commercial": "unverified", "trust": "official"
+    },
+    {
+      "id": "exaone-4.0-32b", "name": "EXAONE 4.0 32B", "params_b": 32.0, "min_ram_gb": 32,
+      "repo": "LGAI-EXAONE/EXAONE-4.0-32B-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["ko", "en"], "recommend": {"ko": 1},
+      "license": "exaone-1.2-nc", "license_url": "https://huggingface.co/LGAI-EXAONE/EXAONE-4.0-32B/blob/main/LICENSE",
+      "commercial": "no", "trust": "official",
+      "notes": "Research/education use only under the EXAONE NC license."
+    },
+    {
+      "id": "gpt-oss-20b", "name": "gpt-oss 20B", "params_b": 20.9, "min_ram_gb": 24,
+      "repo": "unsloth/gpt-oss-20b-GGUF", "quant": ["Q4_K_M", "MXFP4", "Q4_0"],
+      "langs": ["*", "en"], "recommend": {"en": 2},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/openai/gpt-oss-20b",
+      "commercial": "unverified", "trust": "trusted-quant"
+    },
+    {
+      "id": "qwen3.6-27b", "name": "Qwen3.6 27B", "params_b": 26.9, "min_ram_gb": 32,
+      "repo": "unsloth/Qwen3.6-27B-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "en", "zh", "ja", "ko"], "recommend": {"en": 1, "zh": 1, "ja": 1, "ko": 2},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/Qwen/Qwen3.6-27B",
+      "commercial": "unverified", "trust": "trusted-quant"
+    },
+    {
+      "id": "gemma-4-31b", "name": "Gemma 4 31B", "params_b": 30.7, "min_ram_gb": 32,
+      "repo": "unsloth/gemma-4-31B-it-GGUF", "quant": ["Q4_K_M", "Q4_0"],
+      "langs": ["*", "en", "ko", "ja", "zh"], "recommend": {"en": 2},
+      "license": "apache-2.0", "license_url": "https://huggingface.co/google/gemma-4-31B-it",
+      "commercial": "unverified", "trust": "trusted-quant"
+    }
+  ]
+}

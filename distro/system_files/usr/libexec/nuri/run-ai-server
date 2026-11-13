@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+# Launches llama-server for the model selected by `nuri-ai use`.
+set -euo pipefail
+
+MODEL="${NURI_DATA:-$HOME/.local/share/nuri}/models/current.gguf"
+PORT="${NURI_PORT:-8765}"
+CTX="${NURI_CTX:-8192}"
+THREADS="${NURI_THREADS:-0}"
+
+args=(
+    --model "$MODEL"
+    --host 127.0.0.1
+    --port "$PORT"
+    --ctx-size "$CTX"
+    # Reuse the KV cache of the shared prompt prefix between requests.
+    --cache-reuse 256
+)
+# 0 = let llama.cpp decide.
+if [[ "$THREADS" != "0" ]]; then
+    args+=(--threads "$THREADS")
+fi
+# Extra flags, e.g. NURI_EXTRA_ARGS="--n-gpu-layers 99"
+if [[ -n "${NURI_EXTRA_ARGS:-}" ]]; then
+    read -r -a extra <<< "$NURI_EXTRA_ARGS"
+    args+=("${extra[@]}")
+fi
+
+exec llama-server "${args[@]}"

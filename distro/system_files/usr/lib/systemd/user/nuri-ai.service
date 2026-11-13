@@ -1,0 +1,21 @@
+[Unit]
+Description=Nuri on-device AI server (llama.cpp, localhost only)
+Documentation=man:llama-server(1)
+# Starts only once a model has been picked with `nuri-ai install` / `nuri-ai use`.
+ConditionPathExists=%h/.local/share/nuri/models/current.gguf
+
+[Service]
+Type=simple
+# Defaults; override in ~/.config/nuri/ai.env (see /usr/share/nuri/ai.env.example).
+Environment=NURI_PORT=8765
+Environment=NURI_CTX=8192
+Environment=NURI_THREADS=0
+EnvironmentFile=-%h/.config/nuri/ai.env
+# Bound to 127.0.0.1: nothing on the network can reach the model or the chats.
+ExecStart=/usr/libexec/nuri/run-ai-server
+Restart=on-failure
+RestartSec=5
+Nice=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=Nuri OS first-boot app setup (Flatpak)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=!/var/lib/nuri/flatpak-setup.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/nuri/flatpak-setup
+RemainAfterExit=yes
+# Retry on the next boot if the network was down.
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target

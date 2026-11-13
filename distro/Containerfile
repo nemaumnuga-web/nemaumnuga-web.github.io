@@ -1,0 +1,34 @@
+# Nuri OS (codename) - a Fedora Kinoite (KDE Plasma, atomic) based image.
+#
+# The whole OS is one OCI image. Installed machines update by pulling a newer
+# image (`bootc upgrade` / rpm-ostree) and can roll back to the previous one.
+#
+#   podman build -t localhost/nuri:latest .
+#   make iso            # installable ISO via bootc-image-builder
+
+ARG FEDORA_VERSION=45
+ARG BASE_IMAGE=quay.io/fedora/fedora-kinoite
+
+FROM scratch AS ctx
+COPY build_files /build_files
+
+FROM ${BASE_IMAGE}:${FEDORA_VERSION}
+
+ARG FEDORA_VERSION
+ARG NURI_VERSION=dev
+
+# Files that ship as-is (CLI, systemd units, model registry, defaults).
+COPY system_files/ /
+
+# extra_ca is optional: only for building behind a TLS-intercepting proxy
+# (`--secret id=extra_ca,src=proxy-ca.pem`). It is never kept in the image.
+RUN --mount=type=bind,from=ctx,source=/build_files,target=/ctx \
+    --mount=type=cache,dst=/var/cache/libdnf5 \
+    --mount=type=secret,id=extra_ca \
+    NURI_VERSION=${NURI_VERSION} FEDORA_VERSION=${FEDORA_VERSION} \
+    bash /ctx/build.sh
+
+LABEL org.opencontainers.image.title="Nuri OS" \
+      org.opencontainers.image.description="KDE Plasma desktop with an on-device AI assistant" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      containers.bootc="1"
