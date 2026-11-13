@@ -1,0 +1,123 @@
+{
+  "iso": [
+    "en",
+    "ko",
+    "ja",
+    "zh",
+    "es",
+    "fr",
+    "de",
+    "it",
+    "pt",
+    "ru",
+    "ar",
+    "hi",
+    "id",
+    "vi",
+    "th",
+    "tr",
+    "pl",
+    "nl",
+    "uk",
+    "cs",
+    "sv",
+    "he",
+    "fa",
+    "bn"
+  ],
+  "by_name": {
+    "kanana": [
+      "ko",
+      "en"
+    ],
+    "hyperclova": [
+      "ko",
+      "en"
+    ],
+    "exaone": [
+      "ko",
+      "en"
+    ],
+    "solar": [
+      "ko",
+      "en"
+    ],
+    "qwen": [
+      "*",
+      "zh",
+      "en",
+      "ko",
+      "ja"
+    ],
+    "gemma": [
+      "*",
+      "en",
+      "ko",
+      "ja",
+      "zh"
+    ],
+    "ministral": [
+      "*",
+      "fr",
+      "de",
+      "es",
+      "it",
+      "en"
+    ],
+    "mistral": [
+      "*",
+      "fr",
+      "en"
+    ],
+    "llama": [
+      "en"
+    ],
+    "smollm": [
+      "en"
+    ],
+    "granite": [
+      "*",
+      "en"
+    ],
+    "phi": [
+      "en"
+    ],
+    "gpt-oss": [
+      "*",
+      "en"
+    ],
+    "deepseek": [
+      "*",
+      "zh",
+      "en"
+    ],
+    "yi-": [
+      "zh",
+      "en"
+    ],
+    "japanese": [
+      "ja"
+    ],
+    "swallow": [
+      "ja",
+      "en"
+    ],
+    "elyza": [
+      "ja"
+    ]
+  },
+  "extra_search": [
+    "gemma-4",
+    "ministral",
+    "tiny-aya",
+    "lfm",
+    "smollm3",
+    "granite-4",
+    "minicpm",
+    "phi-4",
+    "olmo",
+    "exaone-4",
+    "hyperclovax",
+    "kanana-2"
+  ]
+}
