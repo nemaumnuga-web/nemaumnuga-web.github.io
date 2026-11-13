@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name=Nuri AI
+Name[ko]=누리 AI
+GenericName=On-device AI assistant
+GenericName[ko]=PC 안의 AI 비서
+Comment=Chat with an AI that runs entirely on this computer
+Comment[ko]=이 컴퓨터 안에서만 동작하는 AI와 대화해요
+Exec=nuri-assistant
+Icon=nuri-assistant
+Terminal=false
+Categories=Utility;
+Keywords=AI;assistant;chat;LLM;누리;비서;
+StartupNotify=false
+SingleMainWindow=true
+X-KDE-Shortcuts=Meta+Space
+Actions=library;
+
+[Desktop Action library]
+Name=Model library
+Name[ko]=모델 라이브러리
+Exec=nuri-assistant --library

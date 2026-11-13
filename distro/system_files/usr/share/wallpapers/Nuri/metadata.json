@@ -1,0 +1,8 @@
+{
+    "KPlugin": {
+        "Authors": [{ "Name": "Nuri OS contributors" }],
+        "Id": "Nuri",
+        "License": "CC-BY-4.0",
+        "Name": "Nuri"
+    }
+}

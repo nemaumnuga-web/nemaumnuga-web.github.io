@@ -1,0 +1,25 @@
+[Desktop Entry]
+Type=Service
+MimeType=text/plain;
+Actions=summarize;explain;translate;
+X-KDE-Submenu=Nuri AI
+X-KDE-Submenu[ko]=누리 AI
+Icon=nuri-assistant
+
+[Desktop Action summarize]
+Name=Summarize
+Name[ko]=AI로 요약하기
+Icon=nuri-assistant
+Exec=nuri-assistant --file %f --task summarize
+
+[Desktop Action explain]
+Name=Explain this file
+Name[ko]=이 파일 설명 듣기
+Icon=nuri-assistant
+Exec=nuri-assistant --file %f --task explain
+
+[Desktop Action translate]
+Name=Translate
+Name[ko]=번역하기
+Icon=nuri-assistant
+Exec=nuri-assistant --file %f --task translate

@@ -1,0 +1,16 @@
+# Nuri OS system defaults (users can still change everything in System Settings)
+
+[org.kde.kdecoration2]
+library=org.kde.breeze
+theme=Breeze
+# close, minimise, maximise on the left
+ButtonsOnLeft=XIA
+ButtonsOnRight=
+
+[Wayland]
+# Korean (and other) input via Fcitx 5, toggled with the Hangul key or Ctrl+Space
+InputMethod[$e]=/usr/share/applications/org.fcitx.Fcitx5.desktop
+VirtualKeyboardEnabled=true
+
+[Plugins]
+blurEnabled=true

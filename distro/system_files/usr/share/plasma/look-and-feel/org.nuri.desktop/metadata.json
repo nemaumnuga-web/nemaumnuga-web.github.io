@@ -1,0 +1,15 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [{ "Name": "Nuri OS contributors" }],
+        "Category": "",
+        "Description": "Top bar with global menu, centred floating dock, window buttons on the left",
+        "Description[ko]": "전역 메뉴가 있는 상단 바, 가운데 떠 있는 독, 왼쪽 창 버튼",
+        "Id": "org.nuri.desktop",
+        "License": "Apache-2.0",
+        "Name": "Nuri",
+        "Name[ko]": "누리",
+        "Version": "1.0"
+    },
+    "X-Plasma-APIVersion": "2"
+}

@@ -1,0 +1,10 @@
+[KDE]
+LookAndFeelPackage=org.nuri.desktop
+widgetStyle=Breeze
+
+[General]
+ColorScheme=BreezeLight
+AccentColor=91,103,241
+
+[Icons]
+Theme=breeze

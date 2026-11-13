@@ -21,11 +21,11 @@ test:
 	python3 -m unittest discover -s tests -v
 
 registry:
-	python3 tools/pin_models.py
+	python3 tools/*.py
 
 lint:
-	bash -n build_files/*.sh system_files/usr/libexec/nuri/*
-	python3 -m py_compile system_files/usr/bin/nuri-ai tools/pin_models.py
+	bash -n build_files/*.sh system_files/usr/libexec/nuri/* tools/*.sh
+	python3 -m py_compile system_files/usr/bin/nuri-ai system_files/usr/bin/nuri-assistant system_files/usr/lib/nuri/*.py tools/*.py
 
 build: lint
 	$(ENGINE) build -f Containerfile $(SECRET) \

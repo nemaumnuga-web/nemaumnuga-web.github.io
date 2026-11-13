@@ -8,17 +8,30 @@
 
 ARG FEDORA_VERSION=45
 ARG BASE_IMAGE=quay.io/fedora/fedora-kinoite
+# Same release Fedora 45 packages; bump together with tests.
+ARG LLAMA_CPP_TAG=b9840
 
 FROM scratch AS ctx
 COPY build_files /build_files
+
+# ---- llama.cpp server: CPU (all x86-64 variants) + Vulkan GPU, no ROCm bloat
+FROM quay.io/fedora/fedora:${FEDORA_VERSION} AS llama
+ARG LLAMA_CPP_TAG
+RUN --mount=type=bind,from=ctx,source=/build_files,target=/ctx \
+    --mount=type=cache,dst=/var/cache/libdnf5 \
+    --mount=type=secret,id=extra_ca \
+    bash /ctx/build-llama.sh "${LLAMA_CPP_TAG}"
+
+# ---- the OS image
 
 FROM ${BASE_IMAGE}:${FEDORA_VERSION}
 
 ARG FEDORA_VERSION
 ARG NURI_VERSION=dev
 
-# Files that ship as-is (CLI, systemd units, model registry, defaults).
+# Files that ship as-is (CLI, GUI, theme, systemd units, model registry).
 COPY system_files/ /
+COPY --from=llama /opt/nuri-llama /usr/libexec/nuri-llama
 
 # extra_ca is optional: only for building behind a TLS-intercepting proxy
 # (`--secret id=extra_ca,src=proxy-ca.pem`). It is never kept in the image.

@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CLI = ROOT / "system_files/usr/bin/nuri-ai"
+CLI = ROOT / "system_files/usr/lib/nuri/nuri_ai.py"
 REGISTRY = ROOT / "system_files/usr/share/nuri/models.json"
 
 BLOB = os.urandom(300_000)
