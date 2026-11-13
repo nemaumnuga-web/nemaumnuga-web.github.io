@@ -286,11 +286,20 @@ var $=function(id){return document.getElementById(id)};
 var LS={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}},set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 
 /* ---------- state ---------- */
+var DEFAULT_SYS=[
+"당신은 Liquid AI가 만든 LFM3 VL 2B 모델을 기반으로 한 AI 어시스턴트입니다. (Google Gemini, Gemma 등 다른 회사의 모델이 아닙니다.)",
+"- 사용자의 언어로 답하세요. 기본은 한국어입니다. 질문의 핵심에 먼저 답하고, 필요한 만큼만 자세히 설명하세요.",
+"- 확실하지 않은 내용은 추측하지 말고 모른다고 말하세요. 최신 뉴스, 가격, 수치는 웹 검색 결과가 주어졌을 때만 근거로 삼으세요.",
+"- 웹 검색 결과가 주어지면 그 내용을 근거로 답하고, 근거 문장 뒤에 [번호]로 출처를 표시하세요. 결과에 없는 내용은 덧붙이지 마세요.",
+"- 여러 항목을 비교하면 마크다운 표를 쓰세요. 표는 헤더 줄, 구분 줄(|---|---|), 데이터 줄 순서로 쓰고 모든 줄을 |로 시작하고 끝내세요.",
+"- 코드는 언어를 밝힌 코드 블록에 담으세요. 목록과 단계는 번호나 불릿으로 정리하세요.",
+"- 이 대화에서 사용자가 알려 준 이름, 선호, 약속 같은 정보는 기억해서 활용하세요."
+].join("\n");
 var cfg={
   api:LS.get("lfm.api",""),
   web:LS.get("lfm.web","0")==="1",
   key:LS.get("lfm.key",""),
-  sys:LS.get("lfm.sys","당신은 친절하고 정확한 AI 어시스턴트입니다. 사용자의 언어로 답하세요."),
+  sys:LS.get("lfm.sys2",DEFAULT_SYS),
   temp:LS.get("lfm.temp2",""),
   think:LS.get("lfm.think","1")==="1",
   vmodel:LS.get("lfm.vmodel","audio"),
@@ -313,7 +322,7 @@ var pendingImg=null, streaming=false, ctrl=null, filter="";
 })();
 
 function saveCfg(){
-  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");
+  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");
   LS.set("lfm.lang",cfg.lang);LS.set("lfm.voice",cfg.voice);LS.set("lfm.vmode",cfg.auto?"1":"0");LS.set("lfm.effort",cfg.effort);
 }
 function saveChats(){
@@ -459,6 +468,7 @@ var EFF={minimal:"Minimal",low:"Low",medium:"Medium",high:"High",xhigh:"Extra Hi
 function effLabel(){$("effLabel").textContent=(cfg.effort&&caps.levels.length)?(EFF[cfg.effort]||cfg.effort):(cfg.think?"":"추론 끔")}
 function apiMessages(c,extra){
   var arr=[],sys=cfg.sys.trim();
+  var d=new Date();sys="오늘 날짜: "+d.getFullYear()+"년 "+(d.getMonth()+1)+"월 "+d.getDate()+"일.\n"+sys;
   if(vc.on)sys+=(sys?" ":"")+"지금은 음성 대화 중입니다. 마크다운 없이 말하듯이 자연스럽게, 1~3문장으로 짧게 답하세요.";
   if(c.memory)sys+=(sys?"\n\n":"")+"지금까지 대화의 요약(이전 대화 내용):\n"+c.memory;
   if(extra)sys+=(sys?"\n\n":"")+extra;
@@ -474,12 +484,34 @@ function apiMessages(c,extra){
   return arr;
 }
 // 웹 검색: 서버의 /search(Bing 결과)로 검색하고, 결과를 시스템 메시지에 넣어 출처 번호로 답하게 한다
+// 한국어 질문 → 영어 웹 검색어 한 줄(모델이 만든다). 형식이 어긋나면 빈 문자열(한국어 검색만 함).
+function translateQuery(q){
+  var shots=[["아이폰 16 가격 알려줘","iPhone 16 price"],["서울 맛집 추천","best restaurants in Seoul"],
+             ["제미나이가 뭐야","Google Gemini AI"],["클로드 최신 모델","latest Claude model"]];
+  var msgs=[{role:"system",content:"Task: rewrite the user's text as a short English web search query (2-8 words). Output only the query."}];
+  shots.forEach(function(x){msgs.push({role:"user",content:"Question: "+x[0]});msgs.push({role:"assistant",content:x[1]})});
+  msgs.push({role:"user",content:"Question: "+q});
+  var body={model:"lfm3-vl",max_tokens:30,temperature:0,chat_template_kwargs:{enable_thinking:false},messages:msgs};
+  return fetch(base()+"/v1/chat/completions",{method:"POST",headers:headers(),body:JSON.stringify(body)})
+    .then(function(r){return r.ok?r.json():null})
+    .then(function(j){
+      var t=(j&&j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:"")||"";
+      t=t.split("</think>").pop().split("\n")[0].replace(/["'`]/g,"").trim().replace(/[?.!]+$/,"").trim();
+      var words=t.split(/\s+/).length;
+      if(!t||/[가-힣]/.test(t)||/[.!?]/.test(t)||words<2||words>8)return "";
+      return t;
+    })
+    .catch(function(){return ""});
+}
 function webSearch(c,a,paint){
   var last=null;for(var i=c.msgs.length-1;i>=0;i--){if(c.msgs[i].role==="user"){last=c.msgs[i];break}}
   var q=last&&last.text?last.text.trim():"";
   if(!q)return Promise.resolve(null);
   a.status="웹 검색 중…";paint();
-  return fetch(base()+"/search?q="+encodeURIComponent(q),{headers:headers(),signal:ctrl.signal})
+  var en=/[가-힣]/.test(q)?translateQuery(q):Promise.resolve("");
+  return en.then(function(e){
+    return fetch(base()+"/search?q="+encodeURIComponent(q)+(e?"&en="+encodeURIComponent(e):""),{headers:headers(),signal:ctrl.signal});
+  })
     .then(function(r){if(!r.ok)throw new Error("검색 서버 "+r.status);return r.json()})
     .then(function(j){
       a.status="";
