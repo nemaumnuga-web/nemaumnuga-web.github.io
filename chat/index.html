@@ -792,7 +792,7 @@ function deepResearch(c,a,paint,q){
     step("노트 정리 중 (0/"+read.length+")");
     return pmap(read,2,function(r){
       return llm([{role:"system",content:"You extract facts from a web page for a research question."},
-        {role:"user",content:"질문: "+qctx+"\n\n페이지 본문:\n"+r.content.slice(0,2400)+"\n\n위 본문에서 질문에 답하는 데 도움이 되는 사실을 한국어 불릿 3~6개로 쓰세요. 숫자·날짜·이름은 본문 그대로 쓰고, 본문에 없는 내용은 쓰지 마세요. 관련 내용이 없으면 '없음'이라고만 쓰세요."}],320)
+        {role:"user",content:"질문: "+qctx+"\n\n페이지 본문:\n"+r.content.slice(0,2400)+"\n\n위 본문에서 질문에 직접 답하는 사실만 한국어 불릿 3~6개로 쓰세요. 모든 문장은 한국어로 쓰고(영어 용어는 괄호 안에 한 번만), 숫자·날짜·이름은 본문 그대로 쓰세요. 본문에 없는 내용은 쓰지 마세요. 질문과 비슷하지만 다른 주제(예: 다른 종류의 제품·기술)이거나 관련 내용이 없으면 '없음'이라고만 쓰세요."}],320)
         .then(function(t){done++;upd("노트 정리 중 ("+done+"/"+read.length+")");return {r:r,t:t}})
         .catch(function(e){if(e.name==="AbortError")throw e;return {r:r,t:""}});
     }).then(function(res){
@@ -837,7 +837,7 @@ function deepResearch(c,a,paint,q){
     a.sources=used.concat(pages.filter(function(r){return used.indexOf(r)<0})).slice(0,16);
     step("보고서 작성 중 (출처 "+notes.length+"개)");
     a.deep=true;
-    return "아래는 딥 리서치 조사 노트입니다. 이 노트만 근거로 질문에 대한 상세한 보고서를 한국어로 쓰세요. 형식: 먼저 3문장 이내의 요약 → '## 핵심 내용'(불릿, 문장 끝에 [번호]) → '## 자세히'(소제목 여러 개, 각 소제목마다 근거와 [번호], 숫자·날짜는 노트 그대로) → '## 서로 다른 주장이나 불확실한 점'(출처끼리 다르거나 근거가 약한 내용을 구분해서) → '## 정리'. 노트에 없는 내용은 쓰지 마세요. 가능한 한 많은 출처를 활용하세요.\n\n"+
+    return "아래는 딥 리서치 조사 노트입니다. 이 노트만 근거로 질문에 대한 상세한 보고서를 한국어로 쓰세요. 형식: 먼저 3문장 이내의 요약 → '## 핵심 내용'(불릿, 문장 끝에 [번호]) → '## 자세히'(소제목 여러 개, 각 소제목마다 근거와 [번호], 숫자·날짜는 노트 그대로) → '## 서로 다른 주장이나 불확실한 점'(출처끼리 다르거나 근거가 약한 내용을 구분해서) → '## 정리'. 모든 문장은 자연스러운 한국어로 쓰고 영어 문장을 그대로 붙이지 마세요(필요한 영어 용어는 괄호 안에만). 질문과 직접 관련 없는 노트는 쓰지 마세요. 노트에 없는 내용은 쓰지 말고, 가능한 한 많은 출처를 활용하되 전체 분량은 1500~2200자로 하세요.\n\n"+
       notes.map(function(x){return "["+(a.sources.indexOf(x.r)+1)+"] "+x.r.title+" ("+x.r.url+")\n"+x.t}).join("\n\n");
   }).catch(function(e){
     if(e.name==="AbortError")throw e;
@@ -1118,7 +1118,7 @@ function run(c){
       if(cfg.temp!=="")body.temperature=cfg.temp;
       if(!cfg.think)body.chat_template_kwargs={enable_thinking:false};
       if(cfg.effort&&caps.levels.indexOf(cfg.effort)>=0)body.reasoning_effort=cfg.effort;
-      if(a.deep)body.max_tokens=2800;                       // 딥 리서치 보고서는 길게
+      if(a.deep)body.max_tokens=2400;                       // 딥 리서치 보고서는 길게
     }
     return fetch((isV&&!useVL?vbase():(useVL?nanoBase():modelBase(cmodel)))+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)});
   }).then(function(r){
