@@ -369,8 +369,11 @@ var LS={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}c
 /* ---------- 패치노트 ----------
  * ★ 이 파일을 고칠 때마다 APP_VERSION 을 1 올리고 PATCHES 맨 앞에 바뀐 내용을 추가하세요.
  *   그러면 사용자가 다음에 접속할 때 바뀐 부분이 팝업으로 뜹니다. 항목은 [제목, 설명] 쌍입니다. */
-var APP_VERSION=10;
+var APP_VERSION=11;
 var PATCHES=[
+ {v:11,date:"2026-11-14",title:"자동 선택이 똑똑해졌어요",items:[
+  ["작은 AI가 질문 난이도를 판단해요","Gemma 3 270M을 직접 만든 데이터로 학습시켜서, 질문이 쉬운지 어려운지 보고 나노와 미니 중에 골라 줘요. 키워드로 고르던 이전 방식보다 어려운 경계 사례에서 훨씬 정확해요."],
+  ["고민 상담·계획 같은 질문도 알아봐요","'코드', '분석' 같은 말이 없어도 신중한 추론이 필요한 질문은 미니로 보내요. 반대로 '분석 말고 수다 떨자'처럼 쉬운 말은 나노가 빠르게 답해요."]]},
  {v:10,date:"2026-11-14",title:"라온 나노 · 자동 모델 선택",items:[
   ["라온 나노가 돌아왔어요","이 컴퓨터에서 도는 설정을 찾아서 나노(약 14토큰/초)를 켰어요. 미니보다 약 3배 빨라요."],
   ["모델 고르기","모델 메뉴에서 자동 · 라온 나노 · 라온 미니 중에서 골라요."],
@@ -598,10 +601,16 @@ function chatName(){return cfg.chatm==="auto"?"자동 (라온)":(MODEL_NAME[cfg.
 // 자동 선택: 짧고 가벼운 질문은 빠른 나노(약 14토큰/초), 어려운 작업은 미니(약 5토큰/초)
 var HARD_RE=/분석|비교|설계|코드|프로그램|알고리즘|증명|계산|논리|논문|보고서|전략|장단점|왜 |이유|원인|자세히|단계별|구현|디버그|오류|에러|refactor|explain|analy|compare|design|code|proof/i;
 function pickModel(c,hasCtx){
-  if(cfg.chatm!=="auto")return cfg.chatm;
+  if(cfg.chatm!=="auto")return Promise.resolve(cfg.chatm);
   var u=lastUser(c),t=(u&&u.text)||"";
-  if(cfg.deep||cfg.canvas||hasCtx||(u&&u.img)||t.length>=160||HARD_RE.test(t))return "mini";
-  return "nano";
+  if(cfg.deep||cfg.canvas||hasCtx||(u&&u.img))return Promise.resolve("mini");           // 이런 작업은 항상 미니
+  var fallback=(t.length>=160||HARD_RE.test(t))?"mini":"nano";                       // 라우터가 안 되면 키워드 규칙
+  if(!t)return Promise.resolve("nano");
+  var ac=new AbortController(),to=setTimeout(function(){ac.abort()},2500);
+  return fetch(base()+"/route",{method:"POST",headers:headers(),signal:ac.signal,body:JSON.stringify({text:t.slice(0,600)})})
+    .then(function(r){return r.ok?r.json():null})
+    .then(function(j){clearTimeout(to);return (j&&(j.model==="mini"||j.model==="nano"))?j.model:fallback})
+    .catch(function(){clearTimeout(to);return fallback});
 }
 function vbase(){return base()+"/voice"}      // 음성 서버(LFM3 Audio)는 같은 주소의 /voice 경로
 function headers(){var h={"Content-Type":"application/json"};if(cfg.key)h["Authorization"]="Bearer "+cfg.key;return h}
@@ -995,8 +1004,11 @@ function run(c){
   }
   if(!cfg.api){a.err="서버 주소가 설정되지 않았습니다. 왼쪽 아래 ⚙️ 설정에서 입력하세요.";return done()}
   Promise.resolve().then(function(){ return gather(c,a,paint,isV) }).then(function(ctx){
+    return isV?[ctx,"mini"]:pickModel(c,!!ctx).then(function(m){return [ctx,m]});
+  }).then(function(pair){
+    var ctx=pair[0],cmodel=pair[1];
     a.status="";
-    var cmodel=isV?"mini":pickModel(c,!!ctx);a.model=isV?undefined:cmodel;
+    a.model=isV?undefined:cmodel;
     var body={model:isV&&!useVL?"lfm3-audio":"raon-"+cmodel,messages:apiMessages(c,ctx),stream:true};
     if(isV){
       body.max_tokens=150;                                  // 음성 답변은 짧게(반복 루프 방지)
