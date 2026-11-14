@@ -83,6 +83,8 @@ export XDG_RUNTIME_DIR=$RUN/xdg; mkdir -p -m 700 \$XDG_RUNTIME_DIR
 export LANG=\${LANG:-ko_KR.UTF-8} LC_ALL=\${LANG:-ko_KR.UTF-8}
 export XDG_CURRENT_DESKTOP=KDE KDE_FULL_SESSION=true QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1
 export QT_QPA_PLATFORMTHEME=kde
+# a container restart leaves the old X lock behind and Xvfb then refuses to start
+pgrep -x Xvfb >/dev/null || rm -f /tmp/.X${DISPLAY_NUM#:}-lock /tmp/.X11-unix/X${DISPLAY_NUM#:}
 Xvfb $DISPLAY_NUM -screen 0 ${W}x${H}x24 -nolisten tcp > $RUN/xvfb.log 2>&1 &
 sleep 2
 DISPLAY=$DISPLAY_NUM weston --backend=x11 --renderer=pixman --width=$W --height=$H \\
