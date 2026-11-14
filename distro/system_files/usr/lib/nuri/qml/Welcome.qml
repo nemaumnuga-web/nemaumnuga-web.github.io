@@ -6,9 +6,9 @@ import QtQuick.Controls.Basic
 Window {
     id: win
     width: 900
-    height: 640
-    minimumWidth: 760
-    minimumHeight: 560
+    height: 680
+    minimumWidth: 780
+    minimumHeight: 620
     visible: false
     title: bridge.t.title
     color: ui.card
@@ -84,13 +84,17 @@ Window {
         MouseArea { id: m; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     onClicked: parent.picked() }
     }
-    component InfoRow: Row {
+    component InfoRow: Rectangle {
         property string art
         property alias text: tx.text
-        spacing: 16
         width: parent.width
-        Image { width: 44; height: 44; sourceSize: Qt.size(88, 88); source: parent.art }
-        Text { id: tx; width: parent.width - 60; anchors.verticalCenter: parent.verticalCenter
+        height: Math.max(44, tx.implicitHeight) + 24
+        radius: 16
+        color: ui.surface
+        border.color: ui.border
+        Image { x: 14; anchors.verticalCenter: parent.verticalCenter
+                width: 40; height: 40; sourceSize: Qt.size(80, 80); source: parent.art }
+        Text { id: tx; x: 68; width: parent.width - 84; anchors.verticalCenter: parent.verticalCenter
                font.pixelSize: 15; color: ui.text; wrapMode: Text.Wrap; lineHeight: 1.2 }
     }
 
@@ -120,6 +124,8 @@ Window {
         id: stage
         anchors { left: parent.left; right: parent.right; top: parent.top; bottom: footer.top }
         anchors.margins: 40
+        anchors.topMargin: 30
+        anchors.bottomMargin: 26
 
         // 1. hello ----------------------------------------------------------
         Page {
@@ -157,7 +163,7 @@ Window {
                         }
                     }
                 }
-                Text { width: Math.min(parent.width, 520); anchors.horizontalCenter: parent.horizontalCenter
+                Text { width: Math.min(parent.width, 640); anchors.horizontalCenter: parent.horizontalCenter
                        horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; lineHeight: 1.25
                        text: bridge.t.hello_sub; font.pixelSize: 15; color: ui.sub }
             }
@@ -167,8 +173,9 @@ Window {
         Page {
             name: "ai"
             Column {
+                anchors.verticalCenter: parent.verticalCenter
                 width: parent.width
-                spacing: 22
+                spacing: 18
                 Heading { title: bridge.t.ai_title; sub: bridge.t.ai_sub; art: win.icon("apps", "nuri-assistant") }
                 Flow {
                     width: parent.width
@@ -225,9 +232,10 @@ Window {
         Page {
             name: "look"
             Column {
+                anchors.verticalCenter: parent.verticalCenter
                 width: parent.width
-                spacing: 26
-                Heading { title: bridge.t.look_title; sub: bridge.t.look_sub }
+                spacing: 22
+                Heading { title: bridge.t.look_title; sub: bridge.t.look_sub; art: win.icon("apps", "preferences-desktop-theme") }
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 28
@@ -313,9 +321,10 @@ Window {
         Page {
             name: "comfort"
             Column {
+                anchors.verticalCenter: parent.verticalCenter
                 width: parent.width
-                spacing: 30
-                Heading { title: bridge.t.comfort_title; sub: bridge.t.comfort_sub }
+                spacing: 22
+                Heading { title: bridge.t.comfort_title; sub: bridge.t.comfort_sub; art: win.icon("apps", "preferences-desktop-mouse") }
                 Repeater {
                     model: [
                         { label: bridge.t.btn_side, a: bridge.t.btn_left, b: bridge.t.btn_right, key: "buttons" },
@@ -370,13 +379,15 @@ Window {
         Page {
             name: "windows"
             Column {
+                anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(parent.width, 600)
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 22
+                spacing: 12
                 Heading { title: bridge.t.win_title; sub: bridge.t.win_sub; art: win.icon("apps", "nuri-windows-apps") }
                 InfoRow { art: win.icon("places", "folder-download"); text: bridge.t.win_exe }
                 InfoRow { art: win.icon("apps", "plasma-discover"); text: bridge.t.win_bottles }
                 InfoRow { art: win.icon("apps", "utilities-terminal"); text: bridge.t.win_steam }
+                Item { width: 1; height: 4 }
                 PillButton { anchors.horizontalCenter: parent.horizontalCenter; theme: ui; primary: true
                              icon: "download"; text: bridge.t.win_get; onClicked: bridge.open("bottles") }
             }
@@ -386,9 +397,10 @@ Window {
         Page {
             name: "input"
             Column {
+                anchors.verticalCenter: parent.verticalCenter
                 width: parent.width
                 spacing: 28
-                Heading { title: bridge.t.input_title; sub: bridge.t.input_sub }
+                Heading { title: bridge.t.input_title; sub: bridge.t.input_sub; art: win.icon("apps", "preferences-desktop-keyboard") }
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 18
@@ -419,30 +431,14 @@ Window {
         Page {
             name: "privacy"
             Column {
+                anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(parent.width, 600)
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 24
-                Heading { title: bridge.t.priv_title; sub: "" }
-                Rectangle {
-                    width: parent.width; height: privA.height + 36; radius: 16; color: ui.surface; border.color: ui.border
-                    Row {
-                        id: privA; x: 18; y: 18; spacing: 16; width: parent.width - 36
-                        Rectangle { width: 44; height: 44; radius: 12; color: ui.accentSoft
-                                    Icon { anchors.centerIn: parent; name: "lock"; color: ui.accent; size: 22 } }
-                        Text { width: parent.width - 60; anchors.verticalCenter: parent.verticalCenter
-                               text: bridge.t.priv_ai; wrapMode: Text.Wrap; color: ui.text; font.pixelSize: 15 }
-                    }
-                }
-                Rectangle {
-                    width: parent.width; height: privB.height + 36; radius: 16; color: ui.surface; border.color: ui.border
-                    Row {
-                        id: privB; x: 18; y: 18; spacing: 16; width: parent.width - 36
-                        Image { width: 44; height: 44; sourceSize: Qt.size(88, 88); source: win.icon("apps", "system-software-update") }
-                        Text { width: parent.width - 60; anchors.verticalCenter: parent.verticalCenter
-                               text: bridge.t.priv_upd; wrapMode: Text.Wrap; color: ui.text; font.pixelSize: 15
-                               lineHeight: 1.2 }
-                    }
-                }
+                spacing: 16
+                Heading { title: bridge.t.priv_title; sub: ""; art: win.icon("apps", "preferences-security") }
+                InfoRow { art: win.icon("apps", "nuri-assistant"); text: bridge.t.priv_ai }
+                InfoRow { art: win.icon("apps", "system-software-update"); text: bridge.t.priv_upd }
+                Item { width: 1; height: 4 }
                 PillButton { anchors.horizontalCenter: parent.horizontalCenter; theme: ui
                              icon: "download"; text: bridge.t.priv_check; onClicked: bridge.open("updates") }
             }
@@ -452,6 +448,7 @@ Window {
         Page {
             name: "done"
             Column {
+                anchors.verticalCenter: parent.verticalCenter
                 width: parent.width
                 spacing: 24
                 Heading { title: bridge.t.done_title; sub: bridge.t.done_sub; art: win.icon("apps", "nuri-welcome") }

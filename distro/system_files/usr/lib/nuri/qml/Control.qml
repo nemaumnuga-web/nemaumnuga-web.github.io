@@ -63,17 +63,30 @@ Window {
         signal moved(int v)
         height: 74; radius: 18; color: ui.tile
         Text { x: 16; y: 12; text: st.label; color: ui.text; font.pixelSize: 13; font.weight: Font.DemiBold }
+        Text { anchors.right: parent.right; anchors.rightMargin: 16; y: 13; text: st.value + "%"
+               color: ui.sub; font.pixelSize: 12 }
         Rectangle {
             id: track
             x: 14; y: 38; width: parent.width - 28; height: 24; radius: 12
             color: ui.tileOff
+            // filled part in the accent colour, with a white knob at its end
             Rectangle {
+                id: fill
                 width: Math.max(height, parent.width * st.value / 100); height: parent.height; radius: 12
-                color: ui.dark ? "#ececf4" : "#ffffff"
-                border.color: ui.dark ? "transparent" : "#1a000000"
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0; color: Qt.lighter(ui.accent, 1.25) }
+                    GradientStop { position: 1; color: ui.accent }
+                }
                 Behavior on width { NumberAnimation { duration: 90 } }
+                Rectangle {
+                    anchors.right: parent.right; anchors.rightMargin: 2; anchors.verticalCenter: parent.verticalCenter
+                    width: 20; height: 20; radius: 10; color: "white"
+                    border.color: "#22000000"
+                }
             }
-            Icon { x: 6; anchors.verticalCenter: parent.verticalCenter; name: st.icon; size: 14; color: "#6a6d80" }
+            Icon { x: 6; anchors.verticalCenter: parent.verticalCenter; name: st.icon; size: 14
+                   color: fill.width > 30 ? "white" : ui.sub }
             MouseArea {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                 function set(mx) { st.moved(Math.round(Math.max(0, Math.min(1, mx / width)) * 100)) }
@@ -226,12 +239,16 @@ Window {
             Rectangle {
                 width: parent.width; height: 74; radius: 18; color: ui.tile
                 Row {
+                    id: gauges
                     anchors.centerIn: parent
+                    width: parent.width - 36
                     spacing: 18
-                    Gauge { label: bridge.t.cpu; value: bridge.stats.cpu + "%"; frac: bridge.stats.cpu / 100 }
-                    Gauge { label: bridge.t.memory; value: bridge.stats.ram_used + " / " + bridge.stats.ram_total + " GB"
+                    readonly property real cell: (width - 2 * spacing) / 3
+                    Gauge { width: gauges.cell; label: bridge.t.cpu; value: bridge.stats.cpu + "%"; frac: bridge.stats.cpu / 100 }
+                    Gauge { width: gauges.cell; label: bridge.t.memory; value: bridge.stats.ram_used + " / " + bridge.stats.ram_total + " GB"
                             frac: bridge.stats.ram_frac }
                     Gauge {
+                        width: gauges.cell
                         label: bridge.stats.battery >= 0 ? bridge.t.battery : bridge.t.model
                         value: bridge.stats.battery >= 0
                                ? bridge.stats.battery + "%" + (bridge.stats.charging ? " ⚡" : "")

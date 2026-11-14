@@ -209,6 +209,43 @@ ICONS["about"] = (["nuri-about"], app(
     '<path d="M54 84h20l3 10H51z" fill="#9aa1b2"/><rect x="44" y="93" width="40" height="4" rx="2" fill="#7c8496"/>',
     lg("scr", "#6d7bff", "#e46fb3", mid=("0.55", "#8f5cf6"))))
 
+ICONS["theme"] = (["preferences-desktop-theme", "preferences-desktop-theme-global", "preferences-desktop-color"], app(
+    "#fbcfe8", "#a855f7",
+    # a painter's palette with five paint dots and a brush
+    '<path d="M64 28c-21 0-38 15-38 34 0 18 15 31 30 31 6 0 8-3.6 8-7.2 0-4.8-4-6-4-10.4 0-4 3.2-6.4 7.4-6.4h9.6'
+    'c13 0 25-8 25-20C102 37 85 28 64 28z" fill="#fff"/>'
+    '<circle cx="45" cy="60" r="6.5" fill="#fb5f57"/><circle cx="52" cy="44" r="6.5" fill="#fdbc2f"/>'
+    '<circle cx="69" cy="39" r="6.5" fill="#2ac840"/><circle cx="85" cy="48" r="6.5" fill="#3b82f6"/>'
+    '<path d="M97 70 80 96" stroke="#6b3fa0" stroke-width="5" stroke-linecap="round"/>'
+    '<path d="M80 96c-3 4-8 5-11 3 2-2 2-6 5-8 2-1.6 5-.6 6 5z" fill="#6b3fa0"/>'))
+
+ICONS["comfort"] = (["preferences-desktop-mouse", "preferences-desktop-accessibility", "preferences-desktop"], app(
+    "#99f6e4", "#0d9488",
+    # a mouse pointer over a small window title bar with three dots
+    '<rect x="24" y="30" width="66" height="46" rx="9" fill="#fff" fill-opacity=".9"/>'
+    '<rect x="24" y="30" width="66" height="13" rx="6.5" fill="#ccfbf1"/>'
+    '<circle cx="33" cy="36.5" r="3" fill="#fb5f57"/><circle cx="42" cy="36.5" r="3" fill="#fdbc2f"/>'
+    '<circle cx="51" cy="36.5" r="3" fill="#2ac840"/>'
+    '<path d="M62 54v42l10-10 7 15 8-4-7-14h14z" fill="#134e4a" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>'))
+
+ICONS["keyboard"] = (["preferences-desktop-keyboard", "org.fcitx.Fcitx5", "fcitx", "input-keyboard-app"], app(
+    "#fde68a", "#f97316",
+    # a keycap showing 가 and A
+    '<rect x="26" y="34" width="76" height="62" rx="14" fill="#9a3412" fill-opacity=".35"/>'
+    '<rect x="26" y="28" width="76" height="62" rx="14" fill="#fff"/>'
+    '<text x="50" y="72" font-family="Noto Sans CJK KR, sans-serif" font-size="30" font-weight="700" '
+    'fill="#ea580c" text-anchor="middle">가</text>'
+    '<text x="82" y="70" font-family="Noto Sans, sans-serif" font-size="20" font-weight="700" '
+    'fill="#fdba74" text-anchor="middle">A</text>'))
+
+ICONS["privacy"] = (["preferences-security", "security-high", "preferences-system-privacy"], app(
+    "#86efac", "#16a34a",
+    # a shield with a keyhole lock
+    '<path d="M64 26 96 38v24c0 20-13 34-32 41-19-7-32-21-32-41V38z" fill="#fff"/>'
+    '<rect x="50" y="56" width="28" height="24" rx="6" fill="#15803d"/>'
+    '<path d="M55 57v-6a9 9 0 0 1 18 0v6" fill="none" stroke="#15803d" stroke-width="5"/>'
+    '<circle cx="64" cy="66" r="3.4" fill="#fff"/><path d="M64 68v6" stroke="#fff" stroke-width="3" stroke-linecap="round"/>'))
+
 # Trash: a frosted glass bin (no tile), like a real object on the dock.
 def trash(full):
     ribs = "".join('<path d="M%d 50l%s 50" stroke="#8b93a7" stroke-opacity=".45" stroke-width="2.4" stroke-linecap="round"/>'

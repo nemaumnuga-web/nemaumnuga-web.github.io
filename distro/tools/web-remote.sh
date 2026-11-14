@@ -44,32 +44,35 @@ for name, ctx in (("system-file-manager", "apps"), ("nuri-assistant", "apps"), (
     r = QSvgRenderer(base + ctx + "/" + name + ".svg")
     if not r.isValid():
         continue
-    img = QImage(48, 48, QImage.Format.Format_ARGB32_Premultiplied)
+    # transparent margin around the tile so dock icons do not touch each other
+    img = QImage(40, 40, QImage.Format.Format_ARGB32_Premultiplied)
     img.fill(0)
     p = QPainter(img); p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    r.render(p, QRectF(0, 0, 48, 48)); p.end()
+    r.render(p, QRectF(4, 4, 32, 32)); p.end()
     img.save(os.path.join(sys.argv[1], name + ".png"))
 PY
 
-launcher() {  # icon-name command...
+launcher() {  # icon-name tooltip command...
     [ -f "$ICONS/$1.png" ] || return 0
-    command -v "${2%% *}" >/dev/null || return 0
-    printf '\n[launcher]\nicon=%s\npath=%s\n' "$ICONS/$1.png" "$2"
+    command -v "${3%% *}" >/dev/null || return 0
+    printf '\n[launcher]\nicon=%s\ndisplayname=%s\npath=%s\n' "$ICONS/$1.png" "$2" "$3"
 }
 WALL=/usr/share/wallpapers/Nuri/contents/images/1920x1080.jpg
 {
     printf '[core]\nshell=desktop\nidle-time=0\n\n'
     printf '[shell]\nbackground-image=%s\nbackground-type=scale-crop\n' "$WALL"
-    printf 'panel-position=bottom\npanel-color=0xccf4f5fa\nclock-format=minutes\nlocking=false\nanimation=zoom\n'
-    launcher system-file-manager "/usr/bin/dolphin"
-    launcher nuri-assistant "/usr/bin/nuri-assistant"
-    launcher utilities-terminal "/usr/bin/konsole"
-    launcher accessories-text-editor "/usr/bin/kwrite"
-    launcher org.kde.gwenview "/usr/bin/gwenview"
-    launcher nuri-control "/usr/bin/nuri-control"
-    launcher nuri-about "/usr/bin/nuri-about"
-    launcher nuri-welcome "/usr/bin/nuri-welcome"
-    launcher preferences-system "/usr/bin/systemsettings"
+    printf 'panel-position=bottom\npanel-color=0xb8f4f5fa\nclock-format=minutes\nlocking=false\nanimation=zoom\n'
+    launcher system-file-manager "파일 (Files)" "/usr/bin/dolphin"
+    launcher nuri-assistant "누리 AI" "/usr/bin/nuri-assistant"
+    launcher utilities-terminal "터미널 (Terminal)" "/usr/bin/konsole"
+    launcher accessories-text-editor "텍스트 편집기 (Editor)" "/usr/bin/kwrite"
+    launcher org.kde.gwenview "사진 (Photos)" "/usr/bin/gwenview"
+    launcher nuri-control "제어 센터 (Control Center)" "/usr/bin/nuri-control"
+    launcher nuri-about "이 컴퓨터에 관하여 (About)" "/usr/bin/nuri-about"
+    launcher nuri-welcome "누리 환영 (Welcome)" "/usr/bin/nuri-welcome"
+    launcher preferences-system "시스템 설정 (Settings)" "/usr/bin/systemsettings"
+    # no on-screen keyboard: it popped up over every text field in the browser view
+    printf '\n[input-method]\npath=\n'
 } > "$RUN/weston.ini"
 
 # VNC password file (x11vnc's own format), readable by the session user only
