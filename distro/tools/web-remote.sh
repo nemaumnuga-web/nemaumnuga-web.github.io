@@ -90,8 +90,12 @@ DISPLAY=$DISPLAY_NUM weston --backend=x11 --renderer=pixman --width=$W --height=
 sleep 3
 export WAYLAND_DISPLAY=wayland-nuri QT_QPA_PLATFORM=wayland
 dbus-update-activation-environment --all 2>/dev/null || true
-x11vnc -display $DISPLAY_NUM -rfbauth $RUN/passwd -rfbport $VNC_PORT -localhost -forever -shared \\
-    -noxdamage -quiet > $RUN/x11vnc.log 2>&1 &
+# restarted if it ever exits, so a dropped viewer never leaves the page unable to connect
+(while true; do
+    x11vnc -display $DISPLAY_NUM -rfbauth $RUN/passwd -rfbport $VNC_PORT -localhost -forever -shared \\
+        -noxdamage -o $RUN/x11vnc.log > /dev/null 2>&1
+    sleep 1
+done) &
 websockify --web /usr/share/novnc 127.0.0.1:$WEB_PORT 127.0.0.1:$VNC_PORT > $RUN/websockify.log 2>&1 &
 sleep 2
 nuri-welcome > $RUN/welcome.log 2>&1 &
