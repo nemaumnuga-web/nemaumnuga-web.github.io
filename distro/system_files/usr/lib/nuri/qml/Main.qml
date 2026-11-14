@@ -1,6 +1,6 @@
 // Nuri AI - main window: Spotlight-style chat panel + model library.
-// Uses only QtQuick, QtQuick.Controls.Basic and QtQuick.Shapes, and no shader
-// effects, so it renders the same on any GPU and with the software renderer.
+// Uses only QtQuick and QtQuick.Controls.Basic, no shader effects, and SVG images
+// for vector art, so it renders the same on any GPU and with the software renderer.
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
@@ -220,11 +220,11 @@ Window {
                 states: State {
                     name: "library"
                     when: win.page === "library"
-                    PropertyChanges { target: chatPage; x: bridge.softwareRender ? 0 : -50; opacity: 0 }
+                    PropertyChanges { target: chatPage; x: -50; opacity: 0 }
                     PropertyChanges { target: libPage; x: 0; opacity: 1 }
                 }
                 transitions: Transition {
-                    NumberAnimation { properties: "x,opacity"; duration: bridge.softwareRender ? 0 : 280; easing.type: Easing.OutCubic }
+                    NumberAnimation { properties: "x,opacity"; duration: 280; easing.type: Easing.OutCubic }
                 }
 
                 // ================================================= chat page
@@ -572,7 +572,7 @@ Window {
                 // ================================================= library page
                 Item {
                     id: libPage
-                    x: bridge.softwareRender ? 0 : pages.width
+                    x: pages.width
                     opacity: 0
                     width: pages.width
                     height: pages.height

@@ -1,7 +1,8 @@
-// Line icon drawn from an SVG path on a 24x24 grid, tinted by `color`.
+// Line icon on a 24x24 grid, tinted by `color`, drawn as an SVG image.
+// (An Image, not a Shape: images are clipped correctly by every scene-graph
+// renderer, including the software one used without a GPU.)
 // All icons are original simple geometry (no third-party icon set).
 import QtQuick
-import QtQuick.Shapes
 
 Item {
     id: root
@@ -34,17 +35,25 @@ Item {
         "warn": "M12 4l9 15.5H3z M12 10v4 M12 17h.01"
     })
 
-    Shape {
+    function hex(c) {
+        function h(v) { var s = Math.round(v * 255).toString(16); return s.length < 2 ? "0" + s : s }
+        return "#" + h(c.r) + h(c.g) + h(c.b)
+    }
+
+    Image {
         anchors.fill: parent
-        preferredRendererType: Shape.CurveRenderer
-        transform: Scale { xScale: root.size / 24; yScale: root.size / 24 }
-        ShapePath {
-            strokeColor: root.filled ? "transparent" : root.color
-            strokeWidth: root.stroke
-            fillColor: root.filled ? root.color : "transparent"
-            capStyle: ShapePath.RoundCap
-            joinStyle: ShapePath.RoundJoin
-            PathSvg { path: root.paths[root.name] || "" }
-        }
+        smooth: true
+        mipmap: true
+        sourceSize.width: Math.ceil(root.size * 2)
+        sourceSize.height: Math.ceil(root.size * 2)
+        visible: !!root.paths[root.name]
+        source: !root.paths[root.name] ? "" : "data:image/svg+xml;utf8," + encodeURIComponent(
+            "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>"
+            + "<path d='" + (root.paths[root.name] || "") + "' "
+            + (root.filled
+               ? "fill='" + root.hex(root.color) + "' fill-opacity='" + root.color.a + "' stroke='none'"
+               : "fill='none' stroke='" + root.hex(root.color) + "' stroke-opacity='" + root.color.a
+                 + "' stroke-width='" + root.stroke + "' stroke-linecap='round' stroke-linejoin='round'")
+            + "/></svg>")
     }
 }

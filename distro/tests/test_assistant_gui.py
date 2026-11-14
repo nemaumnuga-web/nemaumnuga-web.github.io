@@ -83,7 +83,7 @@ class AssistantGuiTest(unittest.TestCase):
         self.assertGreaterEqual(w, min_w)
         self.assertGreaterEqual(h, min_h)
 
-    QML_ERRORS = ("TypeError", "ReferenceError", "is not defined", "Cannot assign", "Unable to assign",
+    QML_ERRORS = ("TypeError", "ReferenceError", "is not defined", "Cannot assign", "Unable to assign", "qt.svg",
                   "failed to load", "Type error", "Binding loop", ".qml:")
 
     def assert_clean(self, proc):

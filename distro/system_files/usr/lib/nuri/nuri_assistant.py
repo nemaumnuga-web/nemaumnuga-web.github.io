@@ -242,12 +242,6 @@ class Bridge(QObject):
     def t(self):
         return TXT[lang_key()]
 
-    @pyqtProperty(bool, constant=True)
-    def softwareRender(self):
-        """True without GPU rendering: the UI then fades instead of sliding
-        (the software renderer leaves trails when vector shapes move)."""
-        return QQuickWindow.sceneGraphBackend() == "software" or os.environ.get("QT_QUICK_BACKEND") == "software"
-
     @pyqtProperty(str, constant=True)
     def lang(self):
         return core.ui_lang()
