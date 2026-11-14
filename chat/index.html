@@ -796,7 +796,7 @@ function deepResearch(c,a,paint,q){
     step("노트 정리 중 (0/"+read.length+")");
     return pmap(read,2,function(r){
       return llm([{role:"system",content:"You extract facts from a web page for a research question."},
-        {role:"user",content:"질문: "+qctx+"\n\n페이지 본문:\n"+r.content.slice(0,2400)+"\n\n위 본문에서 질문에 직접 답하는 사실만 한국어 불릿 3~6개로 쓰세요. 모든 문장은 한국어로 쓰고(영어 용어는 괄호 안에 한 번만), 숫자·날짜·이름은 본문 그대로 쓰세요. 본문에 없는 내용은 쓰지 마세요. 질문과 비슷하지만 다른 주제(예: 다른 종류의 제품·기술)이거나 관련 내용이 없으면 '없음'이라고만 쓰세요."}],320)
+        {role:"user",content:"질문: "+qctx+"\n\n페이지 본문:\n"+r.content.slice(0,1600)+"\n\n위 본문에서 질문에 직접 답하는 사실만 한국어 불릿 3~6개로 쓰세요. 모든 문장은 한국어로 쓰고(영어 용어는 괄호 안에 한 번만), 숫자·날짜·이름은 본문 그대로 쓰세요. 본문에 없는 내용은 쓰지 마세요. 질문과 비슷하지만 다른 주제(예: 다른 종류의 제품·기술)이거나 관련 내용이 없으면 '없음'이라고만 쓰세요."}],220)
         .then(function(t){
           // 영어가 그대로 섞인 불릿(3단어 이상 연속 영어)은 버린다
           t=t.split("\n").filter(function(l){return !/[A-Za-z]{3,}(\s+[A-Za-z]{2,}){2,}/.test(l)}).join("\n").trim();
@@ -826,7 +826,7 @@ function deepResearch(c,a,paint,q){
   }).then(function(fresh){
     end("1단계 검색 완료: 페이지 "+pages.length+"개 중 "+fresh.filter(function(r){return r.content&&r.content.length>150}).length+"개 본문을 읽었어요");
     a.sources=pages.slice(0,12);paint();
-    return takeNotes(fresh,10);
+    return takeNotes(fresh,8);
   }).then(function(){
     // 2단계: 지금까지의 노트에서 빠진 부분을 스스로 찾는다
     if(!notes.length)return null;
@@ -839,7 +839,7 @@ function deepResearch(c,a,paint,q){
       step("검색하고 페이지 읽는 중 (0/"+qs.length+")");
       return runSearch(qs,2).then(function(fresh){
         end("2단계 검색 완료: 새 페이지 "+fresh.length+"개");a.sources=notes.map(function(x){return x.r}).concat(pages.filter(function(r){return !notes.some(function(x){return x.r===r})})).slice(0,14);paint();
-        return takeNotes(fresh,6);
+        return takeNotes(fresh,4);
       });
     }).catch(function(e){if(e.name==="AbortError")throw e;});
   }).then(function(){
