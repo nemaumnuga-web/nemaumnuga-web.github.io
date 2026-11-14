@@ -29,3 +29,7 @@ PACKAGES=(
 )
 
 dnf5 -y install --setopt=install_weak_deps=False "${PACKAGES[@]}"
+
+# Fedora's first-login "Welcome" app (Fedora/KDE branding) is replaced by
+# nuri-welcome, which autostarts once from /etc/xdg/autostart.
+dnf5 -y remove plasma-welcome plasma-welcome-fedora

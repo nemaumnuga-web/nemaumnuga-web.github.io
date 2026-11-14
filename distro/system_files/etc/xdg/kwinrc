@@ -1,8 +1,9 @@
 # Nuri OS system defaults (users can still change everything in System Settings)
 
 [org.kde.kdecoration2]
-library=org.kde.breeze
-theme=Breeze
+# Nuri title bars: traffic-light buttons, unified title bar (Aurorae theme)
+library=org.kde.kwin.aurorae
+theme=__aurorae__svg__Nuri
 # close, minimise, maximise on the left
 ButtonsOnLeft=XIA
 ButtonsOnRight=

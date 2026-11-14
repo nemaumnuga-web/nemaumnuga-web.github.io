@@ -6,10 +6,10 @@ ColorScheme=Nuri
 AccentColor=99,102,241
 
 [kdeglobals][Icons]
-Theme=breeze
+Theme=Nuri
 
 [plasmarc][Theme]
-name=default
+name=Nuri
 
 [Wallpaper]
 Image=Nuri
@@ -21,8 +21,8 @@ cursorTheme=breeze_cursors
 LayoutName=org.kde.breeze.desktop
 
 [kwinrc][org.kde.kdecoration2]
-library=org.kde.breeze
-theme=Breeze
+library=org.kde.kwin.aurorae
+theme=__aurorae__svg__Nuri
 ButtonsOnLeft=XIA
 ButtonsOnRight=
 

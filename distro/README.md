@@ -3,6 +3,21 @@
 KDE Plasma 데스크톱에 **PC 안에서만 동작하는 AI 비서**를 넣은 리눅스 배포판이에요.
 Fedora Kinoite(atomic KDE)를 기반으로 하고, OS 전체를 컨테이너 이미지 하나로 만들어 배포해요.
 
+![누리 데스크톱 (합성 미리보기)](docs/screenshots/desktop-light.png)
+
+> 위 데스크톱 그림은 **합성 미리보기**예요. 창 테두리·신호등 버튼, 유리 상단 바·독, 실행 중 표시,
+> 아이콘, 배경화면은 실제 테마 파일을 KDE의 SVG 엔진(KSvg)으로 그린 것이고, 창 안의 내용과 메뉴
+> 글자는 꾸민 장면이에요. 실행 중인 데스크톱을 캡처한 화면이 아니에요(아래 "알려진 한계").
+
+| 어둡게 | 직접 그린 아이콘 |
+|---|---|
+| ![어두운 데스크톱](docs/screenshots/desktop-dark.png) | ![누리 아이콘](docs/screenshots/icons.png) |
+
+| 첫 로그인 안내 "누리 시작 안내" | |
+|---|---|
+| ![인사](docs/screenshots/welcome-hello.png) | ![AI 모델 고르기](docs/screenshots/welcome-ai.png) |
+| ![모양 고르기](docs/screenshots/welcome-look.png) | ![편하게 쓰기](docs/screenshots/welcome-comfort.png) |
+
 | AI 패널 (`Meta+Space`) | 실제 답변 (Qwen3.5 4B, CPU) |
 |---|---|
 | ![AI 패널 첫 화면](docs/screenshots/empty-light.png) | ![AI 답변](docs/screenshots/chat-light.png) |
@@ -13,7 +28,8 @@ Fedora Kinoite(atomic KDE)를 기반으로 하고, OS 전체를 컨테이너 이
 |---|---|
 | ![밝은 배경화면](docs/screenshots/wallpaper-light.jpg) ![어두운 배경화면](docs/screenshots/wallpaper-dark.jpg) | ![스플래시](docs/screenshots/splash.png) |
 
-모든 그림(로고, 아이콘, 배경화면, 스플래시)은 이 저장소의 코드로 직접 생성해요(`make art`).
+모든 그림(로고, 앱·폴더 아이콘 85개, 창 테두리, 패널, 배경화면, 스플래시)은 이 저장소의 코드로 직접 생성해요(`make art`).
+다른 아이콘 세트나 맥의 그림은 쓰지 않았어요.
 
 > 이름 "Nuri"는 임시 코드네임이에요. 공개 전에 상표 검색을 하고 확정하세요.
 > 이름은 `build_files/20-branding.sh`, `Containerfile`, `nuri-ai`의 문구에 있어요.
@@ -31,6 +47,10 @@ Fedora Kinoite(atomic KDE)를 기반으로 하고, OS 전체를 컨테이너 이
 | **누리 로고·아이콘**, **로그인 스플래시**(단계별 진행 막대), **누리 색 테마**(밝게/어둡게), 배경화면 "Silk" | 렌더링 확인 (데스크톱 적용은 실기 미검증) |
 | **Dolphin 우클릭 메뉴**: 텍스트 파일 요약·설명·번역 | 동작 확인 (GUI 테스트), 실기 미검증 |
 | **맥 느낌 데스크톱**: 상단 바(전역 메뉴·한/A 표시·시계), 가운데 떠 있는 독, 왼쪽 창 버튼, 자체 배경화면(밝게/어둡게) | 작성됨, 실기 부팅 미검증 |
+| **창 테두리 "Nuri"**(KWin Aurorae): 빨강·노랑·초록 버튼(마우스를 올리면 ×·−·+), 비활성 창은 회색, 둥근 위 모서리, 부드러운 그림자, 제목줄과 창이 한 색. 밝게/어둡게 | SVG 검증·KSvg 렌더링 확인, 실기 미검증 |
+| **Plasma 스타일 "Nuri"**: 반투명 유리 상단 바와 독(뒤 배경 흐림), 독 그림자, 실행 중인 앱 아래 점, 지금 쓰는 앱은 강조색 막대 | KSvg 렌더링 확인, 실기 미검증 |
+| **아이콘 "Nuri"**: 둥근 사각형 앱 아이콘 20종, 폴더 11종, 휴지통, 드라이브. 나머지는 Breeze로 대체 | 렌더링 확인 |
+| **누리 시작 안내**(첫 로그인): 인사 → AI 언어·추천 모델 → 밝게/어둡게·강조색 → 창 버튼 위치·클릭 방식 → Windows 앱 → 한글 입력 → 개인정보·업데이트 → 단축키. 고르는 즉시 적용. Fedora 환영 창은 제거 | 8개 화면 렌더링·설정 명령 테스트, 실기 미검증 |
 | **한글 입력** (fcitx5-hangul, 한/영 키 또는 Ctrl+Space) | 설치됨, 실기 미검증 |
 | Wine, winetricks, NTFS/exFAT, SMB | 설치됨 |
 | 첫 부팅 시 Flatpak 앱 설치 (Bottles, Steam, LibreOffice, LocalSend, Firefox) | 작성됨, 실기 미검증 |
@@ -49,19 +69,24 @@ build_files/
 system_files/                 이미지에 그대로 복사되는 파일
   usr/lib/nuri/nuri_ai.py     AI 핵심 로직 (추천, 설치·검증, 대화·기억) - 표준 라이브러리만 사용
   usr/lib/nuri/nuri_assistant.py  GUI 연결부: AI 엔진 ↔ 화면 (PyQt6)
-  usr/lib/nuri/qml/           GUI 화면 (Qt Quick): Main, Logo, Icon, 버튼 부품
-  usr/bin/nuri-ai, nuri-assistant 실행 파일
+  usr/lib/nuri/nuri_welcome.py   첫 로그인 안내: 설정 적용 (밝게/어둡게, 강조색, 창 버튼, 클릭 방식)
+  usr/lib/nuri/qml/           GUI 화면 (Qt Quick): Main(AI 패널), Welcome(시작 안내), Logo, Icon, 버튼 부품
+  usr/bin/nuri-ai, nuri-assistant, nuri-welcome 실행 파일
+  usr/share/icons/Nuri/       아이콘 테마 (tools/make_icons.py로 생성)
+  usr/share/aurorae/themes/   창 테두리 Nuri, NuriDark (tools/make_decoration.py로 생성)
+  usr/share/plasma/desktoptheme/Nuri/  유리 패널·독, 실행 중 점 (tools/make_plasma_theme.py로 생성)
   usr/share/applications/     누리 AI 실행 항목 (Meta+Space)
   usr/share/kio/servicemenus/ Dolphin 우클릭 "누리 AI" 메뉴
   usr/share/plasma/look-and-feel/org.nuri.desktop/  데스크톱 배치, 기본값, 스플래시, 미리보기
   usr/share/color-schemes/    누리 색 테마 (Nuri, NuriDark)
   usr/share/wallpapers/Nuri/  배경화면 "Silk" (tools/make_wallpaper.py로 생성)
-  etc/xdg/                    KDE 기본값 (창 버튼, 입력기, 단축키, 잠금화면, 스플래시,
-                              AI 창 배치 규칙, '이 시스템 정보' 로고)
+  etc/xdg/                    KDE 기본값 (창 테두리·버튼, 아이콘, Plasma 스타일, 입력기, 단축키, 잠금화면, 스플래시,
+                              AI 창 배치 규칙, '이 시스템 정보' 로고, 시작 안내 자동 실행)
   usr/lib/systemd/            nuri-ai.service(사용자), nuri-flatpak-setup.service
   usr/share/nuri/models.json  고정된 모델 레지스트리
 registry/models.src.json      사람이 고르는 모델 목록과 언어별 추천 순위
-tools/                        레지스트리 고정, 그림 생성(배경화면·색 테마·미리보기·QML 렌더),
+tools/                        레지스트리 고정, 그림 생성(배경화면·색 테마·아이콘·창 테두리·
+                              Plasma 스타일·미리보기·QML 렌더),
                               데스크톱 스크린샷 도구
 iso/config.toml               설치 ISO 설정
 tests/                        CLI 테스트 + GUI 테스트(화면 없이 렌더링)
@@ -75,7 +100,8 @@ tests/                        CLI 테스트 + GUI 테스트(화면 없이 렌더
 make test                # 단위 테스트 + GUI 테스트 (PyQt6 있으면)
 make build               # OS 이미지 빌드 → localhost/nuri:dev
 make run                 # 이미지 안에서 셸 열기
-make art                 # 배경화면·색 테마·로고 PNG·테마 미리보기 다시 생성
+make art                 # 배경화면·색 테마·아이콘·창 테두리·Plasma 스타일·로고 PNG 다시 생성
+make previews            # 빌드한 이미지 안에서 데스크톱 미리보기 렌더링 (KSvg 필요)
 make iso                 # 설치용 ISO → output/ (podman, root 필요)
 ```
 
@@ -113,12 +139,18 @@ nuri-ai status
 
 - 상단 바: 앱 메뉴(누리 아이콘), 현재 앱의 전역 메뉴, 한/A 입력기 표시, 트레이, 날짜·시계
 - 하단 독: 가운데 정렬, 떠 있고, 창이 겹치면 비켜요. 파일·Firefox·누리 AI·터미널·Discover·설정·휴지통
-- 창 버튼: 왼쪽에 닫기·최소화·최대화
+- 창 버튼: 왼쪽에 닫기·최소화·최대화(빨강·노랑·초록). 누리 시작 안내에서 오른쪽(윈도우식)으로 바꿀 수 있어요.
+- 창 테두리: "Nuri" Aurorae 테마(`/usr/share/aurorae/themes/Nuri`, 어둡게는 `NuriDark`)
+- Plasma 스타일: "Nuri"(`/usr/share/plasma/desktoptheme/Nuri`). 패널 배경과 작업 표시 두 파일만 바꾸고,
+  나머지 위젯은 Breeze를 그대로 써요.
+- 아이콘: "Nuri"(`/usr/share/icons/Nuri`). 없는 아이콘은 Breeze로 대체돼요.
 - 색 테마: 누리(밝게) 기본, 누리 어둡게 선택 가능. 강조색은 인디고(#6366F1)
 - 배경화면: "Silk" - 빛 리본이 흐르는 그림(밝게/어둡게). 애플 로고·아이콘·이름은 쓰지 않아요.
 - 로그인 스플래시: 누리 로고가 숨 쉬듯 움직이고, 시작 단계에 따라 진행 막대가 차요.
 - 누리 AI 창은 KWin 규칙으로 화면 가운데, 다른 창 위에, 작업 표시줄에는 안 보이게 떠요.
-- 시스템 설정 → 전역 테마의 미리보기 그림은 실제 화면 캡처가 아니라 배치를 그린 일러스트예요.
+- 첫 로그인 때 "누리 시작 안내"가 한 번 떠요(`/etc/xdg/autostart/nuri-welcome.desktop`).
+  끝내면 `~/.config/nuri-welcome-done`이 생기고, 앱 메뉴에서 언제든 다시 열 수 있어요.
+- 시스템 설정 → 전역 테마의 미리보기 그림은 실제 테마 파일로 그린 합성 미리보기예요(`make previews`).
 
 모든 설정은 시스템 설정에서 바꿀 수 있어요. 기본값은 `system_files/etc/xdg/`와
 `look-and-feel/org.nuri.desktop/`에 있어요.
@@ -149,8 +181,11 @@ nuri-ai status
 ## 알려진 한계
 
 - **데스크톱 배치와 테마는 실제 화면으로 확인하지 못했어요.** Plasma 6.8의 KWin은 GPU 렌더링 장치가
-  있어야 실행되는데 개발 환경에 없었어요. GPU가 있는 PC에서 `tools/desktop-screenshot.sh`로
-  확인할 수 있어요 (스크립트 맨 위 사용법 참고).
+  있어야 실행되는데 개발 환경에 없었어요(가상 X 화면, 중첩 Weston 등 우회도 모두 막혔어요).
+  GPU가 있는 PC에서 `tools/desktop-screenshot.sh`로 확인할 수 있어요 (스크립트 맨 위 사용법 참고).
+  특히 확인할 것: 창 버튼 크기·위치, 독의 실행 중 점 위치(독 높이에 따라 점이 짧은 막대로 늘어날 수 있어요),
+  어두운 테마에서 패널 색.
+- 맥처럼 독 아이콘이 마우스에 따라 커지는 효과는 Plasma 기본 독에 없어서 넣지 못했어요.
 - `kcm-fcitx5`(시스템 설정 안의 입력기 화면)는 지금 Fedora 45에서 설치가 안 돼서(패키지 의존성 문제)
   별도 설정 도구 `fcitx5-configtool`을 넣었어요.
 - 1B급 모델(EXAONE 4.0 1.2B)은 메모가 있어도 이전 내용을 답에 활용하지 못했어요. 같은 테스트에서

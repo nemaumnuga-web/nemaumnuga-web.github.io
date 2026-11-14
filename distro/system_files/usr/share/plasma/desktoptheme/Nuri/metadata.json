@@ -1,0 +1,17 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Nuri OS contributors"
+            }
+        ],
+        "Category": "",
+        "Description": "Nuri OS: frosted-glass panels and a dock with running-app dots",
+        "EnabledByDefault": true,
+        "Id": "Nuri",
+        "License": "CC-BY-4.0",
+        "Name": "Nuri",
+        "Version": "1.0"
+    },
+    "X-Plasma-API": "5.0"
+}

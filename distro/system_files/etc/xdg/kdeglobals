@@ -7,4 +7,5 @@ ColorScheme=Nuri
 AccentColor=99,102,241
 
 [Icons]
-Theme=breeze
+# Nuri app tiles and folders; everything else falls back to Breeze
+Theme=Nuri

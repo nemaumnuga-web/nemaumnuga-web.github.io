@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Nuri Welcome
+Name[ko]=누리 시작 안내
+Comment=Set up Nuri OS: AI model, appearance, Windows apps, Korean input
+Comment[ko]=AI 모델, 모양, Windows 앱, 한글 입력을 설정해요
+Exec=nuri-welcome
+Icon=nuri-welcome
+Categories=Settings;System;
+Keywords=welcome;setup;tour;환영;설정;

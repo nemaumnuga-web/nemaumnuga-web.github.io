@@ -1,0 +1,28 @@
+[Icon Theme]
+Name=Nuri
+Comment=Nuri OS icons: rounded app tiles and folders (falls back to Breeze)
+Inherits=breeze,hicolor
+Example=folder
+DisplayDepth=32
+Directories=scalable/apps,scalable/places,scalable/devices
+
+[scalable/apps]
+Size=128
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Applications
+
+[scalable/places]
+Size=128
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Places
+
+[scalable/devices]
+Size=128
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Devices

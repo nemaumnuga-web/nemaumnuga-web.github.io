@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_nuri_ai import BLOB, FakeHub  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # for the in-process SVG checks
 APP = ROOT / "system_files/usr/bin/nuri-assistant"
 REGISTRY = ROOT / "system_files/usr/share/nuri/models.json"
 
@@ -128,6 +129,55 @@ class AssistantGuiTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_QT, "PyQt6 not installed")
+class WelcomeTest(unittest.TestCase):
+    APP = ROOT / "system_files/usr/bin/nuri-welcome"
+
+    def run_welcome(self, *args, home):
+        env = dict(os.environ, QT_QPA_PLATFORM="offscreen", LANG="ko_KR.UTF-8", LC_ALL="ko_KR.UTF-8",
+                   NURI_REGISTRY=str(REGISTRY), XDG_CONFIG_HOME=str(home), NURI_SHOT_DELAY="400")
+        return subprocess.run([sys.executable, str(self.APP), *args], env=env, capture_output=True,
+                              text=True, timeout=60)
+
+    def test_every_page_renders_without_qml_errors(self):
+        with tempfile.TemporaryDirectory() as d:
+            for theme in ("light", "dark"):
+                for page in range(8):
+                    with self.subTest(theme=theme, page=page):
+                        shot = Path(d) / ("w-%s-%d.png" % (theme, page))
+                        p = self.run_welcome("--theme", theme, "--page", str(page), "--screenshot", str(shot),
+                                             home=Path(d))
+                        self.assertEqual(p.returncode, 0, p.stderr[-2000:])
+                        bad = [l for l in p.stderr.splitlines() if any(k in l for k in AssistantGuiTest.QML_ERRORS)]
+                        self.assertEqual(bad, [], "\n".join(bad[:10]))
+                        self.assertTrue(shot.read_bytes().startswith(b"\x89PNG"))
+            # screenshots are dry runs: nothing marked as finished
+            self.assertFalse((Path(d) / "nuri-welcome-done").exists())
+
+    def test_first_run_exits_once_finished(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "nuri-welcome-done").write_text("1\n")
+            p = self.run_welcome("--first-run", home=Path(d))
+            self.assertEqual(p.returncode, 0, p.stderr)
+
+    def test_settings_commands(self):
+        sys.path.insert(0, str(ROOT / "system_files/usr/lib/nuri"))
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        os.environ["NURI_REGISTRY"] = str(REGISTRY)
+        import nuri_welcome
+        b = nuri_welcome.Bridge(False, dry_run=True)
+        b.setDark(True)
+        b.setButtonsLeft(False)
+        b.setAccent("#22c55e")
+        b.setAccent("red; rm -rf /")      # not in the palette: ignored
+        log = "\n".join(b.log)
+        self.assertIn("plasma-apply-colorscheme NuriDark", log)
+        self.assertIn("--key theme __aurorae__svg__NuriDark", log)
+        self.assertIn("--key ButtonsOnRight IAX", log)
+        self.assertIn("--accent-color #22c55e", log)
+        self.assertNotIn("rm -rf", log)
+
+
+@unittest.skipUnless(HAVE_QT, "PyQt6 not installed")
 class ThemeArtTest(unittest.TestCase):
     LNF = ROOT / "system_files/usr/share/plasma/look-and-feel/org.nuri.desktop/contents"
 
@@ -155,6 +205,70 @@ class ThemeArtTest(unittest.TestCase):
         self.assertTrue((ROOT / "system_files" / wall.lstrip("/")).is_file(), wall)
         for name in ("preview.png", "splash.png", "fullscreenpreview.jpg"):
             self.assertTrue((self.LNF / "previews" / name).is_file(), name)
+
+    def svg(self, path):
+        from PyQt6.QtSvg import QSvgRenderer
+        r = QSvgRenderer(str(path))
+        self.assertTrue(r.isValid(), path)
+        return r
+
+    def assert_frame(self, r, prefix, path):
+        for part in ("topleft", "top", "topright", "left", "center", "right", "bottomleft", "bottom", "bottomright"):
+            el = (prefix + "-" + part) if prefix else part
+            self.assertTrue(r.elementExists(el), "%s: %s" % (path.name, el))
+
+    def test_window_decoration(self):
+        from PyQt6.QtGui import QGuiApplication
+        app = QGuiApplication.instance() or QGuiApplication([])  # noqa: F841
+        for theme in ("Nuri", "NuriDark"):
+            d = ROOT / "system_files/usr/share/aurorae/themes" / theme
+            r = self.svg(d / "decoration.svg")
+            for prefix in ("decoration", "decoration-inactive", "decoration-maximized",
+                           "decoration-maximized-inactive"):
+                self.assert_frame(r, prefix, d / "decoration.svg")
+            # the corner slice must be as tall as padding + title bar from the rc file
+            rc = dict(l.split("=", 1) for l in (d / (theme + "rc")).read_text().splitlines() if "=" in l)
+            self.assertEqual(r.boundsOnElement("decoration-topleft").height(),
+                             int(rc["PaddingTop"]) + int(rc["TitleHeight"]))
+            for b in ("close", "minimize", "maximize", "restore"):
+                rb = self.svg(d / (b + ".svg"))
+                for state in ("active", "hover", "pressed", "inactive", "deactivated"):
+                    self.assertTrue(rb.elementExists(state + "-center"), (theme, b, state))
+            self.assertIn("X-KDE-PluginInfo-Name=" + theme, (d / "metadata.desktop").read_text())
+        self.assertIn("theme=__aurorae__svg__Nuri", (ROOT / "system_files/etc/xdg/kwinrc").read_text())
+
+    def test_plasma_style(self):
+        from PyQt6.QtGui import QGuiApplication
+        app = QGuiApplication.instance() or QGuiApplication([])  # noqa: F841
+        base = ROOT / "system_files/usr/share/plasma/desktoptheme/Nuri"
+        self.assertEqual(json.loads((base / "metadata.json").read_text())["KPlugin"]["Id"], "Nuri")
+        for f in ("widgets/panel-background.svg", "translucent/widgets/panel-background.svg"):
+            r = self.svg(base / f)
+            for prefix in ("", "mask", "shadow"):
+                self.assert_frame(r, prefix, base / f)
+            for side in ("top", "bottom", "left", "right"):
+                self.assertTrue(r.elementExists("hint-%s-margin" % side))
+            # corners hold the rounded edge exactly (a stray stroke would shift the frame)
+            self.assertEqual(r.boundsOnElement("topleft").width(), r.boundsOnElement("left").width())
+        r = self.svg(base / "widgets/tasks.svg")
+        for state in ("normal", "focus", "hover", "attention", "minimized"):
+            self.assert_frame(r, state, base / "widgets/tasks.svg")
+            self.assertTrue(r.elementExists(state + "-hint-bottom-margin"))
+
+    def test_icon_theme(self):
+        from PyQt6.QtGui import QGuiApplication
+        app = QGuiApplication.instance() or QGuiApplication([])  # noqa: F841
+        base = ROOT / "system_files/usr/share/icons/Nuri"
+        index = (base / "index.theme").read_text()
+        self.assertIn("Inherits=breeze,hicolor", index)
+        icons = list(base.rglob("*.svg"))
+        self.assertGreater(len(icons), 60)
+        for f in icons:
+            self.svg(f)
+        # every launcher in the default dock has a Nuri icon
+        for name in ("system-file-manager", "nuri-assistant", "utilities-terminal", "plasma-discover",
+                     "preferences-system", "user-trash", "folder", "start-here-kde"):
+            self.assertTrue(list(base.rglob(name + ".svg")), name)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Nuri Welcome
+Name[ko]=누리 시작 안내
+Exec=nuri-welcome --first-run
+Icon=nuri-welcome
+X-KDE-autostart-phase=2
+NoDisplay=true
+OnlyShowIn=KDE;
