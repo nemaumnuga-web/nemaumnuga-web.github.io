@@ -14,7 +14,7 @@ Window {
     QtObject {
         id: ui
         property bool dark: bridge.state.dark
-        property color card: dark ? "#ee17181f" : "#f2f8f8fc"
+        property color card: dark ? "#fc17181f" : "#fcf8f8fc"
         property color tile: dark ? "#2a2c38" : "#ffffff"
         property color tileOff: dark ? "#22242e" : "#eceef5"
         property color surface: dark ? "#1c1e28" : "#ffffff"
