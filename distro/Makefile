@@ -2,6 +2,7 @@
 #
 #   make test        unit tests for nuri-ai (no network, no container)
 #   make registry    re-pin the model registry against Hugging Face
+#   make art         regenerate wallpapers, colour schemes, logo PNG, theme previews
 #   make build       build the OS image
 #   make iso         build an installable ISO from the image (podman, root)
 #   make run         open a shell inside the image
@@ -15,13 +16,20 @@ EXTRA_CA   ?=
 SECRET      = $(if $(EXTRA_CA),--secret id=extra_ca$(comma)src=$(EXTRA_CA),)
 comma      := ,
 
-.PHONY: test registry build iso run lint clean
+.PHONY: test registry art build iso run lint clean
 
 test:
 	python3 -m unittest discover -s tests -v
 
 registry:
 	python3 tools/*.py
+
+art:
+	python3 tools/make_wallpaper.py
+	python3 tools/make_color_schemes.py
+	python3 tools/render_qml.py system_files/usr/lib/nuri/qml/Logo.qml \
+		system_files/usr/share/pixmaps/nuri-logo.png 256x256 --prop size=256 --transparent --wait 300
+	python3 tools/make_previews.py
 
 lint:
 	bash -n build_files/*.sh system_files/usr/libexec/nuri/* tools/*.sh

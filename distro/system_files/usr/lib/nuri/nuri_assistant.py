@@ -1,17 +1,19 @@
 """Nuri Assistant - the graphical side of Nuri OS's on-device AI.
 
-* A Spotlight-style chat panel (Meta+Space toggles it).
-* A model library: per-language picks for this PC, licence and trust
-  warnings, one-click verified install.
+* A Spotlight-style chat panel (Meta+Space toggles it), drawn in Qt Quick
+  (qml/Main.qml): streamed answers with Markdown, typing indicator,
+  suggestion cards, light and dark themes.
+* A model library: per-language picks for this PC, RAM fit meter, licence
+  and trust warnings, licence confirmation, verified install with progress.
 * File actions from Dolphin's right-click menu (summarise / explain / translate).
 
 All inference goes to the local llama.cpp server on 127.0.0.1; chats are saved
 by nuri_ai under ~/.local/share/nuri.
 """
 import argparse
-import html
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -20,107 +22,109 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import nuri_ai as core  # noqa: E402
 
-from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal  # noqa: E402
-from PyQt6.QtGui import QGuiApplication, QIcon, QKeySequence, QShortcut  # noqa: E402
-from PyQt6.QtNetwork import QLocalServer, QLocalSocket  # noqa: E402
-from PyQt6.QtWidgets import (  # noqa: E402
-    QApplication, QCheckBox, QComboBox, QDialog, QFrame, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QVBoxLayout, QWidget,
+from PyQt6.QtCore import (  # noqa: E402
+    QObject, Qt, QThread, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot,
 )
+from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon, QTextDocument  # noqa: E402
+from PyQt6.QtNetwork import QLocalServer, QLocalSocket  # noqa: E402
+from PyQt6.QtQml import QQmlApplicationEngine  # noqa: E402
+from PyQt6.QtQuick import QQuickWindow, QSGRendererInterface  # noqa: E402
 
 APP_ID = "nuri-assistant"
+QML_MAIN = Path(os.environ.get("NURI_QML") or Path(__file__).resolve().parent / "qml" / "Main.qml")
 MAX_FILE_CHARS = 12000
 LANGS = [("ko", "한국어"), ("en", "English"), ("ja", "日本語"), ("zh", "中文"),
          ("fr", "Français"), ("de", "Deutsch"), ("es", "Español"), ("it", "Italiano")]
 
 TXT = {
     "ko": {
-        "title": "누리 AI", "placeholder": "무엇이든 물어보세요", "private": "🔒 이 PC 안에서만 처리돼요",
-        "models": "모델", "new": "새 대화", "send": "보내기", "no_model": "모델 없음",
+        "title": "누리 AI", "placeholder": "무엇이든 물어보세요", "private": "이 PC 안에서만 처리돼요",
+        "hotkey": "Meta+Space로 열기 · Esc로 닫기", "no_model": "모델을 골라 주세요",
+        "greeting": "무엇을 도와드릴까요?", "greeting_sub": "인터넷 없이, 이 컴퓨터 안에서만 답해요",
         "starting": "AI를 준비하고 있어요…", "no_server": "AI 서버를 시작하지 못했어요. 모델이 설치됐는지 확인해 주세요.",
         "pick_first": "먼저 사용할 AI 모델을 골라 주세요.",
-        "lib_title": "AI 모델 라이브러리", "lib_sub": "이 PC: RAM %.1f GB · 모두 이 PC 안에서 실행돼요",
-        "lang": "언어", "show_all": "이 PC에서 안 돌아가는 모델도 보기", "rec": "✨ 추천",
-        "install": "설치", "use": "사용", "in_use": "사용 중", "installing": "받는 중…",
-        "nc": "비상업 전용", "unofficial": "⚠ 비공식 변환본", "too_big": "메모리 부족",
-        "license_q": "<b>%s</b><br><br>라이선스: <a href='%s'>%s</a><br>%s<br><br>이 라이선스에 동의하고 내려받을까요? (%.1f GB)",
+        "lib_title": "AI 모델 라이브러리", "lib_sub": "모두 이 PC 안에서 실행돼요", "this_pc": "이 PC",
+        "search": "모델 이름, 라이선스로 찾기", "show_all": "모든 모델", "rec": "추천",
+        "install": "설치", "use": "사용하기", "in_use": "사용 중", "installing": "받는 중",
+        "nc": "비상업 전용", "unofficial": "비공식 변환본", "too_big": "메모리 부족",
+        "nofit": "조건에 맞는 모델이 없어요",
+        "download_size": "내려받기 %1 GB", "license_label": "라이선스:",
+        "license_q": "이 라이선스를 확인했고, 동의하고 내려받을까요?",
+        "cancel": "취소", "agree_install": "동의하고 설치", "copy": "복사", "copied": "복사됨",
         "verify_fail": "무결성 검사에 실패해서 파일을 지웠어요. 다시 시도해 주세요.",
         "net_fail": "내려받기에 실패했어요(네트워크). 다시 누르면 이어서 받아요.",
         "summarize": "다음 파일의 핵심을 5줄 이내로 요약해 줘.",
         "explain": "다음 파일이 무엇인지, 핵심 내용을 쉽게 설명해 줘.",
         "translate": "다음 내용을 자연스러운 한국어로 번역해 줘. 이미 한국어라면 영어로 번역해 줘.",
         "binary": "텍스트 파일만 읽을 수 있어요: %s", "truncated": "(파일이 길어서 앞부분 %d자만 보냈어요)",
-        "you": "나", "ai": "누리",
     },
     "en": {
-        "title": "Nuri AI", "placeholder": "Ask anything", "private": "🔒 Processed on this PC only",
-        "models": "Models", "new": "New chat", "send": "Send", "no_model": "no model",
+        "title": "Nuri AI", "placeholder": "Ask anything", "private": "Processed on this PC only",
+        "hotkey": "Meta+Space to open · Esc to close", "no_model": "Pick a model",
+        "greeting": "How can I help?", "greeting_sub": "No internet needed - answers stay on this computer",
         "starting": "Starting the AI…", "no_server": "Could not start the AI server. Is a model installed?",
         "pick_first": "Pick an AI model first.",
-        "lib_title": "AI model library", "lib_sub": "This PC: %.1f GB RAM · everything runs on this PC",
-        "lang": "Language", "show_all": "Also show models too big for this PC", "rec": "✨ Recommended",
-        "install": "Install", "use": "Use", "in_use": "In use", "installing": "Downloading…",
-        "nc": "non-commercial only", "unofficial": "⚠ unofficial conversion", "too_big": "not enough RAM",
-        "license_q": "<b>%s</b><br><br>License: <a href='%s'>%s</a><br>%s<br><br>Accept this license and download? (%.1f GB)",
+        "lib_title": "AI model library", "lib_sub": "Everything runs on this PC", "this_pc": "This PC",
+        "search": "Search by name or licence", "show_all": "All models", "rec": "Recommended",
+        "install": "Install", "use": "Use", "in_use": "In use", "installing": "Downloading",
+        "nc": "non-commercial only", "unofficial": "unofficial conversion", "too_big": "Not enough RAM",
+        "nofit": "No model matches",
+        "download_size": "%1 GB download", "license_label": "License:",
+        "license_q": "Have you read this licence, and do you accept it and download?",
+        "cancel": "Cancel", "agree_install": "Accept & install", "copy": "Copy", "copied": "Copied",
         "verify_fail": "Integrity check failed; the file was deleted. Please try again.",
         "net_fail": "Download failed (network). Click again to resume.",
         "summarize": "Summarise the key points of this file in at most 5 lines.",
         "explain": "Explain what this file is and its main content in plain words.",
         "translate": "Translate this into natural English. If it is already English, translate it into Korean.",
         "binary": "Only text files can be read: %s", "truncated": "(file is long; sent the first %d characters)",
-        "you": "You", "ai": "Nuri",
     },
 }
 
+SUGGESTIONS = {
+    "ko": [
+        ("window", "#6366f1", "윈도우 프로그램을 이 PC에서 쓰는 방법", "리눅스에서 윈도우 프로그램을 쓰려면 어떻게 해야 해? Wine과 Bottles 중심으로 쉽게 알려줘."),
+        ("doc", "#0ea5e9", "회의록 양식 만들어 줘", "깔끔한 회의록 양식을 마크다운으로 만들어 줘. 안건, 결정 사항, 할 일 칸을 넣어 줘."),
+        ("globe", "#ec4899", "자연스러운 영어로 번역", "다음 문장을 자연스러운 영어로 번역해 줘: 다음 주 화요일 오후 세 시에 회의가 있어요."),
+        ("bolt", "#f59e0b", "8GB 노트북 빠르게 쓰는 팁", "RAM 8GB 노트북을 더 빠르게 쓰는 실용적인 팁을 5개만 알려줘."),
+    ],
+    "en": [
+        ("window", "#6366f1", "Run Windows apps on this PC", "How do I run Windows programs on Linux? Explain simply, focusing on Wine and Bottles."),
+        ("doc", "#0ea5e9", "Draft a meeting-notes template", "Make a clean meeting-notes template in Markdown with agenda, decisions and action items."),
+        ("globe", "#ec4899", "Translate into natural Korean", "Translate into natural Korean: The meeting is next Tuesday at 3 pm."),
+        ("bolt", "#f59e0b", "Speed tips for an 8 GB laptop", "Give me 5 practical tips to make an 8 GB RAM laptop feel faster."),
+    ],
+}
+
+
+def markdown_html(text):
+    """Markdown -> HTML body for a QML TextEdit, with readable paragraph and
+    list spacing (Qt's own conversion uses zero margins) and no font override
+    so the QML font and colour apply."""
+    doc = QTextDocument()
+    doc.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownDialectGitHub)
+    m = re.search(r"<body[^>]*>(.*)</body>", doc.toHtml(), re.S)
+    body = m.group(1) if m else ""
+    # Drop the document's default font (QML sets it) but keep monospace for code.
+    body = re.sub(r"font-family:'(?![^']*[Mm]ono)[^']*';?", "", body)
+    body = re.sub(r"font-size:[^;\"]*;?", "", body)
+    # Readable rhythm: space between paragraphs and lists, tight list items.
+    body = re.sub(r"(<p [^>]*?)margin-top:\d+px; margin-bottom:\d+px", r"\1margin-top:0px; margin-bottom:10px", body)
+    body = re.sub(r"(<li [^>]*?)margin-top:\d+px; margin-bottom:\d+px", r"\1margin-top:2px; margin-bottom:2px", body)
+    body = re.sub(r"(<(?:ul|ol) [^>]*?)margin-top: ?\d+px; margin-bottom: ?\d+px", r"\1margin-top:0px; margin-bottom:10px", body)
+    # No trailing gap after the last block (it would pad the bubble).
+    i = body.rfind("margin-bottom:10px")
+    if i != -1:
+        body = body[:i] + "margin-bottom:0px" + body[i + len("margin-bottom:10px"):]
+    return body.strip()
+
+
+def lang_key():
+    return core.ui_lang() if core.ui_lang() in TXT else "en"
+
 
 def tr(key):
-    return TXT.get(core.ui_lang(), TXT["en"])[key]
-
-
-def is_dark():
-    try:
-        return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
-    except AttributeError:
-        return False
-
-
-def palette():
-    if is_dark():
-        return dict(card="rgba(30,31,38,0.97)", text="#ececf1", sub="#a0a3b1", border="rgba(255,255,255,0.10)",
-                    user="#4f5bd5", user_text="#ffffff", ai="rgba(255,255,255,0.07)", input="rgba(255,255,255,0.06)",
-                    accent="#7c86ff", chip="rgba(124,134,255,0.18)", warn="#f0b44c", item="rgba(255,255,255,0.04)")
-    return dict(card="rgba(250,250,252,0.97)", text="#1d1d24", sub="#6b6e7c", border="rgba(0,0,0,0.08)",
-                user="#5b67f1", user_text="#ffffff", ai="#eef0f6", input="#ffffff",
-                accent="#5b67f1", chip="rgba(91,103,241,0.12)", warn="#b26a00", item="#ffffff")
-
-
-def stylesheet():
-    c = palette()
-    return """
-    #card { background: %(card)s; border: 1px solid %(border)s; border-radius: 18px; }
-    QLabel { color: %(text)s; }
-    QLabel#sub, QLabel#private { color: %(sub)s; }
-    QLabel#title { font-size: 15px; font-weight: 600; }
-    QLabel#chip { background: %(chip)s; color: %(accent)s; border-radius: 9px; padding: 2px 9px; }
-    QLabel#warn { color: %(warn)s; }
-    QLineEdit { background: %(input)s; border: 1px solid %(border)s; border-radius: 12px;
-                padding: 9px 12px; color: %(text)s; font-size: 14px; }
-    QLineEdit:focus { border: 1px solid %(accent)s; }
-    QPushButton { background: transparent; border: 1px solid %(border)s; border-radius: 10px;
-                  padding: 6px 12px; color: %(text)s; }
-    QPushButton:hover { border-color: %(accent)s; }
-    QPushButton#primary { background: %(accent)s; color: white; border: none; }
-    QPushButton#primary:disabled { background: %(chip)s; color: %(sub)s; }
-    QFrame#item { background: %(item)s; border: 1px solid %(border)s; border-radius: 12px; }
-    QProgressBar { border: none; background: %(chip)s; border-radius: 3px; max-height: 6px; }
-    QProgressBar::chunk { background: %(accent)s; border-radius: 3px; }
-    QScrollArea, QScrollArea > QWidget > QWidget#list { background: transparent; border: none; }
-    QLabel#user { background: %(user)s; color: %(user_text)s; border-radius: 14px; padding: 9px 13px; font-size: 14px; }
-    QLabel#ai { background: %(ai)s; color: %(text)s; border-radius: 14px; padding: 9px 13px; font-size: 14px; }
-    QLabel#note { color: %(warn)s; padding: 4px 2px; }
-    QLabel#hint { color: %(sub)s; padding: 4px 2px; font-size: 14px; }
-    """ % c
+    return TXT[lang_key()][key]
 
 
 # ------------------------------------------------------------------ workers
@@ -165,8 +169,7 @@ class AskWorker(QThread):
             self.failed.emit(tr("no_server"))
             return
         try:
-            answer = core.turn(self.session, self.text, _Emitter(self.chunk))
-            self.finished_ok.emit(answer)
+            self.finished_ok.emit(core.turn(self.session, self.text, _Emitter(self.chunk)))
         except SystemExit:
             self.failed.emit(tr("no_server"))
         except Exception as e:  # keep the UI alive whatever happens
@@ -183,9 +186,15 @@ class InstallWorker(QThread):
         self.model = model
 
     def run(self):
+        last = [-1]
+
+        def report(have, total):
+            pct = int(100 * have / total) if total else 0
+            if pct != last[0]:
+                last[0] = pct
+                self.progress.emit(pct)
         try:
-            core.install_model(self.model, progress=lambda have, total: self.progress.emit(
-                int(100 * have / total) if total else 0), activate=True)
+            core.install_model(self.model, progress=report, activate=True)
             self.done.emit(self.model["id"])
         except SystemExit:
             self.failed.emit(tr("verify_fail"))
@@ -193,345 +202,306 @@ class InstallWorker(QThread):
             self.failed.emit(tr("net_fail"))
 
 
-# ------------------------------------------------------------------ chat panel
+# ------------------------------------------------------------------ QML bridge
 
-class Panel(QWidget):
-    def __init__(self):
+class Bridge(QObject):
+    messageAppended = pyqtSignal(str, str, arguments=["role", "text"])
+    streamText = pyqtSignal(str, arguments=["text"])
+    streamDone = pyqtSignal(bool, arguments=["ok"])
+    reset = pyqtSignal()
+    busyChanged = pyqtSignal()
+    noteChanged = pyqtSignal()
+    modelChanged = pyqtSignal()
+    libraryChanged = pyqtSignal()
+    installProgress = pyqtSignal(str, int, arguments=["id", "pct"])
+    openLibraryRequested = pyqtSignal()
+    installDialogRequested = pyqtSignal(str, arguments=["id"])
+    settled = pyqtSignal()  # an answer or error finished (used by --screenshot)
+
+    def __init__(self, dark):
         super().__init__()
-        self.setWindowTitle(tr("title"))
-        self.setWindowIcon(QIcon.fromTheme(APP_ID))
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.resize(720, 540)
+        self._dark = dark
+        self._busy = False
+        self._note = ""
+        self._stream = ""
         self.session = core.Session("assistant")
-        self.streaming = ""
-        self.worker = None
-        self.after_answer = None  # hook for --screenshot
-
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(10, 10, 10, 10)
-        card = QFrame(objectName="card")
-        outer.addWidget(card)
-        lay = QVBoxLayout(card)
-        lay.setContentsMargins(18, 14, 18, 14)
-        lay.setSpacing(10)
-
-        head = QHBoxLayout()
-        title = QLabel("✦  " + tr("title"), objectName="title")
-        self.model_chip = QLabel(objectName="chip")
-        head.addWidget(title)
-        head.addWidget(self.model_chip)
-        head.addStretch()
-        b_models = QPushButton(tr("models"))
-        b_models.clicked.connect(self.open_library)
-        b_new = QPushButton(tr("new"))
-        b_new.clicked.connect(self.new_chat)
-        head.addWidget(b_models)
-        head.addWidget(b_new)
-        lay.addLayout(head)
-
-        self.scroll = QScrollArea(widgetResizable=True)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.list = QWidget(objectName="list")
-        self.list_lay = QVBoxLayout(self.list)
-        self.list_lay.setContentsMargins(0, 4, 4, 4)
-        self.list_lay.setSpacing(8)
-        self.scroll.setWidget(self.list)
-        self.stream_label = None
-        lay.addWidget(self.scroll, 1)
-
-        row = QHBoxLayout()
-        self.input = QLineEdit(placeholderText=tr("placeholder"))
-        self.input.returnPressed.connect(self.send)
-        self.send_btn = QPushButton(tr("send"), objectName="primary")
-        self.send_btn.clicked.connect(self.send)
-        row.addWidget(self.input, 1)
-        row.addWidget(self.send_btn)
-        lay.addLayout(row)
-        lay.addWidget(QLabel(tr("private"), objectName="private"))
-
-        QShortcut(QKeySequence("Escape"), self, activated=self.hide)
-        self.refresh_model()
-        self.render()
-
-    # -- display
-    def refresh_model(self):
-        act = core.active_id()
-        name = act
+        self.workers = []
+        self.installing = {}
         try:
-            reg = core.load_registry()
-            name = next((m["name"] for m in reg["models"] if m["id"] == act), act)
+            self.reg = core.load_registry()
         except SystemExit:
-            pass
-        self.model_chip.setText(name or tr("no_model"))
+            self.reg = {"models": []}
+        self.ram = core.total_ram_gb()
 
-    def bubble(self, role, text):
-        label = QLabel(text, objectName="user" if role == "user" else "ai")
-        label.setWordWrap(True)
-        label.setTextFormat(Qt.TextFormat.PlainText)
-        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        label.setMaximumWidth(int(self.width() * 0.74))
-        row = QHBoxLayout()
-        if role == "user":
-            row.addStretch()
-        row.addWidget(label)
-        if role != "user":
-            row.addStretch()
-        self.list_lay.addLayout(row)
-        return label
+    # -- properties
+    @pyqtProperty(bool, constant=True)
+    def dark(self):
+        return self._dark
 
-    def clear_list(self):
-        def wipe(layout):
-            while layout.count():
-                item = layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-                elif item.layout():
-                    wipe(item.layout())
-        wipe(self.list_lay)
+    @pyqtProperty("QVariantMap", constant=True)
+    def t(self):
+        return TXT[lang_key()]
 
-    def render(self, extra_note=None):
-        """Rebuild the conversation (cheap: at most the last 40 messages)."""
-        self.clear_list()
-        self.list_lay.addStretch()  # keep messages at the bottom, like a chat app
-        msgs = list(self.session.data["recent"])[-40:]
-        if not msgs and not extra_note and not self.streaming:
-            hint = QLabel(tr("placeholder") + " …", objectName="hint")
-            self.list_lay.addWidget(hint)
-        for m in msgs:
-            self.bubble(m["role"], m["content"])
-        self.stream_label = self.bubble("assistant", self.streaming) if self.streaming else None
-        if extra_note:
-            note = QLabel(extra_note, objectName="note")
-            note.setWordWrap(True)
-            self.list_lay.addWidget(note)
-        QTimer.singleShot(0, self.scroll_to_end)
+    @pyqtProperty(bool, constant=True)
+    def softwareRender(self):
+        """True without GPU rendering: the UI then fades instead of sliding
+        (the software renderer leaves trails when vector shapes move)."""
+        return QQuickWindow.sceneGraphBackend() == "software" or os.environ.get("QT_QUICK_BACKEND") == "software"
 
-    def scroll_to_end(self):
-        sb = self.scroll.verticalScrollBar()
-        sb.setValue(sb.maximum())
+    @pyqtProperty(str, constant=True)
+    def lang(self):
+        return core.ui_lang()
 
-    # -- actions
-    def toggle(self):
-        if self.isVisible() and self.isActiveWindow():
-            self.hide()
-        else:
-            self.show_centered()
+    @pyqtProperty(float, constant=True)
+    def ramGb(self):
+        return self.ram
 
-    def show_centered(self):
-        screen = QGuiApplication.primaryScreen()
-        if screen:
-            g = screen.availableGeometry()
-            self.move(g.x() + (g.width() - self.width()) // 2, g.y() + int(g.height() * 0.18))
-        self.show()
-        self.raise_()
-        self.activateWindow()
-        self.input.setFocus()
+    @pyqtProperty("QVariantList", constant=True)
+    def languages(self):
+        return [{"code": c, "name": n} for c, n in LANGS]
 
-    def new_chat(self):
-        if self.worker and self.worker.isRunning():
-            return
-        self.session = core.Session("assistant-%d" % int(time.time()))
-        self.render()
+    @pyqtProperty("QVariantList", constant=True)
+    def suggestions(self):
+        return [{"icon": i, "tint": c, "label": label, "prompt": p}
+                for i, c, label, p in SUGGESTIONS[lang_key()]]
 
-    def open_library(self):
-        Library(self).exec()
-        self.refresh_model()
+    @pyqtProperty(bool, notify=busyChanged)
+    def busy(self):
+        return self._busy
 
-    def send(self, text=None):
-        text = (text if isinstance(text, str) else self.input.text()).strip()
-        if not text or (self.worker and self.worker.isRunning()):
+    @pyqtProperty(str, notify=noteChanged)
+    def note(self):
+        return self._note
+
+    @pyqtProperty(bool, notify=modelChanged)
+    def hasModel(self):
+        return core.active_id() is not None
+
+    @pyqtProperty(str, notify=modelChanged)
+    def modelName(self):
+        act = core.active_id()
+        return next((m["name"] for m in self.reg["models"] if m["id"] == act), act or "")
+
+    def _set_busy(self, v):
+        if v != self._busy:
+            self._busy = v
+            self.busyChanged.emit()
+
+    def _set_note(self, v):
+        if v != self._note:
+            self._note = v
+            self.noteChanged.emit()
+
+    # -- chat
+    @pyqtSlot(result="QVariantList")
+    def history(self):
+        return [{"role": m["role"], "text": m["content"]} for m in self.session.data["recent"][-60:]]
+
+    @pyqtSlot(str)
+    def send(self, text):
+        text = text.strip()
+        if not text or self._busy:
             return
         if core.active_id() is None:
-            self.render(tr("pick_first"))
-            self.open_library()
-            if core.active_id() is None:
-                return
-        self.input.clear()
-        self.send_btn.setEnabled(False)
-        self.streaming = ""
-        # show the question right away; core.turn() records it in the session
-        self.session.data["recent"].append({"role": "user", "content": text})
-        self.render(None if core.server_ok() else tr("starting"))
-        self.session.data["recent"].pop()
-        self.worker = AskWorker(self.session, text)
-        self.worker.chunk.connect(self.on_chunk)
-        self.worker.finished_ok.connect(self.on_done)
-        self.worker.failed.connect(self.on_fail)
-        self.worker.start()
+            self._set_note(tr("pick_first"))
+            self.openLibraryRequested.emit()
+            self.settled.emit()
+            return
+        self._set_note("" if core.server_ok() else tr("starting"))
+        self._stream = ""
+        self.messageAppended.emit("user", text)
+        self._set_busy(True)
+        w = AskWorker(self.session, text)
+        w.chunk.connect(self._on_chunk)
+        w.finished_ok.connect(self._on_done)
+        w.failed.connect(self._on_fail)
+        self.workers.append(w)
+        w.start()
 
-    def on_chunk(self, s):
-        first = not self.streaming
-        self.streaming += s
-        if first or self.stream_label is None:
-            self.render()
-        else:
-            self.stream_label.setText(self.streaming)
-            QTimer.singleShot(0, self.scroll_to_end)
+    def _on_chunk(self, s):
+        if self._note == tr("starting"):
+            self._set_note("")
+        self._stream += s
+        self.streamText.emit(self._stream)
 
-    def on_done(self, _answer):
-        self.streaming = ""
-        self.send_btn.setEnabled(True)
-        self.render()
-        if self.after_answer:
-            QTimer.singleShot(300, self.after_answer)
+    def _on_done(self, answer):
+        if not self._stream and answer:
+            self.streamText.emit(answer)
+        self._finish(True, "")
 
-    def on_fail(self, msg):
-        self.streaming = ""
-        self.send_btn.setEnabled(True)
-        self.render(msg)
-        if self.after_answer:
-            QTimer.singleShot(300, self.after_answer)
+    def _on_fail(self, msg):
+        self._finish(False, msg)
 
-    def file_error(self, msg):
-        self.show_centered()
-        self.render(msg)
-        if self.after_answer:
-            QTimer.singleShot(300, self.after_answer)
+    def _finish(self, ok, note):
+        self.streamDone.emit(ok)
+        self._set_busy(False)
+        self._set_note(note)
+        self.workers = [w for w in self.workers if w.isRunning()]
+        self.settled.emit()
 
-    def run_file_task(self, path, task):
+    @pyqtSlot()
+    def newChat(self):
+        if self._busy:
+            return
+        self.session = core.Session("assistant-%d" % int(time.time()))
+        self._set_note("")
+        self.reset.emit()
+
+    def run_file(self, path, task):
         p = Path(path)
         try:
             raw = p.read_bytes()
         except OSError as e:
-            return self.file_error(str(e))
+            return self._file_error(str(e))
         if b"\x00" in raw[:4096]:
-            return self.file_error(tr("binary") % p.name)
+            return self._file_error(tr("binary") % p.name)
         text = raw.decode("utf-8", "replace")
         note = ""
         if len(text) > MAX_FILE_CHARS:
             text, note = text[:MAX_FILE_CHARS], "\n" + tr("truncated") % MAX_FILE_CHARS
         self.session = core.Session("files")
-        self.show_centered()
+        self.reset.emit()
         self.send("%s\n\n[%s]%s\n---\n%s" % (tr(task), p.name, note, text))
 
+    def _file_error(self, msg):
+        self._set_note(msg)
+        self.settled.emit()
 
-# ------------------------------------------------------------------ model library
-
-class Library(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(tr("lib_title"))
-        self.setWindowIcon(QIcon.fromTheme(APP_ID))
-        self.resize(760, 640)
-        self.setStyleSheet(stylesheet() + "QDialog { background: %s; }" % palette()["card"].replace("0.97", "1"))
-        self.reg = core.load_registry()
-        self.ram = core.total_ram_gb()
-        self.workers = []
-
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(22, 18, 22, 18)
-        lay.addWidget(QLabel(tr("lib_title"), objectName="title"))
-        lay.addWidget(QLabel(tr("lib_sub") % self.ram, objectName="sub"))
-        bar = QHBoxLayout()
-        bar.addWidget(QLabel(tr("lang")))
-        self.lang = QComboBox()
-        for code, name in LANGS:
-            self.lang.addItem(name, code)
-        idx = max(0, [c for c, _ in LANGS].index(core.ui_lang()) if core.ui_lang() in dict(LANGS) else 1)
-        self.lang.setCurrentIndex(idx)
-        self.lang.currentIndexChanged.connect(self.fill)
-        self.all = QCheckBox(tr("show_all"))
-        self.all.toggled.connect(self.fill)
-        bar.addWidget(self.lang)
-        bar.addStretch()
-        bar.addWidget(self.all)
-        lay.addLayout(bar)
-
-        self.scroll = QScrollArea(widgetResizable=True)
-        lay.addWidget(self.scroll, 1)
-        self.fill()
-
-    def fill(self):
-        lang = self.lang.currentData()
-        models = core.recommendations(self.reg, lang, self.ram, self.all.isChecked())
+    # -- library
+    @pyqtSlot(str, bool, str, result="QVariantList")
+    def libraryModels(self, lang, show_all, query):
+        models = core.recommendations(self.reg, lang, self.ram, show_all)
+        q = query.strip().lower()
+        if q:
+            models = [m for m in models
+                      if q in m["name"].lower() or q in m["id"] or q in m["license"].lower()]
         inst, act = core.installed_ids(), core.active_id()
-        box = QWidget(objectName="list")
-        v = QVBoxLayout(box)
-        v.setSpacing(8)
+        out = []
         for label, m in zip(core.LABELS, models):
-            v.addWidget(self.card(label, m, lang, inst, act))
-        v.addStretch()
-        self.scroll.setWidget(box)
+            fits = core.fits(m, self.ram)
+            if m["id"] == act:
+                state = "active"
+            elif m["id"] in inst:
+                state = "installed"
+            elif m["id"] in self.installing:
+                state = "installing"
+            else:
+                state = "install" if fits else "toobig"
+            out.append({
+                "id": m["id"], "letter": label, "name": m["name"], "params": float(m["params_b"]),
+                "sizeGb": (m.get("size") or 0) / 1e9, "license": m["license"],
+                "minRam": m["min_ram_gb"], "fits": fits,
+                "ratio": m["min_ram_gb"] / max(self.ram, 1.0),
+                "recommended": bool(m.get("recommend", {}).get(lang)),
+                "warnings": self._warnings(m), "state": state,
+                "progress": self.installing.get(m["id"], 0),
+            })
+        return out
 
-    def card(self, label, m, lang, inst, act):
-        f = QFrame(objectName="item")
-        h = QHBoxLayout(f)
-        h.setContentsMargins(14, 10, 14, 10)
-        letter = QLabel(label, objectName="title")
-        letter.setFixedWidth(22)
-        h.addWidget(letter)
-        col = QVBoxLayout()
-        top = QHBoxLayout()
-        top.addWidget(QLabel("<b>%s</b>" % html.escape(m["name"])))
-        if m.get("recommend", {}).get(lang):
-            top.addWidget(QLabel(tr("rec"), objectName="chip"))
-        top.addStretch()
-        col.addLayout(top)
-        size = (m.get("size") or 0) / 1e9
-        col.addWidget(QLabel("%.1fB · %.1f GB · %s · RAM %d GB+" % (
-            m["params_b"], size, m["license"], m["min_ram_gb"]), objectName="sub"))
-        warns = []
+    def _warnings(self, m):
+        w = []
         if m.get("commercial") == "no":
-            warns.append(tr("nc"))
+            w.append(tr("nc"))
         if m.get("trust") == "repackaged":
-            warns.append(tr("unofficial"))
-        if not core.fits(m, self.ram):
-            warns.append(tr("too_big"))
-        if warns:
-            col.addWidget(QLabel(" · ".join(warns), objectName="warn"))
-        bar = QProgressBar()
-        bar.setTextVisible(False)
-        bar.hide()
-        col.addWidget(bar)
-        h.addLayout(col, 1)
+            w.append(tr("unofficial"))
+        return w
 
-        btn = QPushButton(objectName="primary")
-        if m["id"] == act:
-            btn.setText(tr("in_use"))
-            btn.setEnabled(False)
-        elif m["id"] in inst:
-            btn.setText(tr("use"))
-            btn.clicked.connect(lambda: self.use(m))
-        else:
-            btn.setText(tr("install"))
-            btn.setEnabled(core.fits(m, self.ram))
-            btn.clicked.connect(lambda: self.install(m, btn, bar))
-        h.addWidget(btn)
-        return f
+    @pyqtSlot(str, result="QVariantMap")
+    def modelInfo(self, model_id):
+        m = next((m for m in self.reg["models"] if m["id"] == model_id), None)
+        if not m:
+            return {}
+        return {"id": m["id"], "name": m["name"], "license": m["license"],
+                "licenseUrl": m.get("license_url", ""), "sizeGb": (m.get("size") or 0) / 1e9,
+                "warnings": self._warnings(m), "notes": m.get("notes", "")}
 
-    def use(self, m):
-        core.set_active(m["id"], m["file"])
-        self.fill()
+    @pyqtSlot(str)
+    def useModel(self, model_id):
+        m = next((m for m in self.reg["models"] if m["id"] == model_id), None)
+        if m and model_id in core.installed_ids():
+            core.set_active(m["id"], m["file"])
+            self._set_note("")
+            self.modelChanged.emit()
+            self.libraryChanged.emit()
 
-    def install(self, m, btn, bar):
-        extra = []
-        if m.get("commercial") == "no":
-            extra.append(tr("nc"))
-        if m.get("trust") == "repackaged":
-            extra.append(tr("unofficial"))
-        if m.get("notes"):
-            extra.append(html.escape(m["notes"]))
-        q = QMessageBox(self)
-        q.setWindowTitle(tr("lib_title"))
-        q.setTextFormat(Qt.TextFormat.RichText)
-        q.setText(tr("license_q") % (html.escape(m["name"]), m.get("license_url", ""), m["license"],
-                                     "<br>".join(extra), (m.get("size") or 0) / 1e9))
-        q.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if q.exec() != QMessageBox.StandardButton.Yes:
+    @pyqtSlot(str)
+    def installModel(self, model_id):
+        m = next((m for m in self.reg["models"] if m["id"] == model_id), None)
+        if not m or model_id in self.installing:
             return
-        btn.setEnabled(False)
-        btn.setText(tr("installing"))
-        bar.show()
+        self.installing[model_id] = 0
+        self._set_note("")
+        self.libraryChanged.emit()
         w = InstallWorker(m)
-        w.progress.connect(bar.setValue)
-        w.done.connect(lambda _id: self.fill())
-        w.failed.connect(lambda msg: (QMessageBox.warning(self, tr("lib_title"), msg), self.fill()))
+        w.progress.connect(lambda pct, i=model_id: self._on_progress(i, pct))
+        w.done.connect(self._on_installed)
+        w.failed.connect(lambda msg, i=model_id: self._on_install_failed(i, msg))
         self.workers.append(w)
         w.start()
 
+    def _on_progress(self, model_id, pct):
+        self.installing[model_id] = pct
+        self.installProgress.emit(model_id, pct)
 
-# ------------------------------------------------------------------ single instance
+    def _on_installed(self, model_id):
+        self.installing.pop(model_id, None)
+        self.modelChanged.emit()
+        self.libraryChanged.emit()
+
+    def _on_install_failed(self, model_id, msg):
+        self.installing.pop(model_id, None)
+        self._set_note(msg)
+        self.libraryChanged.emit()
+
+    @pyqtSlot(str, result=str)
+    def md(self, text):
+        return markdown_html(text)
+
+    @pyqtSlot(str)
+    def copy(self, text):
+        QGuiApplication.clipboard().setText(text)
+
+    @pyqtSlot(str)
+    def openUrl(self, url):
+        if url.startswith("https://"):
+            QDesktopServices.openUrl(QUrl(url))
+
+
+# ------------------------------------------------------------------ window control
+
+class Controller:
+    def __init__(self, win, bridge):
+        self.win, self.bridge = win, bridge
+
+    def show(self):
+        screen = self.win.screen() or QGuiApplication.primaryScreen()
+        if screen:  # honoured on X11; on Wayland the KWin rule centres the window
+            g = screen.availableGeometry()
+            self.win.setPosition(g.x() + (g.width() - self.win.width()) // 2,
+                                 g.y() + int(g.height() * 0.14))
+        self.win.show()
+        self.win.raise_()
+        self.win.requestActivate()
+
+    def toggle(self):
+        if self.win.isVisible() and self.win.isActive():
+            self.win.hide()
+        else:
+            self.show()
+
+    def handle(self, req):
+        if req.get("file"):
+            self.show()
+            self.bridge.run_file(req["file"], req.get("task") or "summarize")
+        elif req.get("library"):
+            self.show()
+            self.bridge.openLibraryRequested.emit()
+        elif req.get("ask"):
+            self.show()
+            self.bridge.send(req["ask"])
+        else:
+            self.toggle()
+
 
 def socket_name():
     return "%s-%d" % (APP_ID, os.getuid())
@@ -551,9 +521,9 @@ def forward_to_running(request):
 
 
 class Server(QObject):
-    def __init__(self, panel):
+    def __init__(self, controller):
         super().__init__()
-        self.panel = panel
+        self.controller = controller
         QLocalServer.removeServer(socket_name())
         self.srv = QLocalServer()
         self.srv.newConnection.connect(self.accept)
@@ -563,23 +533,17 @@ class Server(QObject):
         conn = self.srv.nextPendingConnection()
         conn.waitForReadyRead(500)
         try:
-            handle(self.panel, json.loads(bytes(conn.readAll()).decode() or "{}"))
+            self.controller.handle(json.loads(bytes(conn.readAll()).decode() or "{}"))
         except ValueError:
             pass
         conn.disconnectFromServer()
 
 
-def handle(panel, req):
-    if req.get("file"):
-        panel.run_file_task(req["file"], req.get("task", "summarize"))
-    elif req.get("library"):
-        panel.show_centered()
-        panel.open_library()
-    elif req.get("ask"):
-        panel.show_centered()
-        panel.send(req["ask"])
-    else:
-        panel.toggle()
+def system_dark():
+    try:
+        return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
+    except AttributeError:
+        return False
 
 
 def main(argv=None):
@@ -588,43 +552,62 @@ def main(argv=None):
     ap.add_argument("--file", help="file to work on (used by the Dolphin menu)")
     ap.add_argument("--task", choices=["summarize", "explain", "translate"], default="summarize")
     ap.add_argument("--ask", help="send this question right away")
+    ap.add_argument("--theme", choices=["auto", "light", "dark"],
+                    default=os.environ.get("NURI_THEME", "auto"))
     ap.add_argument("--screenshot", metavar="PNG",
-                    help="for docs/tests: save the window after the answer (or library) and quit")
+                    help="for docs/tests: save the window once it settles, then quit")
+    ap.add_argument("--confirm", metavar="MODEL_ID", help=argparse.SUPPRESS)  # docs: licence dialog
     args = ap.parse_args(argv)
     req = {"library": args.library, "ask": args.ask,
            "file": str(Path(args.file).resolve()) if args.file else None, "task": args.task}
 
-    app = QApplication(sys.argv[:1])
+    if args.screenshot or os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+        QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Software)
+    app = QGuiApplication(sys.argv[:1])
     app.setApplicationName(APP_ID)
     app.setDesktopFileName(APP_ID)
+    app.setWindowIcon(QIcon.fromTheme(APP_ID))
     app.setQuitOnLastWindowClosed(False)
     if not args.screenshot and forward_to_running(req):
         return 0
-    app.setStyleSheet(stylesheet())
-    panel = Panel()
+
+    dark = system_dark() if args.theme == "auto" else args.theme == "dark"
+    bridge = Bridge(dark)
+    engine = QQmlApplicationEngine()
+    engine.rootContext().setContextProperty("bridge", bridge)
+    engine.load(QUrl.fromLocalFile(str(QML_MAIN)))
+    if not engine.rootObjects():
+        print("failed to load " + str(QML_MAIN), file=sys.stderr)
+        return 1
+    win = engine.rootObjects()[0]
+    ctl = Controller(win, bridge)
 
     if args.screenshot:
-        def shoot(widget):
-            widget.grab().save(args.screenshot)
+        def shoot():
+            img = win.grabWindow()
+            if not img.save(args.screenshot):
+                print("could not save " + args.screenshot, file=sys.stderr)
             app.quit()
-        if args.library:
-            lib = Library(panel)
-            lib.show()
-            QTimer.singleShot(800, lambda: shoot(lib))
+        ctl.show()
+        delay = int(os.environ.get("NURI_SHOT_DELAY", "900"))
+        if args.confirm:
+            bridge.installDialogRequested.emit(args.confirm)
+            QTimer.singleShot(delay, shoot)
+        elif args.library:
+            bridge.openLibraryRequested.emit()
+            QTimer.singleShot(delay, shoot)
+        elif args.ask or args.file:
+            bridge.settled.connect(lambda: QTimer.singleShot(700, shoot))
+            QTimer.singleShot(0, lambda: ctl.handle(req))
         else:
-            panel.after_answer = lambda: shoot(panel)
-            panel.show_centered()
-            if not (args.ask or args.file):
-                QTimer.singleShot(800, lambda: shoot(panel))
+            QTimer.singleShot(delay, shoot)
     else:
-        Server(panel)
-    if args.screenshot and args.library:
-        pass  # the library window above is the whole screenshot
-    elif any(req.get(k) for k in ("library", "ask", "file")):
-        QTimer.singleShot(0, lambda: handle(panel, req))
-    elif not args.screenshot:
-        panel.show_centered()
-    return app.exec()
+        server = Server(ctl)  # noqa: F841  (kept alive by the event loop)
+        QTimer.singleShot(0, lambda: ctl.handle(req) if any(req.get(k) for k in ("library", "ask", "file"))
+                          else ctl.show())
+    ret = app.exec()
+    del engine  # tear down QML before the bridge it binds to
+    return ret
 
 
 if __name__ == "__main__":

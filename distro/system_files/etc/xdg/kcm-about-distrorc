@@ -1,0 +1,5 @@
+[General]
+Name=Nuri OS
+LogoPath=/usr/share/pixmaps/nuri-logo.png
+Variant=KDE Plasma · on-device AI
+UseOSReleaseVersion=true

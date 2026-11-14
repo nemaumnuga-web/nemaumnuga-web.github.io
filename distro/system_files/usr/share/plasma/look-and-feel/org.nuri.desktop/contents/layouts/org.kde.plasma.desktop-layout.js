@@ -2,7 +2,7 @@
 // Runs once, on a user's first login: a slim top bar with the app menu,
 // the focused app's global menu, tray and clock, plus a centred floating dock.
 
-var WALLPAPER = "file:///usr/share/wallpapers/Nuri/contents/images/3840x2160.png";
+var WALLPAPER = "file:///usr/share/wallpapers/Nuri/contents/images/3840x2160.jpg";
 
 // ---- desktop & wallpaper
 var all = desktops();

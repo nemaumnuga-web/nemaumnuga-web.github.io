@@ -3,8 +3,8 @@ LookAndFeelPackage=org.nuri.desktop
 widgetStyle=Breeze
 
 [General]
-ColorScheme=BreezeLight
-AccentColor=91,103,241
+ColorScheme=Nuri
+AccentColor=99,102,241
 
 [Icons]
 Theme=breeze

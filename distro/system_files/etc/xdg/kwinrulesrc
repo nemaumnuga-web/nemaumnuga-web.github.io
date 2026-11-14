@@ -1,0 +1,20 @@
+# The Nuri AI panel opens centred, above other windows, and stays out of
+# the task bar and pager - like a launcher, not a document window.
+[General]
+count=1
+rules=nuri-assistant
+
+[nuri-assistant]
+Description=Nuri AI panel
+wmclass=nuri-assistant
+wmclassmatch=1
+placement=5
+placementrule=2
+above=true
+aboverule=2
+skiptaskbar=true
+skiptaskbarrule=2
+skippager=true
+skippagerrule=2
+noborder=true
+noborderrule=2

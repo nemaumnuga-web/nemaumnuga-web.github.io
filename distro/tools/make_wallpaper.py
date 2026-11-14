@@ -1,69 +1,100 @@
 #!/usr/bin/env python3
-"""Generate Nuri OS's default wallpaper (light + dark) - original artwork.
+"""Generate Nuri OS's default wallpaper "Silk" (light + dark) - original artwork.
 
-    python3 tools/make_wallpaper.py        # needs Pillow
+    python3 tools/make_wallpaper.py        # needs numpy and Pillow
 
-Soft aurora-like colour fields: a few large blurred blobs on a gradient,
-rendered small and upscaled so it is fast and band-free. Deterministic.
+Flowing ribbons of light over a soft gradient: each ribbon is a wavy curve
+with a wide glow, a bright core and a faint silk sheen, coloured along its
+length through the Nuri palette. Deterministic, rendered at 4K.
 """
-import random
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+import numpy as np
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "system_files/usr/share/wallpapers/Nuri/contents"
 W, H = 3840, 2160
-SMALL = (384, 216)
+
+PALETTE = np.array([
+    (0.36, 0.42, 1.00),   # indigo
+    (0.56, 0.36, 0.96),   # violet
+    (0.89, 0.44, 0.70),   # pink
+    (0.35, 0.72, 1.00),   # sky
+], dtype=np.float32)
+
+# (centre, wave amplitudes, frequencies, phases, width, colour offset, strength)
+RIBBONS = [
+    (0.58, (0.10, 0.035), (0.55, 1.7), (0.10, 0.62), 0.085, 0.00, 1.00),
+    (0.64, (0.12, 0.030), (0.48, 1.4), (0.32, 0.15), 0.060, 0.30, 0.85),
+    (0.50, (0.08, 0.040), (0.62, 2.1), (0.71, 0.40), 0.045, 0.55, 0.70),
+    (0.72, (0.07, 0.025), (0.40, 1.2), (0.05, 0.85), 0.110, 0.80, 0.55),
+]
 
 THEMES = {
-    "images": {
-        "top": (236, 240, 255), "bottom": (250, 236, 246),
-        "blobs": [((96, 116, 255), 0.55), ((166, 120, 255), 0.5), ((255, 150, 200), 0.45),
-                  ((110, 205, 255), 0.45)],
-    },
-    "images_dark": {
-        "top": (14, 16, 34), "bottom": (30, 14, 38),
-        "blobs": [((70, 82, 230), 0.6), ((132, 72, 230), 0.55), ((214, 82, 160), 0.45),
-                  ((40, 140, 220), 0.4)],
-    },
+    "images": dict(top=(0.93, 0.94, 1.00), bottom=(0.99, 0.95, 0.98), mode="mix", gain=0.85, vignette=0.0),
+    "images_dark": dict(top=(0.05, 0.06, 0.14), bottom=(0.08, 0.04, 0.12), mode="screen", gain=0.95, vignette=0.35),
 }
 
 
-def render(theme, seed=7):
-    rnd = random.Random(seed)
-    w, h = SMALL
-    img = Image.new("RGB", SMALL)
-    px = img.load()
-    for y in range(h):
-        t = y / (h - 1)
-        c = tuple(int(a + (b - a) * t) for a, b in zip(theme["top"], theme["bottom"]))
-        for x in range(w):
-            px[x, y] = c
-    for color, alpha in theme["blobs"]:
-        layer = Image.new("RGBA", SMALL, color + (0,))
-        d = ImageDraw.Draw(layer)
-        cx, cy = rnd.uniform(0.1, 0.9) * w, rnd.uniform(0.15, 0.85) * h
-        rx, ry = rnd.uniform(0.25, 0.45) * w, rnd.uniform(0.25, 0.5) * h
-        d.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=color + (int(255 * alpha),))
-        layer = layer.filter(ImageFilter.GaussianBlur(radius=38))
-        img = Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB")
-    img = img.filter(ImageFilter.GaussianBlur(radius=6))
-    big = img.resize((W, H), Image.Resampling.BICUBIC)
-    # A whisper of noise hides 8-bit banding on large displays.
-    noise = Image.effect_noise((W, H), 6).convert("RGB")
-    return Image.blend(big, noise, 0.025)
+def palette_at(t):
+    """Smooth cyclic interpolation through PALETTE for t in [0, 1)."""
+    n = len(PALETTE)
+    x = (t % 1.0) * n
+    i = np.floor(x).astype(int) % n
+    f = (x - np.floor(x))[..., None]
+    f = f * f * (3 - 2 * f)  # smoothstep
+    return PALETTE[i] * (1 - f) + PALETTE[(i + 1) % n] * f
+
+
+def render(theme, w=W, h=H):
+    u = np.linspace(0, 1, w, dtype=np.float32)[None, :]
+    v = np.linspace(0, 1, h, dtype=np.float32)[:, None]
+    top, bottom = (np.array(theme[k], np.float32) for k in ("top", "bottom"))
+    t = np.clip(0.65 * v + 0.35 * u, 0, 1)[..., None]
+    img = top * (1 - t) + bottom * t
+
+    aspect = h / w
+    for centre, amps, freqs, phases, width, coff, strength in RIBBONS:
+        c = (centre + amps[0] * np.sin(2 * np.pi * (freqs[0] * u + phases[0]))
+             + amps[1] * np.sin(2 * np.pi * (freqs[1] * u + phases[1])))
+        # gentle diagonal drift, thicker in the middle of the screen
+        c = c - 0.18 * (u - 0.5)
+        wid = width * (0.7 + 0.5 * np.sin(np.pi * u) ** 2)
+        d = (v - c) / (wid / aspect * 0.6)
+        glow = np.exp(-d * d)
+        core = np.exp(-(d / 0.16) ** 2)
+        sheen = 0.5 + 0.5 * np.cos(d * 9.0)
+        a = (0.55 * glow * (0.8 + 0.2 * sheen) + 0.35 * core) * strength * theme["gain"]
+        col = palette_at(u * 0.9 + coff)  # (1, w, 3)
+        a = a[..., None]
+        if theme["mode"] == "screen":
+            img = 1 - (1 - img) * (1 - col * a)
+        else:
+            a = np.clip(a * 0.85, 0, 1)
+            img = img * (1 - a) + col * a
+
+    if theme["vignette"]:
+        r = np.sqrt(((u - 0.5) * 1.2) ** 2 + ((v - 0.5)) ** 2)
+        img = img * (1 - theme["vignette"] * np.clip(r - 0.25, 0, 1)[..., None])
+
+    rng = np.random.default_rng(7)
+    img = img + rng.normal(0, 0.6 / 255, img.shape).astype(np.float32)  # hides banding
+    return Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8), "RGB")
 
 
 def main():
+    for old in OUT.glob("images*/*.png"):
+        old.unlink()
     for folder, theme in THEMES.items():
         d = OUT / folder
         d.mkdir(parents=True, exist_ok=True)
         img = render(theme)
-        img.save(d / ("%dx%d.png" % (W, H)), optimize=True)
-        img.resize((1920, 1080), Image.Resampling.LANCZOS).save(d / "1920x1080.png", optimize=True)
+        img.save(d / ("%dx%d.jpg" % (W, H)), quality=93, subsampling=0, optimize=True)
+        img.resize((1920, 1080), Image.Resampling.LANCZOS).save(
+            d / "1920x1080.jpg", quality=93, subsampling=0, optimize=True)
         print("wrote", d)
-    render(THEMES["images"]).resize((400, 225)).save(OUT / "screenshot.png")
+    render(THEMES["images"], 800, 450).save(OUT / "screenshot.png")
 
 
 if __name__ == "__main__":

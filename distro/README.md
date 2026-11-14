@@ -3,9 +3,17 @@
 KDE Plasma 데스크톱에 **PC 안에서만 동작하는 AI 비서**를 넣은 리눅스 배포판이에요.
 Fedora Kinoite(atomic KDE)를 기반으로 하고, OS 전체를 컨테이너 이미지 하나로 만들어 배포해요.
 
-| AI 패널 (`Meta+Space`) | 모델 라이브러리 |
+| AI 패널 (`Meta+Space`) | 실제 답변 (Qwen3.5 4B, CPU) |
 |---|---|
-| ![AI 패널](docs/screenshots/chat.png) | ![모델 라이브러리](docs/screenshots/library.png) |
+| ![AI 패널 첫 화면](docs/screenshots/empty-light.png) | ![AI 답변](docs/screenshots/chat-light.png) |
+| **모델 라이브러리** | **설치 전 라이선스 확인** |
+| ![모델 라이브러리](docs/screenshots/library-dark.png) | ![라이선스 확인](docs/screenshots/confirm-light.png) |
+
+| 배경화면 "Silk" (밝게 / 어둡게) | 로그인 스플래시 |
+|---|---|
+| ![밝은 배경화면](docs/screenshots/wallpaper-light.jpg) ![어두운 배경화면](docs/screenshots/wallpaper-dark.jpg) | ![스플래시](docs/screenshots/splash.png) |
+
+모든 그림(로고, 아이콘, 배경화면, 스플래시)은 이 저장소의 코드로 직접 생성해요(`make art`).
 
 > 이름 "Nuri"는 임시 코드네임이에요. 공개 전에 상표 검색을 하고 확정하세요.
 > 이름은 `build_files/20-branding.sh`, `Containerfile`, `nuri-ai`의 문구에 있어요.
@@ -18,8 +26,9 @@ Fedora Kinoite(atomic KDE)를 기반으로 하고, OS 전체를 컨테이너 이
 | 로컬 AI 엔진: llama.cpp 직접 빌드 (모든 x86-64 CPU 변형 + Vulkan GPU), 127.0.0.1 전용 | 동작 확인 |
 | `nuri-ai` CLI: PC 사양·언어별 추천 (A, B, C…, ✨), 고정된 파일·SHA-256 검증 설치, 이어받기 | 동작 확인 |
 | 긴 대화: 전체 기록은 디스크에, 오래된 대화는 "사실 메모"로 요약 | 동작 확인 (Qwen3.5 4B) |
-| **누리 AI 패널** (GUI): 스포트라이트형 대화창, 실시간 답변, 다크 모드 | 화면 렌더링 확인 |
-| **모델 라이브러리** (GUI): 언어 선택, ✨ 추천, 비상업·비공식 경고, 설치 진행 막대 | 화면 렌더링 확인 |
+| **누리 AI 패널** (Qt Quick): 스포트라이트형 대화창, 실시간 스트리밍, 마크다운 답변, 입력 중 애니메이션, 추천 질문 카드, 답변 복사, 밝게/어둡게 자동 | 화면 렌더링 확인 |
+| **모델 라이브러리**: 언어 칩, 검색, ✨ 추천, RAM 적합도 막대, 비상업·비공식 경고, 라이선스 확인 창, 설치 진행 막대 | 화면 렌더링 확인 |
+| **누리 로고·아이콘**, **로그인 스플래시**(단계별 진행 막대), **누리 색 테마**(밝게/어둡게), 배경화면 "Silk" | 렌더링 확인 (데스크톱 적용은 실기 미검증) |
 | **Dolphin 우클릭 메뉴**: 텍스트 파일 요약·설명·번역 | 동작 확인 (GUI 테스트), 실기 미검증 |
 | **맥 느낌 데스크톱**: 상단 바(전역 메뉴·한/A 표시·시계), 가운데 떠 있는 독, 왼쪽 창 버튼, 자체 배경화면(밝게/어둡게) | 작성됨, 실기 부팅 미검증 |
 | **한글 입력** (fcitx5-hangul, 한/영 키 또는 Ctrl+Space) | 설치됨, 실기 미검증 |
@@ -39,17 +48,21 @@ build_files/
   30-services.sh              서비스 활성화, 아이콘 캐시
 system_files/                 이미지에 그대로 복사되는 파일
   usr/lib/nuri/nuri_ai.py     AI 핵심 로직 (추천, 설치·검증, 대화·기억) - 표준 라이브러리만 사용
-  usr/lib/nuri/nuri_assistant.py  GUI: AI 패널, 모델 라이브러리, 파일 작업 (PyQt6)
+  usr/lib/nuri/nuri_assistant.py  GUI 연결부: AI 엔진 ↔ 화면 (PyQt6)
+  usr/lib/nuri/qml/           GUI 화면 (Qt Quick): Main, Logo, Icon, 버튼 부품
   usr/bin/nuri-ai, nuri-assistant 실행 파일
   usr/share/applications/     누리 AI 실행 항목 (Meta+Space)
   usr/share/kio/servicemenus/ Dolphin 우클릭 "누리 AI" 메뉴
-  usr/share/plasma/look-and-feel/org.nuri.desktop/  데스크톱 배치·기본 테마
-  usr/share/wallpapers/Nuri/  자체 제작 배경화면 (tools/make_wallpaper.py로 생성)
-  etc/xdg/                    KDE 기본값 (창 버튼 위치, 입력기, 단축키, 잠금화면)
+  usr/share/plasma/look-and-feel/org.nuri.desktop/  데스크톱 배치, 기본값, 스플래시, 미리보기
+  usr/share/color-schemes/    누리 색 테마 (Nuri, NuriDark)
+  usr/share/wallpapers/Nuri/  배경화면 "Silk" (tools/make_wallpaper.py로 생성)
+  etc/xdg/                    KDE 기본값 (창 버튼, 입력기, 단축키, 잠금화면, 스플래시,
+                              AI 창 배치 규칙, '이 시스템 정보' 로고)
   usr/lib/systemd/            nuri-ai.service(사용자), nuri-flatpak-setup.service
   usr/share/nuri/models.json  고정된 모델 레지스트리
 registry/models.src.json      사람이 고르는 모델 목록과 언어별 추천 순위
-tools/                        레지스트리 고정, 배경화면 생성, 데스크톱 스크린샷 도구
+tools/                        레지스트리 고정, 그림 생성(배경화면·색 테마·미리보기·QML 렌더),
+                              데스크톱 스크린샷 도구
 iso/config.toml               설치 ISO 설정
 tests/                        CLI 테스트 + GUI 테스트(화면 없이 렌더링)
 ```
@@ -62,6 +75,7 @@ tests/                        CLI 테스트 + GUI 테스트(화면 없이 렌더
 make test                # 단위 테스트 + GUI 테스트 (PyQt6 있으면)
 make build               # OS 이미지 빌드 → localhost/nuri:dev
 make run                 # 이미지 안에서 셸 열기
+make art                 # 배경화면·색 테마·로고 PNG·테마 미리보기 다시 생성
 make iso                 # 설치용 ISO → output/ (podman, root 필요)
 ```
 
@@ -100,7 +114,11 @@ nuri-ai status
 - 상단 바: 앱 메뉴(누리 아이콘), 현재 앱의 전역 메뉴, 한/A 입력기 표시, 트레이, 날짜·시계
 - 하단 독: 가운데 정렬, 떠 있고, 창이 겹치면 비켜요. 파일·Firefox·누리 AI·터미널·Discover·설정·휴지통
 - 창 버튼: 왼쪽에 닫기·최소화·최대화
-- 배경화면: 직접 생성한 그라데이션(밝게/어둡게). 애플 로고·아이콘·이름은 쓰지 않아요.
+- 색 테마: 누리(밝게) 기본, 누리 어둡게 선택 가능. 강조색은 인디고(#6366F1)
+- 배경화면: "Silk" - 빛 리본이 흐르는 그림(밝게/어둡게). 애플 로고·아이콘·이름은 쓰지 않아요.
+- 로그인 스플래시: 누리 로고가 숨 쉬듯 움직이고, 시작 단계에 따라 진행 막대가 차요.
+- 누리 AI 창은 KWin 규칙으로 화면 가운데, 다른 창 위에, 작업 표시줄에는 안 보이게 떠요.
+- 시스템 설정 → 전역 테마의 미리보기 그림은 실제 화면 캡처가 아니라 배치를 그린 일러스트예요.
 
 모든 설정은 시스템 설정에서 바꿀 수 있어요. 기본값은 `system_files/etc/xdg/`와
 `look-and-feel/org.nuri.desktop/`에 있어요.
@@ -149,6 +167,6 @@ nuri-ai status
 
 ## 라이선스
 
-이 저장소의 코드는 Apache License 2.0, 배경화면은 CC BY 4.0이에요. 함께 빌드되는 llama.cpp는
+이 저장소의 코드는 Apache License 2.0, 배경화면·로고·스플래시 그림은 CC BY 4.0이에요. 함께 빌드되는 llama.cpp는
 MIT 라이선스예요(`/usr/libexec/nuri-llama/LICENSE`). 각 AI 모델은 각자의 라이선스를 따르고,
 `nuri-ai install`이 설치 전에 그 라이선스를 보여 주고 동의를 받아요.

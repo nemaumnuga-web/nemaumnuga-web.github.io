@@ -2,8 +2,8 @@
 widgetStyle=Breeze
 
 [kdeglobals][General]
-ColorScheme=BreezeLight
-AccentColor=91,103,241
+ColorScheme=Nuri
+AccentColor=99,102,241
 
 [kdeglobals][Icons]
 Theme=breeze
@@ -25,3 +25,7 @@ library=org.kde.breeze
 theme=Breeze
 ButtonsOnLeft=XIA
 ButtonsOnRight=
+
+[ksplashrc][KSplash]
+Engine=KSplashQML
+Theme=org.nuri.desktop

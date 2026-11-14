@@ -83,6 +83,23 @@ class AssistantGuiTest(unittest.TestCase):
         self.assertGreaterEqual(w, min_w)
         self.assertGreaterEqual(h, min_h)
 
+    QML_ERRORS = ("TypeError", "ReferenceError", "is not defined", "Cannot assign", "Unable to assign",
+                  "failed to load", "Type error", "Binding loop", ".qml:")
+
+    def assert_clean(self, proc):
+        bad = [l for l in proc.stderr.splitlines() if any(k in l for k in self.QML_ERRORS)]
+        self.assertEqual(bad, [], "QML warnings:\n" + "\n".join(bad[:10]))
+
+    def test_every_screen_loads_without_qml_errors(self):
+        reg = self.install_fake_model()
+        for theme in ("light", "dark"):
+            for args in ([], ["--library"], ["--confirm", "tiny"], ["--ask", "hi"]):
+                with self.subTest(theme=theme, args=args):
+                    shot = self.shots / ("%s-%s.png" % (theme, "-".join(args).strip("-") or "empty"))
+                    p = self.run_app("--theme", theme, *args, "--screenshot", str(shot), registry=reg)
+                    self.assert_clean(p)
+                    self.assert_png(shot, 600, 400)
+
     def test_library_renders_shipped_registry(self):
         shot = self.shots / "library.png"
         self.run_app("--library", "--screenshot", str(shot))
@@ -108,6 +125,36 @@ class AssistantGuiTest(unittest.TestCase):
         blob.write_bytes(b"\x00\x01binary")
         self.run_app("--file", str(blob), "--screenshot", str(self.shots / "binary.png"), registry=reg)
         self.assertFalse((self.dir / "data/chats/files.json").read_text().count("binary"))
+
+
+@unittest.skipUnless(HAVE_QT, "PyQt6 not installed")
+class ThemeArtTest(unittest.TestCase):
+    LNF = ROOT / "system_files/usr/share/plasma/look-and-feel/org.nuri.desktop/contents"
+
+    def test_splash_renders_without_qml_errors(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "splash.png"
+            p = subprocess.run([sys.executable, str(ROOT / "tools/render_qml.py"),
+                                str(self.LNF / "splash/Splash.qml"), str(out), "960x540",
+                                "--prop", "stage=3", "--wait", "500"],
+                               capture_output=True, text=True, timeout=60,
+                               env=dict(os.environ, QT_QPA_PLATFORM="offscreen"))
+            self.assertEqual(p.returncode, 0, p.stderr)
+            bad = [l for l in p.stderr.splitlines() if ".qml:" in l or "Error" in l]
+            self.assertEqual(bad, [])
+            self.assertTrue(out.read_bytes().startswith(b"\x89PNG"))
+
+    def test_theme_files_reference_existing_assets(self):
+        defaults = (self.LNF / "defaults").read_text()
+        self.assertIn("ColorScheme=Nuri", defaults)
+        self.assertIn("Theme=org.nuri.desktop", defaults)
+        for scheme in ("Nuri", "NuriDark"):
+            self.assertTrue((ROOT / ("system_files/usr/share/color-schemes/%s.colors" % scheme)).is_file())
+        layout = (self.LNF / "layouts/org.kde.plasma.desktop-layout.js").read_text()
+        wall = layout.split('"file://')[1].split('"')[0]
+        self.assertTrue((ROOT / "system_files" / wall.lstrip("/")).is_file(), wall)
+        for name in ("preview.png", "splash.png", "fullscreenpreview.jpg"):
+            self.assertTrue((self.LNF / "previews" / name).is_file(), name)
 
 
 if __name__ == "__main__":
