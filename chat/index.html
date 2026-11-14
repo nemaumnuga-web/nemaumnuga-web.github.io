@@ -353,7 +353,7 @@ body.voice .voicebar{display:flex}
     <label for="sVoice">읽어주는 목소리</label>
     <select id="sVoice"><option value="female">여성</option><option value="male">남성</option></select>
     <label for="sVmodel">음성 대화 답변 모델</label>
-    <select id="sVmodel"><option value="audio">LFM3 Audio (기본, 빠름)</option><option value="vl">라온 미니 (추론 끔, 더 정확)</option></select>
+    <select id="sVmodel"><option value="audio">LFM3 Audio (기본, 빠름)</option><option value="vl">라온 나노 (추론 끔, 빠름)</option></select>
     <label class="chk"><input id="sAuto" type="checkbox"> 답변 자동으로 소리 내어 읽기</label>
     <button class="row-btn" id="sPatch" style="margin-top:14px;border:1px solid var(--border);justify-content:center">📋 패치노트 보기</button>
     <div class="btns"><button id="sCancel">취소</button><button class="pri" id="sSave">저장</button></div>
@@ -369,8 +369,12 @@ var LS={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}c
 /* ---------- 패치노트 ----------
  * ★ 이 파일을 고칠 때마다 APP_VERSION 을 1 올리고 PATCHES 맨 앞에 바뀐 내용을 추가하세요.
  *   그러면 사용자가 다음에 접속할 때 바뀐 부분이 팝업으로 뜹니다. 항목은 [제목, 설명] 쌍입니다. */
-var APP_VERSION=9;
+var APP_VERSION=10;
 var PATCHES=[
+ {v:10,date:"2026-11-14",title:"라온 나노 · 자동 모델 선택",items:[
+  ["라온 나노가 돌아왔어요","이 컴퓨터에서 도는 설정을 찾아서 나노(약 14토큰/초)를 켰어요. 미니보다 약 3배 빨라요."],
+  ["모델 고르기","모델 메뉴에서 자동 · 라온 나노 · 라온 미니 중에서 골라요."],
+  ["자동 선택","짧고 가벼운 질문은 나노, 길거나 코드·분석 같은 어려운 질문과 딥 리서치·Canvas는 미니가 답해요. 답변 아래에 어느 모델이 답했는지 표시돼요."]]},
  {v:9,date:"2026-11-14",title:"라온 미니가 기본 채팅",items:[
   ["기본 채팅 모델은 라온 미니(IQ3, 13GB)예요","컨테이너 메모리 안에서 돌아가는 가장 큰 라온 모델이에요. 속도는 초당 약 5토큰이에요."],
   ["라온 나노는 잠시 보류","나노 빌드에서 로드 오류가 나서 이번에는 빠졌어요. 원인을 찾는 중이에요."]]},
@@ -415,7 +419,7 @@ var DEFAULT_SYS=[
 var cfg={
   api:LS.get("lfm.api",""),
   web:LS.get("lfm.web","0")==="1",
-  chatm:(function(v){return v==="nano"||v==="vl"||!v?"mini":v})(LS.get("lfm.chatm","mini")),
+  chatm:LS.get("lfm.chatm2","auto"),
   tts:LS.get("lfm.tts","audio"),
   deep:LS.get("lfm.deep","0")==="1",
   canvas:LS.get("lfm.canvas","0")==="1",
@@ -444,7 +448,7 @@ var cvOpenFlag=false, cvTab="view", cvLast="", cvSaveT=0;   // Canvas 패널 상
 })();
 
 function saveCfg(){
-  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");LS.set("lfm.chatm",cfg.chatm);LS.set("lfm.tts",cfg.tts);LS.set("lfm.deep",cfg.deep?"1":"0");LS.set("lfm.canvas",cfg.canvas?"1":"0");
+  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");LS.set("lfm.chatm2",cfg.chatm);LS.set("lfm.tts",cfg.tts);LS.set("lfm.deep",cfg.deep?"1":"0");LS.set("lfm.canvas",cfg.canvas?"1":"0");
   LS.set("lfm.lang",cfg.lang);LS.set("lfm.voice",cfg.voice);LS.set("lfm.vmode",cfg.auto?"1":"0");LS.set("lfm.effort",cfg.effort);
 }
 function saveChats(){
@@ -549,9 +553,10 @@ function assistantInner(m,idx,last){
   }
   var body=m.err?'<span class="err">'+esc(m.err)+"</span>":(shown?md(shown).replace("<p>[[CANVAS_CARD]]</p>",card):"");
   var act=!live?'<div class="actions"><button data-act="copy" data-i="'+idx+'" title="복사">'+ICON_COPY+'</button><button data-act="speak" data-i="'+idx+'" title="소리 내어 읽기">'+(player.idx===idx?ICON_STOP:ICON_SPEAK)+"</button>"+(last?'<button data-act="retry" title="다시 생성">'+ICON_RETRY+"</button>":"")+"</div>":"";
+  var who=(!live&&m.model&&MODEL_NAME[m.model])?'<div class="status" style="margin:2px 0 6px">'+MODEL_NAME[m.model]+"가 답함</div>":"";
   var pre=m.status?'<div class="status">'+esc(m.status)+"</div>":"";
   var srcs=(m.sources&&m.sources.length?'<div class="srcs">'+m.sources.map(function(s,i){return '<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(s.title)+'"><b>'+(i+1)+"</b> "+esc(s.title)+"</a>"}).join("")+"</div>":"")+(m.searchErr?'<div class="status">'+esc(m.searchErr)+"</div>":"");
-  return st+th+pre+'<div class="md'+((live&&m.text)?" cursor":"")+'">'+body+"</div>"+srcs+act;
+  return st+th+pre+'<div class="md'+((live&&m.text)?" cursor":"")+'">'+body+"</div>"+srcs+who+act;
 }
 function msgHTML(m,idx,last){
   if(m.role==="user"){
@@ -586,8 +591,18 @@ function updateSend(){
 
 /* ---------- API ---------- */
 function base(){var a=cfg.api.trim().replace(/\/+$/,"");return a.replace(/\/v1$/,"")}
-function chatBase(){return base()+(cfg.chatm==="mini"?"":"/"+cfg.chatm)}   // 기본(라온 미니)은 /
-function chatName(){return {mini:"라온 미니 (Raon-1 mini)"}[cfg.chatm]||"라온 미니 (Raon-1 mini)"}
+function modelBase(m){return base()+(m==="nano"?"/nano":"")}      // 라온 나노는 /nano, 라온 미니는 /
+function nanoBase(){return modelBase("nano")}
+var MODEL_NAME={nano:"라온 나노",mini:"라온 미니"};
+function chatName(){return cfg.chatm==="auto"?"자동 (라온)":(MODEL_NAME[cfg.chatm]||"라온")+" (Raon-1)"}
+// 자동 선택: 짧고 가벼운 질문은 빠른 나노(약 14토큰/초), 어려운 작업은 미니(약 5토큰/초)
+var HARD_RE=/분석|비교|설계|코드|프로그램|알고리즘|증명|계산|논리|논문|보고서|전략|장단점|왜 |이유|원인|자세히|단계별|구현|디버그|오류|에러|refactor|explain|analy|compare|design|code|proof/i;
+function pickModel(c,hasCtx){
+  if(cfg.chatm!=="auto")return cfg.chatm;
+  var u=lastUser(c),t=(u&&u.text)||"";
+  if(cfg.deep||cfg.canvas||hasCtx||(u&&u.img)||t.length>=160||HARD_RE.test(t))return "mini";
+  return "nano";
+}
 function vbase(){return base()+"/voice"}      // 음성 서버(LFM3 Audio)는 같은 주소의 /voice 경로
 function headers(){var h={"Content-Type":"application/json"};if(cfg.key)h["Authorization"]="Bearer "+cfg.key;return h}
 function checkHealth(){
@@ -603,7 +618,7 @@ function checkHealth(){
   }).catch(function(){caps.levels=[];effLabel()});
 }
 var EFF={minimal:"Minimal",low:"Low",medium:"Medium",high:"High",xhigh:"Extra High",max:"Max"};
-function setModelName(){var n=$("modelName");if(n)n.textContent=chatName().replace(/ 2B$/,"").replace(/ \(.*\)$/,"")}
+function setModelName(){var n=$("modelName");if(n)n.textContent=chatName().replace(/ \(.*\)$/,"")}
 function effLabel(){$("effLabel").textContent=(cfg.effort&&caps.levels.length)?(EFF[cfg.effort]||cfg.effort):(cfg.think?"":"추론 끔")}
 function apiMessages(c,extra){
   var arr=[],sys=cfg.sys.trim();
@@ -645,7 +660,7 @@ function jget(path,params){
 // 모델에게 짧은 작업을 시키고 결과를 한 번에 받는다(스트리밍 없음, 생각 끔)
 function llm(messages,max){
   var body={model:"lfm3-vl",max_tokens:max||80,temperature:0,repeat_penalty:1.1,chat_template_kwargs:{enable_thinking:false},messages:messages};
-  return fetch(base()+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)})
+  return fetch(nanoBase()+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)})
     .then(function(r){return r.ok?r.json():null})
     .then(function(j){var t=(j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||"";return t.split("</think>").pop().trim()});
 }
@@ -981,7 +996,8 @@ function run(c){
   if(!cfg.api){a.err="서버 주소가 설정되지 않았습니다. 왼쪽 아래 ⚙️ 설정에서 입력하세요.";return done()}
   Promise.resolve().then(function(){ return gather(c,a,paint,isV) }).then(function(ctx){
     a.status="";
-    var body={model:isV&&!useVL?"lfm3-audio":"lfm3-vl",messages:apiMessages(c,ctx),stream:true};
+    var cmodel=isV?"mini":pickModel(c,!!ctx);a.model=isV?undefined:cmodel;
+    var body={model:isV&&!useVL?"lfm3-audio":"raon-"+cmodel,messages:apiMessages(c,ctx),stream:true};
     if(isV){
       body.max_tokens=150;                                  // 음성 답변은 짧게(반복 루프 방지)
       if(useVL)body.chat_template_kwargs={enable_thinking:false};else body.repeat_penalty=1.1;
@@ -991,7 +1007,7 @@ function run(c){
       if(cfg.effort&&caps.levels.indexOf(cfg.effort)>=0)body.reasoning_effort=cfg.effort;
       if(a.deep)body.max_tokens=1600;                       // 딥 리서치 보고서는 길게
     }
-    return fetch((isV&&!useVL?vbase():chatBase())+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)});
+    return fetch((isV&&!useVL?vbase():(useVL?nanoBase():modelBase(cmodel)))+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)});
   }).then(function(r){
     if(!r.ok)return r.text().then(function(t){throw new Error("서버 오류 "+r.status+(r.status===401?" (API 키를 확인하세요)":"")+" "+t.slice(0,200))});
     var rd=r.body.getReader(),dec=new TextDecoder(),buf="";
@@ -1374,7 +1390,7 @@ function runTool(t){
   var inp=$("input");inp.value=pre+inp.value;inp.focus();inp.dispatchEvent(new Event("input"));
 }
 function buildModelMenu(){
-  var CM=[["mini","라온 미니 (Raon-1 mini)","기본 · 텍스트 · 추론 · 13GB · 느림(약 5토큰/초)"]];
+  var CM=[["auto","자동","짧고 가벼운 질문은 나노, 어려운 작업은 미니가 답해요"],["nano","라온 나노 (Raon-1 nano)","빠름 · 약 14토큰/초 · 2GB"],["mini","라온 미니 (Raon-1 mini)","더 똑똑함 · 약 5토큰/초 · 13GB"]];
   var h='<div class="ttl">채팅 모델</div>';
   CM.forEach(function(m){h+='<button class="opt" data-cm="'+m[0]+'"><span class="grow">'+esc(m[1])+"<small>"+esc(m[2])+'</small></span>'+(cfg.chatm===m[0]?"<span>✓</span>":"")+"</button>"});
   h+='<div class="ttl">읽어 주는 목소리</div>';
