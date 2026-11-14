@@ -221,6 +221,8 @@ def main(argv=None, mode="control"):
         print("failed to load " + str(qml), file=sys.stderr)
         return 1
     win = engine.rootObjects()[0]
+    if mode == "control" and not args.screenshot:
+        win.setProperty("closeOnBlur", True)
     win.show()
     if args.screenshot:
         def shoot():

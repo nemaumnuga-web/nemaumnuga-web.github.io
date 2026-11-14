@@ -221,6 +221,34 @@ class ControlCenterTest(unittest.TestCase):
         st = b.stats
         self.assertGreater(st["ram_total"], 0)
 
+    def test_menu_renders_and_only_launches_known_items(self):
+        with tempfile.TemporaryDirectory() as d:
+            for args in ([], ["--logo"]):
+                for theme in ("light", "dark"):
+                    with self.subTest(args=args, theme=theme):
+                        shot = Path(d) / ("menu-%d-%s.png" % (len(args), theme))
+                        env = dict(os.environ, QT_QPA_PLATFORM="offscreen", LANG="ko_KR.UTF-8", LC_ALL="ko_KR.UTF-8",
+                                   XDG_CONFIG_HOME=d, NURI_SHOT_DELAY="300")
+                        p = subprocess.run([sys.executable, str(ROOT / "system_files/usr/bin/nuri-menu"), *args,
+                                            "--theme", theme, "--hover", "2", "--screenshot", str(shot)],
+                                           env=env, capture_output=True, text=True, timeout=60)
+                        self.assertEqual(p.returncode, 0, p.stderr[-2000:])
+                        bad = [l for l in p.stderr.splitlines() if any(k in l for k in AssistantGuiTest.QML_ERRORS)]
+                        self.assertEqual(bad, [], "\n".join(bad[:10]))
+                        self.assertTrue(shot.read_bytes().startswith(b"\x89PNG"))
+        sys.path.insert(0, str(ROOT / "system_files/usr/lib/nuri"))
+        import nuri_menu
+        b = nuri_menu.Bridge(False, logo=False, dry_run=True)
+        keys = [it["key"] for it in b.items if not it["sep"]]
+        self.assertIn("assistant", keys)
+        for it in b.items:                       # every icon exists in the Nuri theme
+            if not it["sep"]:
+                self.assertTrue((ROOT / "system_files" / it["icon"][len("file:///"):]).exists(), it["icon"])
+        b.pick("files")
+        b.pick("about")
+        b.pick("rm -rf /")                       # not a menu item: ignored
+        self.assertEqual(b.runner.log, ["dolphin", "nuri-about"])
+
 
 @unittest.skipUnless(HAVE_QT, "PyQt6 not installed")
 class ThemeArtTest(unittest.TestCase):

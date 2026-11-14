@@ -261,4 +261,9 @@ Window {
     }
 
     Shortcut { sequence: "Esc"; onActivated: Qt.quit() }
+    // like a drop-down panel: clicking anywhere else closes it
+    property bool closeOnBlur: false
+    property bool settled: false
+    Timer { interval: 500; running: true; onTriggered: win.settled = true }
+    onActiveChanged: if (!active && closeOnBlur && settled) Qt.quit()
 }

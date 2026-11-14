@@ -38,8 +38,28 @@
   </keyboard>
   <mouse>
     <default />
+    <!-- the Nuri menu instead of labwc's own (rounded, icons, touch-sized rows) -->
+    <context name="Root">
+      <mousebind button="Right" action="Press"><action name="Execute" command="nuri-menu" /></mousebind>
+      <mousebind button="Middle" action="Press"><action name="Execute" command="nuri-menu" /></mousebind>
+    </context>
     <context name="Title">
       <mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize" /></mousebind>
     </context>
   </mouse>
+  <windowRules>
+    <!-- desktop menu: centred on the pointer (its own window puts the menu's corner there) -->
+    <windowRule identifier="nuri-menu" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="AutoPlace" policy="cursor" />
+    </windowRule>
+    <!-- logo menu: right under the logo in the menu bar -->
+    <windowRule identifier="nuri-menu-logo" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="MoveTo" x="-4" y="22" />
+    </windowRule>
+    <!-- Control Center drops down at the top right, under its menu bar button -->
+    <windowRule identifier="nuri-control" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="MoveToEdge" direction="right" snapWindows="no" />
+      <action name="MoveToEdge" direction="up" snapWindows="no" />
+    </windowRule>
+  </windowRules>
 </labwc_config>

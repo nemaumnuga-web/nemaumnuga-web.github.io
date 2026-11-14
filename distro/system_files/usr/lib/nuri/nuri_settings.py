@@ -90,6 +90,12 @@ LAUNCH = {
     "files": ["dolphin"],
     "localsend": ["flatpak", "run", "org.localsend.localsend_app"],
     "welcome": ["nuri-welcome"],
+    "terminal": ["konsole"],
+    "editor": ["kwrite"],
+    "photos": ["gwenview"],
+    "control": ["nuri-control"],
+    "about": ["nuri-about"],
+    "trash": ["dolphin", "trash:/"],
 }
 
 

@@ -173,7 +173,10 @@ Plasma 셸(KWin)은 GPU가 있어야 켜져서, 이 모드에서는 labwc(소프
 (시작 안내, AI, 제어 센터, 이 컴퓨터에 관하여, 파일, 터미널, 메모장, 사진)을 띄워요.
 `tools/web-remote/`의 설정으로 맥처럼 꾸며져요: 위쪽 메뉴 막대(앞에 있는 앱 이름, AI·Wi-Fi·제어 센터
 버튼, 날짜와 시계), 아래쪽 떠 있는 독(마우스를 올리면 아이콘이 올라오고, 열린 앱 아래 점),
-빨강·노랑·초록 창 버튼과 둥근 모서리·그림자, 바탕화면 오른쪽 클릭 메뉴.
+빨강·노랑·초록 창 버튼과 둥근 모서리·그림자.
+바탕화면 오른쪽 클릭과 로고 누르기에는 누리 메뉴(`nuri-menu`)가 떠요: 둥근 모서리, 항목마다 아이콘과
+단축키, 손가락으로 누르기 좋은 높이. 휴대폰·태블릿에서는 로고를 눌러 메뉴를 여세요(길게 누르기는
+오른쪽 클릭이 안 돼요). 제어 센터는 메뉴 막대 오른쪽 아래로 내려오고, 다른 곳을 누르면 닫혀요.
 labwc가 없으면 Weston 기본 화면으로 켜져요(`NURI_REMOTE_SHELL=weston`).
 
 ```bash
@@ -182,7 +185,7 @@ podman exec nuri-remote dnf5 -y install xorg-x11-server-Xvfb x11vnc novnc python
     labwc waybar swaybg wlr-randr
 podman cp tools nuri-remote:/src/
 podman exec -d -e NURI_VNC_PASSWORD='긴-비밀번호' nuri-remote bash /src/tools/web-remote.sh
-# 브라우저: http://127.0.0.1:6080/vnc.html
+# 브라우저: http://127.0.0.1:6080/  (화면 크기에 맞춰 줄여 보여 주고, 끊기면 다시 연결해요)
 ```
 
 다른 기기에서 접속하려면 Tailscale을 쓰세요.

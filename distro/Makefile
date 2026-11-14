@@ -42,7 +42,7 @@ previews:
 
 lint:
 	bash -n build_files/*.sh system_files/usr/libexec/nuri/* tools/*.sh
-	python3 -m py_compile system_files/usr/bin/nuri-ai system_files/usr/bin/nuri-assistant system_files/usr/bin/nuri-welcome system_files/usr/bin/nuri-control system_files/usr/bin/nuri-about system_files/usr/lib/nuri/*.py tools/*.py
+	python3 -m py_compile system_files/usr/bin/nuri-ai system_files/usr/bin/nuri-assistant system_files/usr/bin/nuri-welcome system_files/usr/bin/nuri-control system_files/usr/bin/nuri-about system_files/usr/bin/nuri-menu system_files/usr/lib/nuri/*.py tools/*.py
 
 build: lint
 	$(ENGINE) build -f Containerfile $(SECRET) \

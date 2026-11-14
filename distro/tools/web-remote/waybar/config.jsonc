@@ -9,7 +9,7 @@
     "spacing": 4,
     "modules-left": ["image#logo", "wlr/taskbar#title"],
     "modules-right": ["custom/ai", "custom/wifi", "custom/control", "clock"],
-    "image#logo": { "path": "@ICONS@/nuri-assistant-small.png", "size": 18, "on-click": "nuri-about" },
+    "image#logo": { "path": "@ICONS@/nuri-assistant-small.png", "size": 18, "on-click": "nuri-menu --logo", "tooltip": false },
     "wlr/taskbar#title": {
       "format": "{name}",
       "active-first": true,

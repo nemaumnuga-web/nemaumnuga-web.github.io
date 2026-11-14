@@ -107,6 +107,23 @@ export WAYLAND_DISPLAY=wayland-nuri
 nuri-welcome > $RUN/welcome.log 2>&1 &"
 fi
 
+# Web page: noVNC plus a start page that opens the session scaled to the browser
+# window (phones and tablets see the whole desktop) and reconnecting by itself.
+WEB="$RUN/web"
+mkdir -p "$WEB"
+cp -r /usr/share/novnc/. "$WEB/"
+VNC_OPTS="resize=scale&reconnect=true&reconnect_delay=1500&show_dot=true"
+cat > "$WEB/index.html" <<HTML
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nuri OS</title>
+<meta http-equiv="refresh" content="0; url=vnc.html?$VNC_OPTS">
+<style>body{margin:0;height:100vh;display:grid;place-items:center;font-family:sans-serif;
+background:linear-gradient(160deg,#eef0fb,#d9d2fb 60%,#f8d9ec);color:#1c1d26}</style></head>
+<body><a href="vnc.html?$VNC_OPTS">Nuri OS</a></body></html>
+HTML
+chown -R "$USER_NAME" "$WEB"
+
 # VNC password file (x11vnc's own format), readable by the session user only
 x11vnc -storepasswd "$NURI_VNC_PASSWORD" "$RUN/passwd" >/dev/null 2>&1
 chown "$USER_NAME" "$RUN/passwd"
@@ -130,10 +147,10 @@ dbus-update-activation-environment --all 2>/dev/null || true
         -noxdamage -o $RUN/x11vnc.log > /dev/null 2>&1
     sleep 1
 done) &
-websockify --web /usr/share/novnc 127.0.0.1:$WEB_PORT 127.0.0.1:$VNC_PORT > $RUN/websockify.log 2>&1 &
+websockify --web $WEB 127.0.0.1:$WEB_PORT 127.0.0.1:$VNC_PORT > $RUN/websockify.log 2>&1 &
 wait
 EOF
 chmod 755 "$RUN/session.sh"
 chown "$USER_NAME" "$RUN/session.sh"
-echo "starting ($SHELL_KIND): open http://127.0.0.1:$WEB_PORT/vnc.html (or your tailnet URL + /vnc.html)"
+echo "starting ($SHELL_KIND): open http://127.0.0.1:$WEB_PORT/ (or your tailnet URL)"
 exec su "$USER_NAME" -c "cd ~ && dbus-run-session -- $RUN/session.sh"
