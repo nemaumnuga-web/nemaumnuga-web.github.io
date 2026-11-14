@@ -18,6 +18,14 @@ Fedora Kinoite(atomic KDE)를 기반으로 하고, OS 전체를 컨테이너 이
 | ![인사](docs/screenshots/welcome-hello.png) | ![AI 모델 고르기](docs/screenshots/welcome-ai.png) |
 | ![모양 고르기](docs/screenshots/welcome-look.png) | ![편하게 쓰기](docs/screenshots/welcome-comfort.png) |
 
+| 제어 센터 (`Meta+C`, 상단 바 버튼) | 이 컴퓨터에 관하여 |
+|---|---|
+| ![제어 센터](docs/screenshots/control-light.png) ![제어 센터 어둡게](docs/screenshots/control-dark.png) | ![이 컴퓨터에 관하여](docs/screenshots/about-light.png) |
+
+| 웹 브라우저로 원격 조종 (GPU 없는 서버에서, 아래 "웹 원격 조종") |
+|---|
+| ![웹 원격 세션](docs/screenshots/web-remote.png) |
+
 | AI 패널 (`Meta+Space`) | 실제 답변 (Qwen3.5 4B, CPU) |
 |---|---|
 | ![AI 패널 첫 화면](docs/screenshots/empty-light.png) | ![AI 답변](docs/screenshots/chat-light.png) |
@@ -51,6 +59,9 @@ Fedora Kinoite(atomic KDE)를 기반으로 하고, OS 전체를 컨테이너 이
 | **Plasma 스타일 "Nuri"**: 반투명 유리 상단 바와 독(뒤 배경 흐림), 독 그림자, 실행 중인 앱 아래 점, 지금 쓰는 앱은 강조색 막대 | KSvg 렌더링 확인, 실기 미검증 |
 | **아이콘 "Nuri"**: 둥근 사각형 앱 아이콘 20종, 폴더 11종, 휴지통, 드라이브. 나머지는 Breeze로 대체 | 렌더링 확인 |
 | **누리 시작 안내**(첫 로그인): 인사 → AI 언어·추천 모델 → 밝게/어둡게·강조색 → 창 버튼 위치·클릭 방식 → Windows 앱 → 한글 입력 → 개인정보·업데이트 → 단축키. 고르는 즉시 적용. Fedora 환영 창은 제거 | 8개 화면 렌더링·설정 명령 테스트, 실기 미검증 |
+| **제어 센터**: Wi-Fi, 블루투스, 근처 공유(LocalSend), 어둡게, 방해 금지, 야간 모드, 전원 모드(절전·균형·성능), 밝기·소리 슬라이더, AI·캡처·잠금·설정 바로가기, CPU·메모리·배터리/AI 모델 실시간 표시 | OS 컨테이너 안에서 실행 확인, 각 설정 명령은 테스트(실기 미검증) |
+| **이 컴퓨터에 관하여**: OS 버전, 프로세서, 메모리, 그래픽, AI 모델, 저장 공간 막대 | OS 컨테이너 안에서 실행 확인 |
+| **웹 원격 조종** (`tools/web-remote.sh`): 브라우저(noVNC)로 OS 컨테이너의 앱을 조종 | 동작 확인 (Plasma 셸 대신 Weston) |
 | **한글 입력** (fcitx5-hangul, 한/영 키 또는 Ctrl+Space) | 설치됨, 실기 미검증 |
 | Wine, winetricks, NTFS/exFAT, SMB | 설치됨 |
 | 첫 부팅 시 Flatpak 앱 설치 (Bottles, Steam, LibreOffice, LocalSend, Firefox) | 작성됨, 실기 미검증 |
@@ -154,6 +165,28 @@ nuri-ai status
 
 모든 설정은 시스템 설정에서 바꿀 수 있어요. 기본값은 `system_files/etc/xdg/`와
 `look-and-feel/org.nuri.desktop/`에 있어요.
+
+## 웹 원격 조종
+
+GPU가 없는 서버나 컨테이너에서도 브라우저로 누리 OS의 앱을 써 볼 수 있어요.
+Plasma 셸(KWin)은 GPU가 있어야 켜져서, 이 모드에서는 Weston(소프트웨어 그리기) 위에 누리 앱
+(시작 안내, AI, 제어 센터, 이 컴퓨터에 관하여, 파일, 터미널, 메모장, 사진)을 띄워요.
+상단 바·독·창 테두리 같은 Plasma 테마는 이 모드에서 보이지 않아요.
+
+```bash
+podman run -d --name nuri-remote --network host localhost/nuri:dev sleep infinity
+podman exec nuri-remote dnf5 -y install xorg-x11-server-Xvfb weston x11vnc novnc python3-websockify dbus-daemon
+podman cp tools nuri-remote:/src/
+podman exec -d -e NURI_VNC_PASSWORD='긴-비밀번호' nuri-remote bash /src/tools/web-remote.sh
+# 브라우저: http://127.0.0.1:6080/vnc.html
+```
+
+다른 기기에서 접속하려면 Tailscale을 쓰세요.
+- `tailscale serve --bg 6080`: 내 Tailscale 기기에서만 접속돼요. 권장해요.
+- `tailscale funnel --bg 6080`: 인터넷 전체에 공개돼요.
+
+이 세션에는 터미널이 있어서, 주소와 비밀번호를 아는 사람은 컨테이너 안의 무엇이든 실행할 수
+있어요. 공개할 때는 긴 비밀번호를 쓰고, 다 쓰면 바로 끄세요.
 
 ## 모델 레지스트리
 

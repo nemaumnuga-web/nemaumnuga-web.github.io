@@ -10,8 +10,6 @@ away with Plasma's own tools and can be changed later in System Settings.
 """
 import argparse
 import os
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +19,7 @@ from PyQt6.QtQml import QQmlApplicationEngine
 from PyQt6.QtQuick import QQuickWindow, QSGRendererInterface
 
 import nuri_ai as core
+import nuri_settings as S
 from nuri_assistant import LANGS, system_dark
 
 APP_ID = "nuri-welcome"
@@ -28,7 +27,7 @@ QML = Path(os.environ.get("NURI_QML_DIR", Path(__file__).resolve().parent / "qml
 ICONS = Path(__file__).resolve().parents[2] / "share/icons/Nuri/scalable"
 DONE = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "nuri-welcome-done"
 
-ACCENTS = ["#6366f1", "#3b82f6", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#64748b"]
+ACCENTS = S.ACCENTS
 
 TXT = {
     "ko": {
@@ -108,7 +107,7 @@ class Bridge(QObject):
         self._dark = dark
         self._note = ""
         self.dry = dry_run
-        self.log = []          # what would run (dry run) or ran
+        self.runner = S.Runner(dry_run)
         try:
             self.reg = core.load_registry()
         except SystemExit:
@@ -165,65 +164,41 @@ class Bridge(QObject):
         return out
 
     # ---------------------------------------------------------- actions
-    def _run(self, *cmds):
-        """Run each command (argv lists) in the background; False if a tool is missing."""
-        for argv in cmds:
-            self.log.append(" ".join(argv))
-            if self.dry:
-                continue
-            if not shutil.which(argv[0]):
-                self._set_note(TXT[lang_key()]["unavailable"])
-                return False
-            subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL, start_new_session=True)
-        return True
+    @property
+    def log(self):
+        return self.runner.log
+
+    def _run(self, cmds):
+        if not self.runner.run(cmds):
+            self._set_note(TXT[lang_key()]["unavailable"])
 
     def _set_note(self, v):
         self._note = v
         self.noteChanged.emit()
-
-    def _kwin(self, key, value):
-        return ["kwriteconfig6", "--file", "kwinrc", "--group", "org.kde.kdecoration2", "--key", key, value]
-
-    def _reload_kwin(self):
-        return ["dbus-send", "--session", "--type=signal", "/KWin", "org.kde.KWin.reloadConfig"]
 
     @pyqtSlot(bool)
     def setDark(self, dark):
         if dark != self._dark:
             self._dark = dark
             self.appearanceChanged.emit()
-        scheme, deco = ("NuriDark", "__aurorae__svg__NuriDark") if dark else ("Nuri", "__aurorae__svg__Nuri")
-        self._run(["plasma-apply-colorscheme", scheme],
-                  self._kwin("library", "org.kde.kwin.aurorae"), self._kwin("theme", deco),
-                  self._reload_kwin())
+        self._run(S.appearance(dark))
 
     @pyqtSlot(str)
     def setAccent(self, color):
-        if color in ACCENTS:
-            self._run(["plasma-apply-colorscheme", "--accent-color", color])
+        self._run(S.accent(color))
 
     @pyqtSlot(bool)
     def setButtonsLeft(self, left):
-        self._run(self._kwin("ButtonsOnLeft", "XIA" if left else ""),
-                  self._kwin("ButtonsOnRight", "" if left else "IAX"),
-                  self._reload_kwin())
+        self._run(S.buttons_left(left))
 
     @pyqtSlot(bool)
     def setSingleClick(self, single):
-        self._run(["kwriteconfig6", "--file", "kdeglobals", "--group", "KDE", "--key", "SingleClick",
-                   "true" if single else "false"])
+        self._run(S.single_click(single))
 
     @pyqtSlot(str)
     def open(self, what):
-        cmd = {
-            "library": ["nuri-assistant", "--library"],
-            "bottles": ["plasma-discover", "appstream://com.usebottles.bottles"],
-            "input": ["fcitx5-configtool"],
-            "updates": ["plasma-discover", "--mode", "Update"],
-        }.get(what)
-        if cmd:
-            self._run(cmd)
+        if what in S.LAUNCH:
+            self._run([S.LAUNCH[what]])
 
     @pyqtSlot()
     def finish(self):

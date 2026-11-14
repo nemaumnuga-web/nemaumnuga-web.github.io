@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=About This Computer
+Name[ko]=이 컴퓨터에 관하여
+Comment=Nuri OS version, hardware, storage and AI model
+Comment[ko]=누리 OS 버전, 하드웨어, 저장 공간, AI 모델
+Exec=nuri-about
+Icon=nuri-about
+Categories=System;
+Keywords=about;system;info;정보;사양;

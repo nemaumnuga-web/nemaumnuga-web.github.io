@@ -27,6 +27,10 @@ top.addWidget("org.kde.plasma.appmenu");
 top.addWidget("org.kde.plasma.panelspacer");
 // Input-method indicator (한/A) - what Plasma's own default panel adds for CJK locales
 top.addWidget("org.kde.plasma.kimpanel");
+// Control Center button (Wi-Fi, Bluetooth, dark mode, brightness, sound...), like a Mac's
+var cc = top.addWidget("org.kde.plasma.icon");
+cc.currentConfigGroup = ["General"];
+cc.writeConfig("url", "file:///usr/share/applications/nuri-control.desktop");
 top.addWidget("org.kde.plasma.systemtray");
 
 var clock = top.addWidget("org.kde.plasma.digitalclock");

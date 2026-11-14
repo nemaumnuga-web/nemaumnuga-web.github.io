@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Control Center
+Name[ko]=제어 센터
+Comment=Wi-Fi, Bluetooth, dark mode, brightness, sound and more
+Comment[ko]=Wi-Fi, 블루투스, 어둡게, 밝기, 소리를 한곳에서
+Exec=nuri-control
+Icon=nuri-control
+Categories=Settings;
+Keywords=control;quick settings;wifi;bluetooth;dark;제어;설정;
+StartupNotify=false
+X-KDE-Shortcuts=Meta+C

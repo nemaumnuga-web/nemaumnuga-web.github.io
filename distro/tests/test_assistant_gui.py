@@ -178,6 +178,51 @@ class WelcomeTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_QT, "PyQt6 not installed")
+class ControlCenterTest(unittest.TestCase):
+    def test_control_and_about_render_without_qml_errors(self):
+        with tempfile.TemporaryDirectory() as d:
+            for app in ("nuri-control", "nuri-about"):
+                for theme in ("light", "dark"):
+                    with self.subTest(app=app, theme=theme):
+                        shot = Path(d) / ("%s-%s.png" % (app, theme))
+                        env = dict(os.environ, QT_QPA_PLATFORM="offscreen", LANG="ko_KR.UTF-8", LC_ALL="ko_KR.UTF-8",
+                                   NURI_REGISTRY=str(REGISTRY), XDG_CONFIG_HOME=d, NURI_SHOT_DELAY="400")
+                        p = subprocess.run([sys.executable, str(ROOT / "system_files/usr/bin" / app), "--theme", theme,
+                                            "--screenshot", str(shot)], env=env, capture_output=True, text=True,
+                                           timeout=60)
+                        self.assertEqual(p.returncode, 0, p.stderr[-2000:])
+                        bad = [l for l in p.stderr.splitlines() if any(k in l for k in AssistantGuiTest.QML_ERRORS)]
+                        self.assertEqual(bad, [], "\n".join(bad[:10]))
+                        self.assertTrue(shot.read_bytes().startswith(b"\x89PNG"))
+
+    def test_quick_settings_commands(self):
+        sys.path.insert(0, str(ROOT / "system_files/usr/lib/nuri"))
+        os.environ["NURI_REGISTRY"] = str(REGISTRY)
+        import nuri_control
+        b = nuri_control.Bridge(False, dry_run=True)
+        b.timer.stop()
+        b.toggle("wifi", False)
+        b.toggle("bluetooth", True)
+        b.toggle("night", True)
+        b.toggle("rm -rf", True)            # unknown: ignored
+        b.setPower("performance")
+        b.setPower("turbo; reboot")         # unknown: ignored
+        b.setVolume(250)                    # clamped
+        b.launch("lock")
+        b.launch("/bin/sh")                 # not in the list: ignored
+        log = "\n".join(b.log)
+        for want in ("nmcli radio wifi off", "rfkill unblock bluetooth", "--group NightColor --key Active true",
+                     "powerprofilesctl set performance", "wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%",
+                     "loginctl lock-session"):
+            self.assertIn(want, log)
+        for bad in ("rm -rf", "turbo", "/bin/sh"):
+            self.assertNotIn(bad, log)
+        self.assertEqual(b.state["power"], "performance")
+        st = b.stats
+        self.assertGreater(st["ram_total"], 0)
+
+
+@unittest.skipUnless(HAVE_QT, "PyQt6 not installed")
 class ThemeArtTest(unittest.TestCase):
     LNF = ROOT / "system_files/usr/share/plasma/look-and-feel/org.nuri.desktop/contents"
 

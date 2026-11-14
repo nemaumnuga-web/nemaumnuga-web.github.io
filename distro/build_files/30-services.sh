@@ -2,7 +2,7 @@
 # Enable services shipped in system_files/.
 set -euxo pipefail
 
-chmod 0755 /usr/bin/nuri-ai /usr/bin/nuri-assistant /usr/bin/nuri-welcome /usr/libexec/nuri/*
+chmod 0755 /usr/bin/nuri-ai /usr/bin/nuri-assistant /usr/bin/nuri-welcome /usr/bin/nuri-control /usr/bin/nuri-about /usr/libexec/nuri/*
 
 # llama.cpp server (built in the llama stage, see build-llama.sh)
 ln -sf /usr/libexec/nuri-llama/llama-server /usr/bin/llama-server

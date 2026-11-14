@@ -194,6 +194,21 @@ ICONS["windows-apps"] = (["nuri-windows-apps"], app(
     '<path d="M76 58h14M76 66h14M76 74h9" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>'
     '<path d="M56 94h16" stroke="#fff" stroke-width="5" stroke-linecap="round"/>'))
 
+ICONS["control"] = (["nuri-control"], app(
+    "#9aa3b8", "#4b5468",
+    '<rect x="28" y="34" width="72" height="24" rx="12" fill="#fff" fill-opacity=".95"/>'
+    '<circle cx="88" cy="46" r="9" fill="#6366f1"/>'
+    '<rect x="28" y="70" width="72" height="24" rx="12" fill="#fff" fill-opacity=".45"/>'
+    '<circle cx="40" cy="82" r="9" fill="#fff"/>'))
+
+ICONS["about"] = (["nuri-about"], app(
+    "#e9ebf2", "#b9bfcd",
+    '<rect x="26" y="32" width="76" height="52" rx="8" fill="#2b2f3a"/>'
+    '<rect x="31" y="37" width="66" height="42" rx="4" fill="url(#scr)"/>'
+    '<path d="M64 46c1.2 7.5 4 10.3 11.5 11.5-7.5 1.2-10.3 4-11.5 11.5-1.2-7.5-4-10.3-11.5-11.5 7.5-1.2 10.3-4 11.5-11.5z" fill="#fff"/>'
+    '<path d="M54 84h20l3 10H51z" fill="#9aa1b2"/><rect x="44" y="93" width="40" height="4" rx="2" fill="#7c8496"/>',
+    lg("scr", "#6d7bff", "#e46fb3", mid=("0.55", "#8f5cf6"))))
+
 # Trash: a frosted glass bin (no tile), like a real object on the dock.
 def trash(full):
     ribs = "".join('<path d="M%d 50l%s 50" stroke="#8b93a7" stroke-opacity=".45" stroke-width="2.4" stroke-linecap="round"/>'
