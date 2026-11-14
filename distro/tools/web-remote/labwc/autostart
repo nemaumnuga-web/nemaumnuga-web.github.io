@@ -1,0 +1,4 @@
+# started by labwc: wallpaper, menu bar + dock, then the welcome guide
+swaybg -i "$NURI_WALL" -m fill >/dev/null 2>&1 &
+waybar -c "$NURI_RUN/waybar.jsonc" -s "$HOME/.config/nuri-remote/waybar/style.css" >"$NURI_RUN/waybar.log" 2>&1 &
+nuri-welcome >"$NURI_RUN/welcome.log" 2>&1 &

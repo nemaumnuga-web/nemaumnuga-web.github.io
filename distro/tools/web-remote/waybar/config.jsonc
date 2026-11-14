@@ -1,0 +1,63 @@
+// Nuri web remote: a menu bar at the top and a floating dock at the bottom.
+// @ICONS@ is replaced with the folder of PNG icons rendered by web-remote.sh.
+[
+  {
+    "name": "menubar",
+    "layer": "top",
+    "position": "top",
+    "height": 30,
+    "spacing": 4,
+    "modules-left": ["image#logo", "wlr/taskbar#title"],
+    "modules-right": ["custom/ai", "custom/wifi", "custom/control", "clock"],
+    "image#logo": { "path": "@ICONS@/nuri-assistant-small.png", "size": 18, "on-click": "nuri-about" },
+    "wlr/taskbar#title": {
+      "format": "{name}",
+      "active-first": true,
+      "icon-size": 0,
+      "tooltip": false,
+      "on-click": "activate",
+      "rewrite": { "nuri-assistant": "누리 AI", "Nuri.*": "누리", "org.kde.dolphin": "파일", "dolphin": "파일",
+                   "org.kde.konsole": "터미널", "konsole": "터미널", "org.kde.kwrite": "텍스트 편집기",
+                   "org.kde.gwenview": "사진", "nuri-control": "제어 센터", "nuri-about": "이 컴퓨터에 관하여",
+                   "nuri-welcome": "누리 환영", "systemsettings": "시스템 설정" }
+    },
+    "custom/ai": { "format": "\ue2ca", "tooltip-format": "누리 AI (Meta+Space)", "on-click": "nuri-assistant" },
+    "custom/wifi": { "format": "\uf1eb", "tooltip-format": "Wi-Fi 연결됨", "on-click": "nuri-control" },
+    "custom/control": { "format": "\uf1de", "tooltip-format": "제어 센터", "on-click": "nuri-control" },
+    "clock": {
+      "format": "{:L%m월 %d일 (%a)  %p %I:%M}",
+      "locale": "ko_KR.UTF-8",
+      "tooltip-format": "<big>{:L%Y년 %B}</big>\n<tt>{calendar}</tt>",
+      "interval": 10
+    }
+  },
+  {
+    "name": "dock",
+    "layer": "top",
+    "position": "bottom",
+    "height": 74,
+    "margin-bottom": 8,
+    "exclusive": true,
+    "modules-center": ["image#files", "image#ai", "image#term", "image#editor", "image#photos",
+                       "image#control", "image#settings", "image#welcome", "custom/sep", "wlr/taskbar#dock", "image#about"],
+    "image#files":    { "path": "@ICONS@/system-file-manager.png", "size": 50, "on-click": "dolphin", "tooltip": true },
+    "image#ai":       { "path": "@ICONS@/nuri-assistant.png", "size": 50, "on-click": "nuri-assistant" },
+    "image#term":     { "path": "@ICONS@/utilities-terminal.png", "size": 50, "on-click": "konsole" },
+    "image#editor":   { "path": "@ICONS@/accessories-text-editor.png", "size": 50, "on-click": "kwrite" },
+    "image#photos":   { "path": "@ICONS@/org.kde.gwenview.png", "size": 50, "on-click": "gwenview" },
+    "image#control":  { "path": "@ICONS@/nuri-control.png", "size": 50, "on-click": "nuri-control" },
+    "image#settings": { "path": "@ICONS@/preferences-system.png", "size": 50, "on-click": "systemsettings" },
+    "image#welcome":  { "path": "@ICONS@/nuri-welcome.png", "size": 50, "on-click": "nuri-welcome" },
+    "image#about":    { "path": "@ICONS@/user-trash.png", "size": 50, "on-click": "dolphin trash:/" },
+    "custom/sep": { "format": " ", "tooltip": false },
+    "wlr/taskbar#dock": {
+      "format": "{icon}",
+      "icon-size": 50,
+      "icon-theme": "Nuri",
+      "tooltip-format": "{title}",
+      "on-click": "activate",
+      "on-click-middle": "close",
+      "markup": false
+    }
+  }
+]

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- right click on the desktop -->
+<openbox_menu>
+  <menu id="root-menu" label="">
+    <item label="누리 AI에게 묻기"><action name="Execute" command="nuri-assistant" /></item>
+    <separator />
+    <item label="파일"><action name="Execute" command="dolphin" /></item>
+    <item label="터미널"><action name="Execute" command="konsole" /></item>
+    <item label="텍스트 편집기"><action name="Execute" command="kwrite" /></item>
+    <item label="사진"><action name="Execute" command="gwenview" /></item>
+    <separator />
+    <item label="제어 센터"><action name="Execute" command="nuri-control" /></item>
+    <item label="시스템 설정"><action name="Execute" command="systemsettings" /></item>
+    <item label="누리 환영"><action name="Execute" command="nuri-welcome" /></item>
+    <separator />
+    <item label="이 컴퓨터에 관하여"><action name="Execute" command="nuri-about" /></item>
+  </menu>
+</openbox_menu>

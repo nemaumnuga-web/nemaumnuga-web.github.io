@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!-- Nuri web remote session: macOS-like window handling on labwc -->
+<labwc_config>
+  <core>
+    <decoration>server</decoration>
+    <gap>6</gap>
+  </core>
+  <placement><policy>center</policy></placement>
+  <theme>
+    <name>Nuri</name>
+    <cornerRadius>11</cornerRadius>
+    <dropShadows>yes</dropShadows>
+    <titlebar>
+      <layout>close,iconify,max:</layout>
+      <showTitle>yes</showTitle>
+    </titlebar>
+    <font place="ActiveWindow"><name>Noto Sans CJK KR</name><size>10</size><weight>bold</weight></font>
+    <font place="InactiveWindow"><name>Noto Sans CJK KR</name><size>10</size><weight>bold</weight></font>
+    <font place="MenuItem"><name>Noto Sans CJK KR</name><size>10</size></font>
+    <font place="OnScreenDisplay"><name>Noto Sans CJK KR</name><size>10</size></font>
+  </theme>
+  <windowSwitcher preview="yes" outlines="yes">
+    <osd show="yes" />
+    <fields>
+      <field content="icon" width="8%" />
+      <field content="title" width="92%" />
+    </fields>
+  </windowSwitcher>
+  <keyboard>
+    <default />
+    <keybind key="W-space"><action name="Execute" command="nuri-assistant" /></keybind>
+    <keybind key="A-space"><action name="Execute" command="nuri-assistant" /></keybind>
+    <keybind key="W-e"><action name="Execute" command="dolphin" /></keybind>
+    <keybind key="W-c"><action name="Execute" command="nuri-control" /></keybind>
+    <keybind key="C-A-t"><action name="Execute" command="konsole" /></keybind>
+    <keybind key="W-q"><action name="Close" /></keybind>
+    <keybind key="W-m"><action name="Iconify" /></keybind>
+  </keyboard>
+  <mouse>
+    <default />
+    <context name="Title">
+      <mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize" /></mousebind>
+    </context>
+  </mouse>
+</labwc_config>

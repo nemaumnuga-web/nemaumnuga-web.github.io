@@ -61,7 +61,7 @@ Fedora Kinoite(atomic KDE)를 기반으로 하고, OS 전체를 컨테이너 이
 | **누리 시작 안내**(첫 로그인): 인사 → AI 언어·추천 모델 → 밝게/어둡게·강조색 → 창 버튼 위치·클릭 방식 → Windows 앱 → 한글 입력 → 개인정보·업데이트 → 단축키. 고르는 즉시 적용. Fedora 환영 창은 제거 | 8개 화면 렌더링·설정 명령 테스트, 실기 미검증 |
 | **제어 센터**: Wi-Fi, 블루투스, 근처 공유(LocalSend), 어둡게, 방해 금지, 야간 모드, 전원 모드(절전·균형·성능), 밝기·소리 슬라이더, AI·캡처·잠금·설정 바로가기, CPU·메모리·배터리/AI 모델 실시간 표시 | OS 컨테이너 안에서 실행 확인, 각 설정 명령은 테스트(실기 미검증) |
 | **이 컴퓨터에 관하여**: OS 버전, 프로세서, 메모리, 그래픽, AI 모델, 저장 공간 막대 | OS 컨테이너 안에서 실행 확인 |
-| **웹 원격 조종** (`tools/web-remote.sh`): 브라우저(noVNC)로 OS 컨테이너의 앱을 조종 | 동작 확인 (Plasma 셸 대신 Weston) |
+| **웹 원격 조종** (`tools/web-remote.sh`): 브라우저(noVNC)로 OS 컨테이너의 앱을 조종 | 동작 확인 (Plasma 셸 대신 labwc + 메뉴 막대·독) |
 | **한글 입력** (fcitx5-hangul, 한/영 키 또는 Ctrl+Space) | 설치됨, 실기 미검증 |
 | Wine, winetricks, NTFS/exFAT, SMB | 설치됨 |
 | 첫 부팅 시 Flatpak 앱 설치 (Bottles, Steam, LibreOffice, LocalSend, Firefox) | 작성됨, 실기 미검증 |
@@ -169,13 +169,17 @@ nuri-ai status
 ## 웹 원격 조종
 
 GPU가 없는 서버나 컨테이너에서도 브라우저로 누리 OS의 앱을 써 볼 수 있어요.
-Plasma 셸(KWin)은 GPU가 있어야 켜져서, 이 모드에서는 Weston(소프트웨어 그리기) 위에 누리 앱
+Plasma 셸(KWin)은 GPU가 있어야 켜져서, 이 모드에서는 labwc(소프트웨어 그리기) 위에 누리 앱
 (시작 안내, AI, 제어 센터, 이 컴퓨터에 관하여, 파일, 터미널, 메모장, 사진)을 띄워요.
-상단 바·독·창 테두리 같은 Plasma 테마는 이 모드에서 보이지 않아요.
+`tools/web-remote/`의 설정으로 맥처럼 꾸며져요: 위쪽 메뉴 막대(앞에 있는 앱 이름, AI·Wi-Fi·제어 센터
+버튼, 날짜와 시계), 아래쪽 떠 있는 독(마우스를 올리면 아이콘이 올라오고, 열린 앱 아래 점),
+빨강·노랑·초록 창 버튼과 둥근 모서리·그림자, 바탕화면 오른쪽 클릭 메뉴.
+labwc가 없으면 Weston 기본 화면으로 켜져요(`NURI_REMOTE_SHELL=weston`).
 
 ```bash
 podman run -d --name nuri-remote --network host localhost/nuri:dev sleep infinity
-podman exec nuri-remote dnf5 -y install xorg-x11-server-Xvfb weston x11vnc novnc python3-websockify dbus-daemon
+podman exec nuri-remote dnf5 -y install xorg-x11-server-Xvfb x11vnc novnc python3-websockify dbus-daemon \
+    labwc waybar swaybg wlr-randr
 podman cp tools nuri-remote:/src/
 podman exec -d -e NURI_VNC_PASSWORD='긴-비밀번호' nuri-remote bash /src/tools/web-remote.sh
 # 브라우저: http://127.0.0.1:6080/vnc.html
