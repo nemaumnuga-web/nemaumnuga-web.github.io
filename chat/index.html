@@ -113,6 +113,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .cv-err{display:none;align-items:center;gap:8px;padding:6px 12px;background:rgba(217,48,37,.1);color:var(--danger);font-size:13px}
 .cv-err span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cv-err button{border:1px solid currentColor;border-radius:999px;padding:2px 12px;font-size:12.5px}
+.cv-out{margin:0;padding:14px 16px;font:13.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
+.cv-out .e{color:var(--danger)}.cv-out .s{color:var(--muted)}
+.cv-run{background:var(--accent);color:var(--accent-text)!important;border-radius:8px}
+.cv-tbl{overflow:auto}
 .cv-acts{display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px;border-top:1px solid var(--border)}
 .cv-acts button{font-size:12.5px;border:1px solid var(--border);border-radius:999px;padding:4px 12px;color:var(--muted)}
 .cv-acts button:hover{background:var(--bg-hover);color:var(--text)}
@@ -311,7 +315,7 @@ body.voice .voicebar{display:flex}
       <div class="cv-tabs"><button class="cv-tab on" id="cvTabView">미리보기</button><button class="cv-tab" id="cvTabCode">코드</button></div>
       <span class="sp"></span>
       <button class="sm" id="cvPrev" title="이전 버전">◀</button><span class="cv-ver" id="cvVer">1/1</span><button class="sm" id="cvNext" title="다음 버전">▶</button>
-      <button class="sm" id="cvCopy">복사</button><button class="sm" id="cvDown">저장</button>
+      <button class="sm cv-run" id="cvRun" style="display:none">▶ 실행</button><button class="sm" id="cvCopy">복사</button><button class="sm" id="cvDown">저장</button>
     </div>
     <div class="cv-err" id="cvErr"><span id="cvErrT"></span><button id="cvErrFix">고치기</button></div>
     <div class="cv-body">
@@ -369,8 +373,12 @@ var LS={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}c
 /* ---------- 패치노트 ----------
  * ★ 이 파일을 고칠 때마다 APP_VERSION 을 1 올리고 PATCHES 맨 앞에 바뀐 내용을 추가하세요.
  *   그러면 사용자가 다음에 접속할 때 바뀐 부분이 팝업으로 뜹니다. 항목은 [제목, 설명] 쌍입니다. */
-var APP_VERSION=11;
+var APP_VERSION=12;
 var PATCHES=[
+ {v:12,date:"2026-11-14",title:"Canvas 코드 실행과 더 많은 형식",items:[
+  ["코드를 바로 실행해요","JavaScript와 Python 코드를 Canvas의 ▶ 실행 버튼으로 돌려 볼 수 있어요. 결과·오류가 바로 나오고, 오류는 '고치기'로 모델에게 넘길 수 있어요. 채팅 안 코드 블록에도 실행 버튼이 생겼어요."],
+  ["미리 볼 수 있는 형식이 늘었어요","웹페이지(HTML)·SVG·마크다운에 더해 mermaid 도표, JSON(정리해서 보기), CSV(표로 보기), CSS(샘플 화면에 적용)를 지원해요."],
+  ["안전하게 실행돼요","실행은 격리된 샌드박스에서 돼서 이 사이트의 저장된 대화나 설정에 접근할 수 없어요. Python은 처음에 몇 초 동안 준비해요."]]},
  {v:11,date:"2026-11-14",title:"자동 선택이 똑똑해졌어요",items:[
   ["작은 AI가 질문 난이도를 판단해요","Gemma 3 270M을 직접 만든 데이터로 학습시켜서, 질문이 쉬운지 어려운지 보고 나노와 미니 중에 골라 줘요. 키워드로 고르던 이전 방식보다 어려운 경계 사례에서 훨씬 정확해요."],
   ["고민 상담·계획 같은 질문도 알아봐요","'코드', '분석' 같은 말이 없어도 신중한 추론이 필요한 질문은 미니로 보내요. 반대로 '분석 말고 수다 떨자'처럼 쉬운 말은 나노가 빠르게 답해요."]]},
@@ -486,7 +494,7 @@ function md(src){
       flush();var buf=[];i++;
       while(i<lines.length&&!/^```/.test(lines[i])){buf.push(lines[i]);i++}
       i++;
-      out.push('<pre><div class="ph"><span>'+esc(m[1]||"code")+'</span><span class="phb">'+(buf.length>=6||/^(html|svg|markdown|md)$/i.test(m[1])||buf.join("").length>=200?'<button data-cv>Canvas</button>':"")+'<button data-copy>복사</button></span></div><code>'+esc(buf.join("\n"))+"</code></pre>");
+      out.push('<pre><div class="ph"><span>'+esc(m[1]||"code")+'</span><span class="phb">'+(/^(js|javascript|mjs|node|py|python)$/i.test(m[1])?'<button data-run>▶ 실행</button>':"")+(buf.length>=6||/^(html|svg|markdown|md|mermaid|json|csv|css)$/i.test(m[1])||buf.join("").length>=200?'<button data-cv>Canvas</button>':"")+'<button data-copy>복사</button></span></div><code>'+esc(buf.join("\n"))+"</code></pre>");
       continue;
     }
     if((m=L.match(/^(#{1,3})\s+(.*)/))){flush();out.push("<h"+m[1].length+">"+inline(m[2])+"</h"+m[1].length+">");i++;continue}
@@ -551,7 +559,7 @@ function assistantInner(m,idx,last){
     var cb=cvFind(m.text);
     if(cb){
       shown=m.text.slice(0,cb.start)+"\n\n[[CANVAS_CARD]]\n\n"+(cb.closed?m.text.slice(cb.end):"");
-      card='<button class="cv-card" data-act="opencv" data-v="'+m.cv+'"><span class="cv-ico">'+(cb.kind==="html"?"🖥️":cb.kind==="doc"?"📄":cb.kind==="svg"?"🎨":"💻")+'</span><span class="cv-meta"><b>'+esc(cvTitle(cb)||"Canvas")+"</b><small>"+(live&&!cb.closed?"Canvas에 작성하는 중…":"눌러서 Canvas에서 열기")+"</small></span></button>";
+      card='<button class="cv-card" data-act="opencv" data-v="'+m.cv+'"><span class="cv-ico">'+(CV_ICON[cb.kind]||"💻")+'</span><span class="cv-meta"><b>'+esc(cvTitle(cb)||"Canvas")+"</b><small>"+(live&&!cb.closed?"Canvas에 작성하는 중…":"눌러서 Canvas에서 열기")+"</small></span></button>";
     }
   }
   var body=m.err?'<span class="err">'+esc(m.err)+"</span>":(shown?md(shown).replace("<p>[[CANVAS_CARD]]</p>",card):"");
@@ -636,7 +644,7 @@ function apiMessages(c,extra){
   if(c.memory)sys+=(sys?"\n\n":"")+"지금까지 대화의 요약(이전 대화 내용):\n"+c.memory;
   var cvOn=cfg.canvas&&!vc.on;
   if(cvOn){
-    sys+="\n\n[Canvas 모드] 사용자가 웹페이지·앱·게임·문서·글·코드 같은 '결과물'을 요청하면 대화 답변은 한두 문장으로 짧게 하고, 결과물 전체를 코드 블록 하나에 담으세요. 웹페이지·앱·게임은 ```html 블록(HTML, CSS, JS를 한 파일에), 글·문서는 ```markdown 블록, 그 밖의 코드는 해당 언어 블록을 쓰세요. Canvas에 이미 내용이 있고 수정을 요청하면, 고친 전체 내용을 같은 형식의 블록으로 다시 쓰세요. 일부만 쓰거나 '생략'이라고 쓰지 마세요.";
+    sys+="\n\n[Canvas 모드] 사용자가 웹페이지·앱·게임·문서·글·코드 같은 '결과물'을 요청하면 대화 답변은 한두 문장으로 짧게 하고, 결과물 전체를 코드 블록 하나에 담으세요. 웹페이지·앱·게임은 ```html 블록(HTML, CSS, JS를 한 파일에), 글·문서는 ```markdown 블록, 그림은 ```svg, 도표·순서도는 ```mermaid, 데이터는 ```json 또는 ```csv, 스타일은 ```css, 실행해 볼 코드는 ```javascript 또는 ```python 블록(사용자가 실행 버튼으로 돌려요, 결과는 print/console.log로 출력), 그 밖의 코드는 해당 언어 블록을 쓰세요. Canvas에 이미 내용이 있고 수정을 요청하면, 고친 전체 내용을 같은 형식의 블록으로 다시 쓰세요. 일부만 쓰거나 '생략'이라고 쓰지 마세요.";
     if(c.canvas&&c.canvas.versions.length)sys+="\n\n현재 Canvas 내용(수정 요청이면 이것을 기준으로 고치세요):\n```"+(c.canvas.lang||"")+"\n"+c.canvas.versions[c.canvas.v]+"\n```";
   }
   if(sys)arr.push({role:"system",content:sys});
@@ -819,7 +827,9 @@ function gather(c,a,paint,isV){
 }
 
 // ---------- Canvas ----------
-var CV_KIND={html:"html",htm:"html",svg:"svg",markdown:"doc",md:"doc"};
+var CV_KIND={html:"html",htm:"html",svg:"svg",markdown:"doc",md:"doc",javascript:"js",js:"js",mjs:"js",node:"js",python:"py",py:"py",mermaid:"mermaid",json:"json",csv:"csv",css:"css"};
+var CV_RUN={js:1,py:1};   // 실행할 수 있는 종류
+var CV_ICON={html:"🖥️",doc:"📄",svg:"🎨",js:"▶️",py:"🐍",mermaid:"🧭",json:"🧾",csv:"📊",css:"🎀",code:"💻"};
 function cvKind(lang,code){
   lang=(lang||"").toLowerCase();
   if(CV_KIND[lang])return CV_KIND[lang];
@@ -830,6 +840,8 @@ function cvTitle(b){
   var m;
   if(b.kind==="html"&&(m=b.code.match(/<title[^>]*>([^<]{1,60})<\/title>/i)))return m[1].trim();
   if(b.kind==="doc"&&(m=b.code.match(/^\s*#{1,3}\s+(.{1,60})/m)))return m[1].trim();
+  if(b.kind==="js"||b.kind==="py"){m=b.code.match(/^\s*(?:#|\/\/)\s*(.{1,50})/);return m?m[1].trim():(b.kind==="py"?"Python":"JavaScript")}
+  if(b.kind==="mermaid")return "다이어그램";if(b.kind==="json")return "JSON";if(b.kind==="csv")return "표(CSV)";if(b.kind==="css")return "CSS";
   return b.kind==="code"?(b.lang||"코드"):"";
 }
 // 답변 글에서 Canvas로 보낼 코드 블록(가장 긴 것)을 찾는다. 아직 닫히지 않은 블록(스트리밍 중)도 포함한다.
@@ -880,17 +892,75 @@ function cvRender(streaming_){
   if(ta!==document.activeElement||streaming_)ta.value=code;
   if(streaming_&&cvTab==="code")ta.scrollTop=ta.scrollHeight;
   var showView=cvTab==="view"&&canView;
-  $("cvFrame").style.display=showView&&cv.kind!=="doc"?"block":"none";
-  $("cvDoc").style.display=showView&&cv.kind==="doc"?"block":"none";
+  var docKind={doc:1,json:1,csv:1,js:1,py:1}[cv.kind];
+  $("cvRun").style.display=CV_RUN[cv.kind]?"":"none";
+  $("cvTabView").textContent=CV_RUN[cv.kind]?"실행 결과":"미리보기";
+  $("cvFrame").style.display=showView&&!docKind?"block":"none";
+  $("cvDoc").style.display=showView&&docKind?"block":"none";
   if(showView){
     var key=cv.kind+"\n"+code;
-    if(key!==cvLast){
-      cvLast=key;
+    if(CV_RUN[cv.kind]){ if(!cvRunning&&cvLast!==key){cvLast=key;cvOutHTML='<div class="cv-out"><span class="s">▶ 실행 버튼을 누르면 샌드박스에서 코드를 실행해요.</span></div>';$("cvDoc").innerHTML=cvOutHTML} }
+    else if(key!==cvLast){
+      cvLast=key;$("cvErr").style.display="none";
       if(cv.kind==="doc")$("cvDoc").innerHTML=md(code);
-      else{$("cvErr").style.display="none";$("cvFrame").srcdoc=cv.kind==="svg"?'<!doctype html><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#fff">'+code+"</body>":cvWrap(code)}
+      else if(cv.kind==="json")$("cvDoc").innerHTML=cvJson(code);
+      else if(cv.kind==="csv")$("cvDoc").innerHTML=cvCsv(code);
+      else $("cvFrame").srcdoc=cvHtmlFor(cv.kind,code);
     }
   }
 }
+function cvJson(code){
+  try{return '<pre class="cv-out">'+esc(JSON.stringify(JSON.parse(code),null,2))+"</pre>"}
+  catch(e){return '<pre class="cv-out"><span class="e">JSON 오류: '+esc(e.message)+"</span>\n\n"+esc(code)+"</pre>"}
+}
+function cvCsv(code){
+  var rows=[],row=[],cell="",q=false,i,ch;
+  for(i=0;i<code.length;i++){ch=code[i];
+    if(q){if(ch==='"'){if(code[i+1]==='"'){cell+='"';i++}else q=false}else cell+=ch}
+    else if(ch==='"')q=true;else if(ch===","){row.push(cell);cell=""}
+    else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&code[i+1]==="\n")i++;row.push(cell);cell="";if(row.join("")!=="")rows.push(row);row=[]}
+    else cell+=ch}
+  row.push(cell);if(row.join("")!=="")rows.push(row);
+  if(!rows.length)return '<div class="cv-out"><span class="s">내용이 없어요.</span></div>';
+  return '<div class="cv-tbl md"><table><thead><tr>'+rows[0].map(function(c){return "<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>"+rows.slice(1).map(function(r){return "<tr>"+r.map(function(c){return "<td>"+esc(c)+"</td>"}).join("")+"</tr>"}).join("")+"</tbody></table></div>";
+}
+function cvHtmlFor(kind,code){
+  if(kind==="svg")return '<!doctype html><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#fff">'+code+"</body>";
+  if(kind==="mermaid")return '<!doctype html><body style="margin:0;padding:16px;background:#fff"><pre class="mermaid">'+esc(code)+'</pre><script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";mermaid.initialize({startOnLoad:true});<\/script></body>';
+  if(kind==="css")return '<!doctype html><meta name="viewport" content="width=device-width"><style>body{font-family:system-ui;padding:16px}'+code.replace(/<\/style/gi,"")+'</style><body><h1>제목 Heading 1</h1><h2>소제목 Heading 2</h2><p>본문 문장입니다. <a href="#">링크</a>와 <b>굵은 글씨</b>, <i>기울임</i>.</p><ul><li>목록 하나</li><li>목록 둘</li></ul><button>버튼</button> <input placeholder="입력창"> <select><option>선택</option></select><table border="1"><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table><div class="card box container">.card .box .container</div></body>';
+  return cvWrap(code);
+}
+
+// ---------- 코드 실행(샌드박스 iframe: 쿠키·저장소에 접근할 수 없음) ----------
+var cvRunning=false,cvOutHTML="",cvRunFrame=null,cvRunTimer=0;
+function cvRunLine(t,k){cvOutHTML+=(k==="err"?'<span class="e">':k==="sys"?'<span class="s">':"<span>")+esc(t)+"</span>\n";var d=$("cvDoc");d.innerHTML='<pre class="cv-out">'+cvOutHTML+"</pre>";d.scrollTop=d.scrollHeight}
+function cvRunDone(msg){cvRunning=false;clearTimeout(cvRunTimer);if(cvRunFrame){cvRunFrame.remove();cvRunFrame=null}if(msg)cvRunLine(msg,"sys");$("cvRun").textContent="▶ 실행"}
+function cvRunnerHTML(kind,code){
+  var pre='<script>var out=function(t,k){parent.postMessage({lfmRun:{k:k||"log",t:String(t)}},"*")};'+
+    'console.log=console.info=console.debug=function(){out([].map.call(arguments,function(a){try{return typeof a==="object"?JSON.stringify(a):String(a)}catch(e){return String(a)}}).join(" "))};'+
+    'console.error=console.warn=function(){out([].join.call(arguments," "),"err")};'+
+    'addEventListener("error",function(e){out((e.message||"오류")+(e.lineno?" (줄 "+e.lineno+")":""),"err")});'+
+    'addEventListener("unhandledrejection",function(e){out("Promise 오류: "+(e.reason&&e.reason.message||e.reason),"err")});<\/script>';
+  if(kind==="js")return '<!doctype html><body>'+pre+'<script>(async function(){try{\n'+code.replace(/<\/script/gi,"<\\/script")+'\n}catch(e){out(e&&e.message||e,"err")}out("","done")})();<\/script></body>';
+  var j=JSON.stringify(code).replace(/</g,"\\u003c");
+  return '<!doctype html><body>'+pre+'<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"><\/script><script>(async function(){var CODE='+j+';try{out("Python 준비 중… (처음에는 몇 초 걸려요)","sys");var py=await loadPyodide();py.setStdout({batched:function(s){out(s)}});py.setStderr({batched:function(s){out(s,"err")}});await py.loadPackagesFromImports(CODE);var r=await py.runPythonAsync(CODE);if(r!==undefined&&r!==null)out(String(r))}catch(e){out(e&&e.message||e,"err")}out("","done")})();<\/script></body>';
+}
+function cvRunNow(){
+  var c=cur(),cv=c&&c.canvas;if(!cv||!CV_RUN[cv.kind])return;
+  if(cvRunning){cvRunDone("중지했어요.");return}
+  cvTab="view";cvOutHTML="";cvRunning=true;cvErrMsg="";$("cvErr").style.display="none";$("cvRun").textContent="■ 중지";cvRender();
+  cvRunLine(cv.kind==="py"?"Python 실행 중…":"JavaScript 실행 중…","sys");
+  var f=document.createElement("iframe");f.setAttribute("sandbox","allow-scripts");f.style.display="none";
+  f.srcdoc=cvRunnerHTML(cv.kind,cv.versions[cv.v]);document.body.appendChild(f);cvRunFrame=f;
+  cvRunTimer=setTimeout(function(){cvRunDone("시간 초과(실행을 "+(cv.kind==="py"?60:10)+"초 안에 마치지 못했어요).")},(cv.kind==="py"?60:10)*1000);
+}
+window.addEventListener("message",function(e){
+  if(!cvRunFrame||e.source!==cvRunFrame.contentWindow||!e.data||!e.data.lfmRun)return;
+  var m=e.data.lfmRun;
+  if(m.k==="done"){cvRunDone("— 끝 —")}
+  else{cvRunLine(m.t,m.k);if(m.k==="err"){cvErrMsg=m.t.slice(0,200);$("cvErrT").textContent="실행 오류: "+cvErrMsg;$("cvErr").style.display="flex"}}
+});
+$("cvRun").addEventListener("click",cvRunNow);
 // 미리보기 안에서 스크립트 오류가 나면 부모 창에 알려서 "고치기" 버튼을 보여 준다
 var CV_ERR_JS='<script>addEventListener("error",function(e){parent.postMessage({lfmCvErr:(e.message||"오류")+(e.lineno?" (줄 "+e.lineno+")":"")},"*")})<\/script>';
 function cvWrap(code){
@@ -905,7 +975,7 @@ window.addEventListener("message",function(e){
   $("cvErrT").textContent="미리보기 오류: "+cvErrMsg;$("cvErr").style.display="flex";
 });
 function cvExt(cv){
-  if(cv.kind==="html")return "html";if(cv.kind==="svg")return "svg";if(cv.kind==="doc")return "md";
+  var ex={html:"html",svg:"svg",doc:"md",js:"js",py:"py",mermaid:"mmd",json:"json",csv:"csv",css:"css"}[cv.kind];if(ex)return ex;
   return {python:"py",py:"py",javascript:"js",js:"js",typescript:"ts",ts:"ts",css:"css",json:"json",bash:"sh",sh:"sh",java:"java",c:"c",cpp:"cpp",go:"go",rust:"rs",sql:"sql",yaml:"yml"}[cv.lang]||"txt";
 }
 function cvSave(){clearTimeout(cvSaveT);cvSaveT=setTimeout(saveChats,500)}
@@ -927,7 +997,7 @@ $("cvDown").addEventListener("click",function(){
 $("cvErrFix").addEventListener("click",function(){
   if(streaming)return;
   if(!cfg.canvas){cfg.canvas=true;saveCfg();setToolLabels()}
-  send("미리보기에서 오류가 났어요: "+cvErrMsg+"\n이 오류를 고쳐서 전체 코드를 다시 써 줘.");
+  send("미리보기·실행 중 오류가 났어요: "+cvErrMsg+"\n이 오류를 고쳐서 전체 코드를 다시 써 줘.");
 });
 $("cvActs").addEventListener("click",function(e){
   var b=e.target.closest("[data-q]");if(!b||streaming)return;
@@ -1350,6 +1420,12 @@ $("chatList").addEventListener("click",function(e){
   if(it&&!streaming){curId=it.getAttribute("data-id");saveChats();render();closeMobile()}
 });
 $("msgs").addEventListener("click",function(e){
+  var rb=e.target.closest("[data-run]");
+  if(rb){
+    var pre0=rb.closest("pre"),code0=pre0.querySelector("code").textContent,lang0=pre0.querySelector(".ph span").textContent.toLowerCase(),c1=cur();
+    if(c1){var b0={lang:lang0,code:code0,kind:cvKind(lang0,code0)};cvPush(c1,b0);cvOpenFlag=true;cvLast="";saveChats();cvRender();cvRunNow()}
+    return;
+  }
   var cb=e.target.closest("[data-cv]");
   if(cb){
     var pre=cb.closest("pre"),code=pre.querySelector("code").textContent,lang=pre.querySelector(".ph span").textContent.toLowerCase(),c0=cur();
