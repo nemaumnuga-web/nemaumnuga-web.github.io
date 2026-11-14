@@ -250,7 +250,7 @@ body.voice .voicebar{display:flex}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
       </button>
       <button class="model-btn" id="modelBtn">
-        <span class="status-dot" id="dot"></span><b style="font-weight:600">LFM3 VL</b><span class="sub" id="effLabel"></span>
+        <span class="status-dot" id="dot"></span><b id="modelName" style="font-weight:600">LFM3 VL</b><span class="sub" id="effLabel"></span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <div class="pop down" id="modelMenu"></div>
@@ -353,7 +353,7 @@ body.voice .voicebar{display:flex}
     <label for="sVoice">읽어주는 목소리</label>
     <select id="sVoice"><option value="female">여성</option><option value="male">남성</option></select>
     <label for="sVmodel">음성 대화 답변 모델</label>
-    <select id="sVmodel"><option value="audio">LFM3 Audio (기본, 빠름)</option><option value="vl">LFM3 VL (추론 끔, 더 정확)</option></select>
+    <select id="sVmodel"><option value="audio">LFM3 Audio (기본, 빠름)</option><option value="vl">라온 미니 (추론 끔, 더 정확)</option></select>
     <label class="chk"><input id="sAuto" type="checkbox"> 답변 자동으로 소리 내어 읽기</label>
     <button class="row-btn" id="sPatch" style="margin-top:14px;border:1px solid var(--border);justify-content:center">📋 패치노트 보기</button>
     <div class="btns"><button id="sCancel">취소</button><button class="pri" id="sSave">저장</button></div>
@@ -369,8 +369,15 @@ var LS={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}c
 /* ---------- 패치노트 ----------
  * ★ 이 파일을 고칠 때마다 APP_VERSION 을 1 올리고 PATCHES 맨 앞에 바뀐 내용을 추가하세요.
  *   그러면 사용자가 다음에 접속할 때 바뀐 부분이 팝업으로 뜹니다. 항목은 [제목, 설명] 쌍입니다. */
-var APP_VERSION=7;
+var APP_VERSION=9;
 var PATCHES=[
+ {v:9,date:"2026-11-14",title:"라온 미니가 기본 채팅",items:[
+  ["기본 채팅 모델은 라온 미니(IQ3, 13GB)예요","컨테이너 메모리 안에서 돌아가는 가장 큰 라온 모델이에요. 속도는 초당 약 5토큰이에요."],
+  ["라온 나노는 잠시 보류","나노 빌드에서 로드 오류가 나서 이번에는 빠졌어요. 원인을 찾는 중이에요."]]},
+ {v:8,date:"2026-11-14",title:"라온 모델 · 한국어 음성",items:[
+  ["기본 채팅 모델이 라온 나노로 바뀌었어요","KRAFTON의 Raon-1 nano(약 2GB)가 기본이에요. LFM3 VL은 저장 공간 확보를 위해 삭제했어요."],
+  ["라온 미니 준비 중","Raon-1 mini(IQ3, 약 13GB)는 메모리가 부족해 평소에는 켜지 않아요. 필요할 때 따로 켤 수 있도록 준비 중이에요."],
+  ["한국어 전용 음성 추가","모델 메뉴의 '읽어 주는 목소리'에서 한국어 전용 음성(Piper kss, 약 63MB)을 고를 수 있어요."]]},
  {v:7,date:"2026-11-13",title:"링크 읽기 · 웹 검색 개선 · 딥 리서치 · Canvas",items:[
   ["링크를 붙여 넣으면 읽어 줘요","주소를 보내면 서버가 그 페이지를 열어 내용을 바탕으로 답해요. 자동 접근을 막은 사이트는 막혔다고 솔직히 알려 줘요."],
   ["웹 검색이 더 정확해졌어요","한국어·영어 검색어를 함께 쓰고, DuckDuckGo·위키백과에서 찾은 위쪽 페이지의 본문을 직접 읽은 뒤 답해요. 「그건 누가 만들었어?」 같은 이어지는 질문도 알아들어요."],
@@ -392,12 +399,12 @@ var PATCHES=[
   ["음성 대화 버튼","입력창의 파형 버튼으로 말로 대화해요."],
   ["Thinking 표시","추론하는 모델은 생각한 시간을 접어서 보여 줘요."]]},
  {v:2,title:"음성 입력·출력",items:[["받아쓰기와 읽어 주기","마이크로 말하면 글이 되고, 답변을 소리로 들을 수 있어요."]]},
- {v:1,title:"첫 공개",items:[["ChatGPT 같은 채팅 화면","LFM3 VL 2B와 대화하는 웹 채팅이에요."]]}
+ {v:1,title:"첫 공개",items:[["ChatGPT 같은 채팅 화면","웹 채팅 화면을 처음 열었어요."]]}
 ];
 
 /* ---------- state ---------- */
 var DEFAULT_SYS=[
-"당신은 Liquid AI가 만든 LFM3 VL 2B 모델을 기반으로 한 AI 어시스턴트입니다. (Google Gemini, Gemma 등 다른 회사의 모델이 아닙니다.)",
+"당신은 KRAFTON이 만든 Raon-1 mini 모델을 기반으로 한 AI 어시스턴트입니다. (Google Gemini, Gemma 등 다른 회사의 모델이 아닙니다.)",
 "- 사용자의 언어로 답하세요. 기본은 한국어입니다. 질문의 핵심에 먼저 답하고, 필요한 만큼만 자세히 설명하세요.",
 "- 확실하지 않은 내용은 추측하지 말고 모른다고 말하세요. 최신 뉴스, 가격, 수치는 웹 검색 결과가 주어졌을 때만 근거로 삼으세요.",
 "- 웹 검색 결과가 주어지면 그 내용을 근거로 답하고, 근거 문장 뒤에 [번호]로 출처를 표시하세요. 결과에 없는 내용은 덧붙이지 마세요.",
@@ -408,6 +415,8 @@ var DEFAULT_SYS=[
 var cfg={
   api:LS.get("lfm.api",""),
   web:LS.get("lfm.web","0")==="1",
+  chatm:(function(v){return v==="nano"||v==="vl"||!v?"mini":v})(LS.get("lfm.chatm","mini")),
+  tts:LS.get("lfm.tts","audio"),
   deep:LS.get("lfm.deep","0")==="1",
   canvas:LS.get("lfm.canvas","0")==="1",
   key:LS.get("lfm.key",""),
@@ -435,7 +444,7 @@ var cvOpenFlag=false, cvTab="view", cvLast="", cvSaveT=0;   // Canvas 패널 상
 })();
 
 function saveCfg(){
-  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");LS.set("lfm.deep",cfg.deep?"1":"0");LS.set("lfm.canvas",cfg.canvas?"1":"0");
+  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");LS.set("lfm.chatm",cfg.chatm);LS.set("lfm.tts",cfg.tts);LS.set("lfm.deep",cfg.deep?"1":"0");LS.set("lfm.canvas",cfg.canvas?"1":"0");
   LS.set("lfm.lang",cfg.lang);LS.set("lfm.voice",cfg.voice);LS.set("lfm.vmode",cfg.auto?"1":"0");LS.set("lfm.effort",cfg.effort);
 }
 function saveChats(){
@@ -577,10 +586,12 @@ function updateSend(){
 
 /* ---------- API ---------- */
 function base(){var a=cfg.api.trim().replace(/\/+$/,"");return a.replace(/\/v1$/,"")}
+function chatBase(){return base()+(cfg.chatm==="mini"?"":"/"+cfg.chatm)}   // 기본(라온 미니)은 /
+function chatName(){return {mini:"라온 미니 (Raon-1 mini)"}[cfg.chatm]||"라온 미니 (Raon-1 mini)"}
 function vbase(){return base()+"/voice"}      // 음성 서버(LFM3 Audio)는 같은 주소의 /voice 경로
 function headers(){var h={"Content-Type":"application/json"};if(cfg.key)h["Authorization"]="Bearer "+cfg.key;return h}
 function checkHealth(){
-  var dot=$("dot");dot.className="status-dot";
+  var dot=$("dot");dot.className="status-dot";setModelName();
   if(!cfg.api)return;
   fetch(base()+"/v1/models",{headers:headers()}).then(function(r){dot.className="status-dot "+(r.ok?"ok":"bad")}).catch(function(){dot.className="status-dot bad"});
   // 모델이 추론 강도(low/medium/high …)를 지원할 때만 선택기를 보여준다
@@ -592,6 +603,7 @@ function checkHealth(){
   }).catch(function(){caps.levels=[];effLabel()});
 }
 var EFF={minimal:"Minimal",low:"Low",medium:"Medium",high:"High",xhigh:"Extra High",max:"Max"};
+function setModelName(){var n=$("modelName");if(n)n.textContent=chatName().replace(/ 2B$/,"").replace(/ \(.*\)$/,"")}
 function effLabel(){$("effLabel").textContent=(cfg.effort&&caps.levels.length)?(EFF[cfg.effort]||cfg.effort):(cfg.think?"":"추론 끔")}
 function apiMessages(c,extra){
   var arr=[],sys=cfg.sys.trim();
@@ -979,7 +991,7 @@ function run(c){
       if(cfg.effort&&caps.levels.indexOf(cfg.effort)>=0)body.reasoning_effort=cfg.effort;
       if(a.deep)body.max_tokens=1600;                       // 딥 리서치 보고서는 길게
     }
-    return fetch((isV&&!useVL?vbase():base())+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)});
+    return fetch((isV&&!useVL?vbase():chatBase())+"/v1/chat/completions",{method:"POST",headers:headers(),signal:ctrl.signal,body:JSON.stringify(body)});
   }).then(function(r){
     if(!r.ok)return r.text().then(function(t){throw new Error("서버 오류 "+r.status+(r.status===401?" (API 키를 확인하세요)":"")+" "+t.slice(0,200))});
     var rd=r.body.getReader(),dec=new TextDecoder(),buf="";
@@ -1116,6 +1128,8 @@ function chunkText(t){
   return out.filter(function(x){return x.trim()});
 }
 function fetchTTS(txt){
+  if(cfg.tts==="kss")return fetch(base()+"/tts",{method:"POST",headers:headers(),body:JSON.stringify({text:txt})})
+    .then(function(r){if(!r.ok)throw new Error("서버 오류 "+r.status);return r.blob()});
   return fetch(vbase()+"/v1/audio/speech",{method:"POST",headers:headers(),body:JSON.stringify({model:"tts",input:txt,voice:cfg.voice,lang:cfg.lang,response_format:"wav"})})
     .then(function(r){if(!r.ok)throw new Error("서버 오류 "+r.status);return r.blob()});
 }
@@ -1360,8 +1374,12 @@ function runTool(t){
   var inp=$("input");inp.value=pre+inp.value;inp.focus();inp.dispatchEvent(new Event("input"));
 }
 function buildModelMenu(){
-  var h='<div class="ttl">채팅</div><div class="opt"><div class="grow">LFM3 VL 2B<small>텍스트 · 이미지 · 추론(Thinking)</small></div><span>✓</span></div>';
-  h+='<div class="ttl">음성 대화 · 받아쓰기 · 읽기</div><div class="opt"><div class="grow">LFM3 Audio 2B<small>음성 인식과 음성 합성, 음성 대화 답변</small></div></div>';
+  var CM=[["mini","라온 미니 (Raon-1 mini)","기본 · 텍스트 · 추론 · 13GB · 느림(약 5토큰/초)"]];
+  var h='<div class="ttl">채팅 모델</div>';
+  CM.forEach(function(m){h+='<button class="opt" data-cm="'+m[0]+'"><span class="grow">'+esc(m[1])+"<small>"+esc(m[2])+'</small></span>'+(cfg.chatm===m[0]?"<span>✓</span>":"")+"</button>"});
+  h+='<div class="ttl">읽어 주는 목소리</div>';
+  [["audio","LFM3 Audio 2B","기본 · 음성 인식과 같은 모델"],["kss","한국어 전용 (Piper kss)","가장 작음 · 약 63MB · 한국어만"]].forEach(function(m){h+='<button class="opt" data-tts="'+m[0]+'"><span class="grow">'+esc(m[1])+"<small>"+esc(m[2])+'</small></span>'+(cfg.tts===m[0]?"<span>✓</span>":"")+"</button>"});
+  h+='<div class="ttl">음성 대화 · 받아쓰기</div><div class="opt"><div class="grow">LFM3 Audio 2B<small>음성 인식과 음성 합성, 음성 대화 답변</small></div></div>';
   h+='<div class="ttl">추론</div><button class="opt" data-think="1"><span class="grow">Thinking<small>답하기 전에 생각하고 그 과정을 보여줍니다</small></span><span>'+(cfg.think?"켜짐 ✓":"꺼짐")+"</span></button>";
   if(caps.levels.length){
     h+='<div class="ttl">추론 강도</div><button class="opt" data-eff=""><span class="grow">기본</span>'+(!cfg.effort?"<span>✓</span>":"")+"</button>";
@@ -1376,6 +1394,10 @@ $("modelMenu").addEventListener("click",function(e){
   e.stopPropagation();
   var t=e.target.closest("[data-think]");
   if(t){cfg.think=!cfg.think;saveCfg();effLabel();buildModelMenu();return}
+  var cm=e.target.closest("[data-cm]");
+  if(cm){cfg.chatm=cm.getAttribute("data-cm");saveCfg();checkHealth();closePops();buildModelMenu();return}
+  var tt=e.target.closest("[data-tts]");
+  if(tt){cfg.tts=tt.getAttribute("data-tts");saveCfg();buildModelMenu();return}
   var b=e.target.closest("[data-eff]");if(!b)return;
   cfg.effort=b.getAttribute("data-eff");saveCfg();effLabel();closePops();
 });
