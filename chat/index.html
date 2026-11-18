@@ -354,6 +354,8 @@ body.voice .voicebar{display:flex}
     <input id="sTemp" type="number" min="0" max="2" step="0.1" placeholder="서버 권장값">
     <label for="sLang">음성 언어 (인식·읽기)</label>
     <select id="sLang"><option value="ko">한국어</option><option value="en">English</option><option value="ja">日本語</option><option value="zh">中文</option></select>
+    <label for="sAsr">음성 인식 (받아쓰기)</label>
+    <select id="sAsr"><option value="raon">라온 받아쓰기 (브라우저, 서버 없이, 한국어)</option><option value="server">LFM3 Audio (서버)</option></select>
     <label for="sVoice">읽어주는 목소리</label>
     <select id="sVoice"><option value="female">여성</option><option value="male">남성</option></select>
     <label for="sVmodel">음성 대화 답변 모델</label>
@@ -364,6 +366,7 @@ body.voice .voicebar{display:flex}
   </div>
 </div>
 
+<script src="asr.js"></script>
 <script>
 (function(){
 "use strict";
@@ -446,6 +449,7 @@ var cfg={
   temp:LS.get("lfm.temp2",""),
   think:LS.get("lfm.think","1")==="1",
   vmodel:LS.get("lfm.vmodel","audio"),
+  asr:LS.get("lfm.asr","raon"),
   lang:LS.get("lfm.lang","ko"),
   voice:LS.get("lfm.voice","female"),
   auto:LS.get("lfm.vmode","0")==="1",
@@ -466,7 +470,7 @@ var cvOpenFlag=false, cvTab="view", cvLast="", cvSaveT=0;   // Canvas 패널 상
 })();
 
 function saveCfg(){
-  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.web",cfg.web?"1":"0");LS.set("lfm.chatm2",cfg.chatm);LS.set("lfm.tts",cfg.tts);LS.set("lfm.deep",cfg.deep?"1":"0");LS.set("lfm.canvas",cfg.canvas?"1":"0");
+  LS.set("lfm.api",cfg.api);LS.set("lfm.key",cfg.key);LS.set("lfm.sys2",cfg.sys);LS.set("lfm.temp2",String(cfg.temp));LS.set("lfm.think",cfg.think?"1":"0");LS.set("lfm.vmodel",cfg.vmodel);LS.set("lfm.asr",cfg.asr);LS.set("lfm.web",cfg.web?"1":"0");LS.set("lfm.chatm2",cfg.chatm);LS.set("lfm.tts",cfg.tts);LS.set("lfm.deep",cfg.deep?"1":"0");LS.set("lfm.canvas",cfg.canvas?"1":"0");
   LS.set("lfm.lang",cfg.lang);LS.set("lfm.voice",cfg.voice);LS.set("lfm.vmode",cfg.auto?"1":"0");LS.set("lfm.effort",cfg.effort);
 }
 function saveChats(){
@@ -1212,7 +1216,13 @@ function blobToWav16k(blob){     // 녹음 파일(webm/mp4 등) -> WAV
     return ctx.decodeAudioData(ab).then(function(buf){ctx.close();return resample16k(buf)});
   }).then(toWav);
 }
+function useLocalAsr(){return cfg.asr==="raon"&&cfg.lang==="ko"&&!!window.RaonASR}
 function transcribe(wavAb){
+  if(useLocalAsr()){                     // 라온 받아쓰기: WAV(16kHz int16) -> Float32 -> 브라우저 모델
+    var pcm=new Int16Array(wavAb,44),x=new Float32Array(pcm.length);
+    for(var i=0;i<pcm.length;i++)x[i]=pcm[i]/32768;
+    return RaonASR.transcribe(x);
+  }
   return fetch(vbase()+"/v1/chat/completions",{
     method:"POST",headers:headers(),
     body:JSON.stringify({model:"lfm3-audio",temperature:0,max_tokens:400,messages:[
@@ -1232,7 +1242,8 @@ function setMic(state){
   $("input").placeholder=state==="rec"?"듣는 중… 마이크를 다시 누르면 끝납니다":state==="wait"?"음성을 인식하는 중…":"무엇이든 물어보세요";
 }
 function startRec(){
-  if(!cfg.api){toast("먼저 설정에서 서버 주소를 입력하세요");return}
+  if(useLocalAsr())RaonASR.load().catch(function(){});   // 녹음하는 동안 모델 미리 받기
+  if(!cfg.api&&!useLocalAsr()){toast("먼저 설정에서 서버 주소를 입력하세요");return}
   if(!navigator.mediaDevices||!window.MediaRecorder){toast("이 브라우저는 녹음을 지원하지 않습니다");return}
   stopSpeak();
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
@@ -1567,7 +1578,7 @@ $("themeBtn").addEventListener("click",function(){
 /* settings */
 function openSettings(){
   $("sApi").value=cfg.api;$("sKey").value=cfg.key;$("sSys").value=cfg.sys;$("sTemp").value=cfg.temp;
-  $("sLang").value=cfg.lang;$("sVoice").value=cfg.voice;$("sAuto").checked=cfg.auto;$("sVmodel").value=cfg.vmodel;
+  $("sLang").value=cfg.lang;$("sVoice").value=cfg.voice;$("sAuto").checked=cfg.auto;$("sVmodel").value=cfg.vmodel;$("sAsr").value=cfg.asr;
   $("modalBg").classList.add("on");closeMobile();
 }
 $("settingsBtn").addEventListener("click",openSettings);
@@ -1576,7 +1587,7 @@ $("modalBg").addEventListener("click",function(e){if(e.target===this)this.classL
 $("sSave").addEventListener("click",function(){
   cfg.api=$("sApi").value.trim();cfg.key=$("sKey").value.trim();cfg.sys=$("sSys").value;
   var tv=parseFloat($("sTemp").value);cfg.temp=isNaN(tv)?"":Math.max(0,Math.min(2,tv));
-  cfg.lang=$("sLang").value;cfg.voice=$("sVoice").value;cfg.auto=$("sAuto").checked;cfg.vmodel=$("sVmodel").value;
+  cfg.lang=$("sLang").value;cfg.voice=$("sVoice").value;cfg.auto=$("sAuto").checked;cfg.vmodel=$("sVmodel").value;cfg.asr=$("sAsr").value;
   saveCfg();$("modalBg").classList.remove("on");checkHealth();
 });
 
