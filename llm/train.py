@@ -89,7 +89,7 @@ def evaluate():
     model.train()
     return tot / cnt
 
-base_loss = evaluate()
+base_loss = float("nan") if os.path.exists(os.path.join(a.out, "ckpt.pt")) else evaluate()
 print(f"[base] eval loss {base_loss:.3f}  ppl {math.exp(base_loss):.1f}", flush=True)
 
 # 임베딩(262k 어휘, 파라미터의 약 60%)은 얼리고 트랜스포머 층만 학습: 메모리·시간 절약
@@ -104,8 +104,15 @@ warm = max(1, a.steps // 20)
 sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1, (s + 1) / warm) * 0.5 * (1 + math.cos(math.pi * min(s, a.steps) / a.steps)))
 
 log = {"base_eval_loss": base_loss, "steps": []}
+# 컨테이너가 재시작돼도 이어서 학습할 수 있게 체크포인트에서 재개
+ck = os.path.join(a.out, "ckpt.pt"); start = 1
+if os.path.exists(ck):
+    st = torch.load(ck, weights_only=False)
+    model.load_state_dict(st["model"], strict=False); opt.load_state_dict(st["opt"]); sched.load_state_dict(st["sched"])
+    start, log = st["step"] + 1, st["log"]; random.seed(start)
+    print(f"resume from step {st['step']}", flush=True)
 it = batches(train, a.bs); t0 = time.time(); model.train()
-for step in range(1, a.steps + 1):
+for step in range(start, a.steps + 1):
     ids, lab, att = collate(next(it))
     loss = lm_loss(ids, lab, att)
     loss.backward()
@@ -113,13 +120,19 @@ for step in range(1, a.steps + 1):
     opt.step(); sched.step(); opt.zero_grad(set_to_none=True)
     if step % 20 == 0 or step == 1:
         el = time.time() - t0
-        print(f"step {step}/{a.steps} loss {loss.item():.3f} {el/step:.2f}s/step eta {el/step*(a.steps-step)/60:.0f}m", flush=True)
+        print(f"step {step}/{a.steps} loss {loss.item():.3f} {el/(step-start+1):.2f}s/step eta {el/(step-start+1)*(a.steps-step)/60:.0f}m", flush=True)
     if step % 200 == 0 or step == a.steps:
         ev = evaluate(); print(f"  eval loss {ev:.3f} ppl {math.exp(ev):.1f}", flush=True)
         log["steps"].append({"step": step, "eval_loss": ev})
+    if step % 100 == 0 and step < a.steps:
+        os.makedirs(a.out, exist_ok=True)
+        sd = {k: v for k, v in model.state_dict().items() if "embed_tokens" not in k and "lm_head" not in k}
+        torch.save({"model": sd, "opt": opt.state_dict(), "sched": sched.state_dict(), "step": step, "log": log}, ck + ".tmp")
+        os.replace(ck + ".tmp", ck)
 
 os.makedirs(a.out, exist_ok=True)
 model.save_pretrained(a.out); tok.save_pretrained(a.out)
+if os.path.exists(ck): os.remove(ck)
 log["train_minutes"] = (time.time() - t0) / 60
 json.dump(log, open(os.path.join(a.out, "train_log.json"), "w"), ensure_ascii=False, indent=1)
 print("saved", a.out)
